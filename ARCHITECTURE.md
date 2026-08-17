@@ -1,7 +1,20 @@
 # Architecture — Cross-Platform Pinball
 
-**Status:** Proposed
+**Status:** Original technical baseline — superseded in places (see banner)
 **Last updated:** 2026-08-16
+
+> **Read this first.** This is Tiltburst's original technical baseline. Its
+> reasoning is still valuable and ADR-001–ADR-004 are kept intact, but it is
+> **not** the final word on the stack. [PLAN.md](PLAN.md) §5 is canon, and
+> [docs/plan/02-decisions.md](docs/plan/02-decisions.md) carries ADR-005+
+> together with an authoritative table of every statement below that has been
+> amended. **Wherever this document and that amendment table disagree, the
+> table wins** (canon §5.10). Amended in places you will notice quickly: the
+> rendering API (§2, §5 — SDL3 GPU API, no MoltenVK), the rendering approach
+> (§5 — a 2-D instanced SDF vector renderer with no MSAA, cubemaps, or baked
+> lighting), the goals table (§1), the repo layout (§9), the milestone list
+> (§10 — see PLAN.md §6, M0–M20), and all three §12 open questions, which are
+> resolved. Statements not listed in the amendment table remain in force.
 
 This document records the initial technology choices and the reasoning behind
 them. It is meant to be argued with. Where a decision is reversible, that is
@@ -128,7 +141,9 @@ this document changes.
 
 ## 5. ADR-002: Vulkan with MoltenVK
 
-**Status:** Accepted
+**Status:** Accepted at the time — **superseded by ADR-005**
+(docs/plan/02-decisions.md): v1 renders through the SDL3 GPU API, and the
+rendering-approach paragraph below is amended there row by row.
 
 Vulkan gives explicit swapchain configuration, present mode selection, and
 control over queue submission — all three are load-bearing for section 3.
@@ -277,14 +292,26 @@ possible.
 
 ---
 
-## 12. Open questions
+## 12. Open questions (all three resolved)
+
+The questions are kept for the reasoning that produced them; each is answered
+in docs/plan/02-decisions.md and none is open.
 
 - Table scripting: embedded Lua, or compiled C++ table modules? Lua is friendlier
   for modders; C++ avoids a whole class of frame-time surprises.
+  → **Resolved (ADR-006):** embedded Lua 5.4 via sol2, sandboxed and
+  deterministic, one `lua_State` per table on the sim thread; the frame-time
+  worry is answered by a per-tick VM-instruction watchdog, not by a compiler.
 - Original tables only, or support for existing table formats? The latter raises
   licensing questions that are much cheaper to answer now than after launch.
+  → **Resolved (ADR-007):** original tables only. No VPX/FP/ROM/PinMAME
+  importer in v1; VPX stays a physics-feel reading reference, never a source
+  of copied code or converted content.
 - Cabinet hardware support in scope for v2? If yes, the input abstraction needs
   to accommodate it from the start.
+  → **Resolved (ADR-014):** out of scope for v1, designed for anyway — the
+  input layer maps sources to actions with room for an analog axis, and the
+  `SimEvent` ring is the feed a future solenoid/LED driver consumes.
 
 ---
 

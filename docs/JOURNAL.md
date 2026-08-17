@@ -30,24 +30,29 @@ it as the original baseline, superseded where `02-decisions.md` says so.
 
 **Reviewer unavailable — fallback invoked (03-process.md §2.7).**
 
-The GLM 5.3 review workflow ran twice on this PR and produced no review
-both times:
+The GLM 5.3 review workflow ran three times on this PR and produced no
+review, and no comment of any kind, every time:
 
-| Run | Attempt | Outcome |
+| Run | Trigger | Outcome |
 |---|---|---|
-| 32050486618 | 1 | cancelled at the 30-minute job cap |
-| 32050486618 | 2 (re-run) | cancelled at the 30-minute job cap |
+| 32050486618 attempt 1 | `opened` | cancelled at the 30-minute job cap |
+| 32050486618 attempt 2 | manual re-run | cancelled at the 30-minute job cap |
+| 32057669416 | `synchronize` (review fixes) | cancelled at the 30-minute job cap |
+
+After the third run concluded: 0 reviews, 0 inline comments, 0 issue
+comments.
 
 Evidence it is the Z.ai endpoint and not configuration or payload size:
 
 - `ZAI_API_KEY` is configured — the workflow's "Skip when Z.ai API key is
   unavailable" step was itself *skipped*, which only happens when the key
   is present.
-- Ten API calls across the two runs, **every one** failing with
+- ~15 API calls across the three runs, **every one** failing with
   `Z.ai API: Request timed out` at ~300,000 ms — the client timeout
-  ceiling, never a shorter failure.
-- Both a 20,985-char and a 41,062-char prompt failed identically. A
-  payload-size problem would let the smaller chunk through at least once.
+  ceiling, never a shorter failure and never a partial success.
+- Prompts of 20,985, 30,138 and 42,716 chars all failed identically, and
+  chunks of 1 file and of 3 files failed identically. A payload-size
+  problem would let the smallest chunk through at least once.
 - GitHub was concurrently in a "Partial System Outage" (GraphQL 503s
   forced this PR to be opened via the REST endpoint), so the two may share
   a cause, but the Z.ai timeouts are independent of GitHub's API.

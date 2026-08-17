@@ -1041,9 +1041,10 @@ Two numbers this prefab exists to get right, on the default table
   carries the measurement, so the merged variant measures the same);
   the outer endpoint sits on the outer boundary wall's right leg ⇒ distance
   **0.000 m**. Both are ≤ V014's 0.006 m tolerance, so the prefab is
-  warning-free out of the box. (Before this was fixed the gate sat at
-  `top_y + 0.015`, leaving 0.015 m to the wall and 0.007 m to the post
-  surface — two V014 warnings on every table that used the prefab.)
+  warning-free out of the box. The gate line and the wall top are the same
+  line, `top_y + 0.008`, and must stay so: lifting the gate to `top_y + 0.015`
+  leaves 0.015 m to the wall and 0.007 m to the post surface — two V014
+  warnings on every table that uses the prefab.
 - **Lane clearance past the post.** `<id>_top_post` is centered at
   `xw - 0.008`, i.e. tangent to the wall line from the playfield side: its
   rightmost point is exactly `[xw, y_gate]`, so the lane-side surface runs
@@ -1947,8 +1948,9 @@ correct behavior:
 15. **Orbit-lane elements off the lane center.** An orbit hugs the boundary,
     so its lane center is `mouth_x/2` — 0.0375 on the left and
     `W - mouth_x/2` = 0.4825 on the right at the default `mouth_x` 0.075 the
-    shipped tables use (section 5.5). A spinner at 0.0975 (the old inset
-    model's center) sits outside the lane entirely and is never touched.
+    shipped tables use (section 5.5). A spinner at 0.0975 — the center you
+    get by insetting from the guide wall, as if the lane had its own outer
+    wall — sits outside the lane entirely and is never touched.
 16. **Expecting a "full travel" flag on `switch_hit`.** The captive ball
     fires two *separate* events at two different times: `switch_hit` when
     the free ball strikes it, `captive_full_travel{id}` if and when the

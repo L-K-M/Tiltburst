@@ -49,8 +49,9 @@ mouth = the guide wall's lower node `[0.075, entry_y_left]` on the left and the
 right mouth's aperture midpoint `[0.4625, 0.894]` (§0.8); ramp = its entrance
 node; target bank / standup row = the row centre (a ball on the row's bearing
 strikes the face anywhere along it); everything else = the element's `pos`.
-An earlier draft's angle column was hand-estimated and did not satisfy this
-definition anywhere except §4.4's tent row; the values below replace it.
+The angle column is **computed per this definition, never estimated**:
+recompute it whenever a pivot or an aim point moves, and never hand-adjust a
+single row.
 
 **Launch windows.** 09-table-format.md §4.3 sweeps `side` "right" from
 `rest_angle_deg` to `rest_angle_deg − swing_deg` and `side` "left" the other
@@ -60,6 +61,39 @@ flipper can only put a ball on bearings **`rest − 90` → `rest − 90 − swi
 window is stated in its §x.3 roster row (the standard pair in §0.4), and every
 §x.4 row's angle lies inside its flipper's window — that is the shot map's
 binding validity test.
+
+**What the straight-ray model is worth (binding, read before trusting any
+margin).** Every clearance number in this document — the §2.4 method, the
++0.003 m floor, every `⊥ dist` and every **ball margin** — comes from one
+model: a **straight ray from the flipper's `pos` (its pivot) to the aim
+point**, with the obstacle's radius and the 0.0135 m ball radius subtracted.
+The model omits two terms, and **both are larger than the margins it
+produces**:
+
+- **Slope gravity curves the path.** The ray is straight; a real ball is a
+  projectile under `g·sin 6.5°` = 1.1105 m/s² in the plane. Over a typical
+  shot the droop is **≈ 5.6 mm for a 5 m/s shot across 0.50 m** and
+  **≈ 10 mm for a 4 m/s shot across 0.55 m** — and it grows as the square of
+  the distance and falls as the square of the speed, so slow long shots are
+  worse still.
+- **The ball does not leave the pivot.** It leaves along the **bat face**,
+  up to a `length` (0.076 m on the §0.4 pair) out from `pos`, so the true
+  launch point moves along the bat with contact position and the real path is
+  a translated, slightly rotated copy of the pivot ray. Near-field obstacles
+  — anything within ~0.15 m of a flipper — move by millimetres under this
+  term alone.
+
+Consequence, and it is binding on how these numbers are read: **any clearance
+below roughly 10 mm is INDICATIVE, not decisive.** The straight-ray model is
+a **screening tool for gross blockage** — it proves an element sits squarely
+across a shot line, and a large negative margin is a real geometric fault
+worth fixing on paper — but a small positive margin is **not** proof that the
+shot is makeable, and a small negative one is not proof that it is not. The
+authority that settles makeability is **measurement**: the M16/M17
+`tb_autoplay` shot-rate run, `shots[<id>].rate` against the table's floor
+(§0.7, 14-authoring-guide.md §8.2). Where the two disagree, the measurement
+wins and the geometry is retuned by §0.7's steps — never the other way round.
+Each per-table clearance record points back here.
 
 ### 0.4 Standard bottom (shared prefab instantiation)
 
@@ -236,19 +270,19 @@ lane outer edge = the boundary   top run y = 1.040          (lane center y 1.002
 The left orbit is shot from RF, and RF's launch window tops out at **121°**
 (§0.4). To enter the left mouth the ball must pass *outboard* of the guide's
 lower node `[0.075, entry_y_left]`, i.e. on a bearing of at least
-`bearing(RF → node) + asin(0.0135 / d)`. At the prefab default 0.550 that is
-`121.25 + 1.52` = **122.77°** — **1.77° past RF's rest end**, so the left orbit
-was not shootable at all. The requirement falls as the mouth rises, and
+`bearing(RF → node) + asin(0.0135 / d)`. **09 §5.5's prefab default 0.550 is
+never usable on a table that shoots the left orbit**: it requires
+`121.25 + 1.52` = **122.77°**, **1.77° past RF's rest end**, so every table
+here overrides it. The requirement falls as the mouth rises, and
 break-even — the mouth height at which the requirement equals 121° exactly — is
-**0.58058** ⇒ `119.5547 + 1.4453` = 121.00000°. The three tables that had
-shipped 0.550 (§1.3, §4.3, §5.3) now use **0.620** ⇒ `117.60 + 1.36` = 118.96°,
-**2.04°** of *mouth* margin. The two that had already raised it for their own reasons
-clear it as shipped: 0.600 (§3.3) ⇒ 119.96°, **1.04°**; 0.660 (§2.3) ⇒
-117.12°, **3.88°**. Nothing may lower `entry_y_left` below **0.590** on a table
+**0.58058** ⇒ `119.5547 + 1.4453` = 121.00000°. The authored values are
+**0.620** on §1.3, §4.3 and §5.3 ⇒ `117.60 + 1.36` = 118.96°, **2.04°** of
+*mouth* margin; **0.600** on §3.3 ⇒ 119.96°, **1.04°**; and **0.660** on §2.3
+⇒ 117.12°, **3.88°**. Nothing may lower `entry_y_left` below **0.590** on a table
 whose §x.4 shoots the left orbit — that authored floor sits 0.00942 above
 break-even and still keeps **0.512°** of window (`119.0648 + 1.4235` =
-120.48833°), so it is the floor, not the break-even point, and no shipped
-`entry_y_left` changes.
+120.48833°), so it is the floor, not the break-even point, and all five
+authored values sit above it.
 
 **Mouth clearance is necessary, not sufficient (binding, all five tables).**
 Every number above tests **one point** — the guide's lower node — and says
@@ -256,15 +290,17 @@ nothing about the 0.55–0.60 m of field the ray crosses to reach it. An entry
 band is usable only where the **whole ray** is clear by §2.4's method, so each
 §x.4 must record the **controlling obstacle across the band**, at both ends,
 not just the mouth geometry; a band whose field is blocked is worth only the
-sub-band that is clear, and the shot row must say so. neon-drift forced this
-rule: `pit_scoop` at `[0.100, 0.480]` cleared the 118.95683° floor ray by
-+0.00491 but passed **0.01687** from RF's 121° rest-end ray against the 0.0275
-a 0.014 rim plus ball needs — **−0.01063** — so the rim only cleared for
-bearings ≤ **119.60270°** and **68.4 %** of a nominally **2.04317°** band was
-dead (**0.64587°** usable), while §1.4 listed the shot unconditional. The cause
-is the one already corrected for tilt-o-tron's `control_booth` and
-atomic-diner's `shaker`: the element had been tested as a *target* and never as
-an obstacle. §1.3 moves the scoop and the band is clear end to end.
+sub-band that is clear, and the shot row must say so. The worked example is
+neon-drift's `pit_scoop`: a scoop at `[0.100, 0.480]` clears the 118.95683°
+floor ray by +0.00491 but passes **0.01687** from RF's 121° rest-end ray
+against the 0.0275 a 0.014 rim plus ball needs — **−0.01063** — so the rim
+clears only for bearings ≤ **119.60270°** and **68.4 %** of a nominally
+**2.04317°** band is dead (**0.64587°** usable) while the shot map still
+reads unconditional. **Test every element on both roles**: an element on or
+near an orbit ray is an *obstacle* to that shot as well as a *target* of its
+own, and a scoop, a captive slot or a kicker rim must be cleared in both
+roles before its §x.4 row is written. §1.3's `[0.180, 0.480]`, §2.3's
+`shaker` and §3.3's `control_booth` are all sited on that test.
 
 **Every element that lives in an orbit lane sits on that center line** —
 0.0375 on the left, 0.4825 on the right. That includes the prefab's own
@@ -275,9 +311,9 @@ magnet, lock or scoop a roster puts in a lane. **A `spinner` is the one
 exception**, and keep-out (c) below says why: its plate sits 0.0085 *outboard*
 of the center line, x **0.029** on the left and **0.491** on the right, so that
 its inboard end opens an escape gap instead of a pocket. There is **no strip
-outside an orbit**: the boundary is the lane's outer wall, so the old
-"ordinary playfield outside the loop" band does not exist on any of these
-tables and nothing there can trap a ball. Anything inside a
+outside an orbit**: the boundary *is* the lane's outer wall, so there is no
+"ordinary playfield outside the loop" band on any of these tables to place
+anything in, and nothing outboard of a lane can trap a ball. Anything inside a
 lane between `entry_y` and the top arc intercepts **every** ball that takes
 that loop, so only elements meant to (a spinner, a magnet, and the two locks
 that deliberately catch a loop — neon-drift's `drift_lock`) live there, each
@@ -329,7 +365,7 @@ values identical:
 
 | id | type | pos | params | notes |
 |---|---|---|---|---|
-| `orbit_merge_gate` | gate | `[0.500, 0.8945]` | `width` 0.042, `facing_deg` 108, `default_state` "one_way" | flap span `[0.480, 0.888]` → `[0.520, 0.901]`, i.e. 18° above +x; length `sqrt(0.040² + 0.013²)` = 0.0421. Inner endpoint is `shooter_wall`'s top node (V014 distance **0.000**; the merged lane has no top post, above), outer endpoint is on the boundary's straight right leg, below its corner tangent y 0.910 (**0.000**). The 0.030 m V014 ray from `pos` along 108° runs `[0.500, 0.8945]` → `[0.49073, 0.92303]`, inside the lane. One lane-spanning element crosses that corridor — the orbit's own `<id>_right_switch` at y 0.920 (ray x 0.49171, all five tables) — and it is **not a collider**: an `open` gate never collides (09 §5.5) and 09 §8.1's collider list omits it. The ray therefore hits nothing V014 counts. **Keep-out, binding, two rules:** (a) *V014*: no table may put a **solid** collider (wall, post, target face, kicker rim, bumper body) in the right lane between y 0.8945 and y 0.9231. (b) *Stuck balls*: no table may put a **spinner** anywhere in the merged right lane above the gate line y 0.888. A spinner is "a trigger plus a 1-D plate angular model, not a solid collider **(except when too slow to pass)**" (08 §6.6) — under `s_pass` 0.15 m/s the plate is a `steel` wall for that contact — and the whole straight leg (y 0.900 to the corner tangent at 0.910) lies inside the V014 corridor, so a plate there spans the lane at a height every plunge reaches. With the plate level (normal 90°, the one normal that carries gravity, above) a ball that crossed upward at just over 0.15 m/s re-crosses downward at `v − 0.12` < 0.15 and comes to rest **on** it; tilting it does not help, because a plate that spans its lane (Common pitfalls) makes a wedge with a lane wall whose two normals bracket 90°. There is therefore no valid spinner position in the right leg on any table, and the one table that had put a plate there (cosmic-carnival's `plate_r`) now carries it in the left leg (§4.3), where keep-out (c) below — not "off the plunge path", which the left leg is not — is what makes it safe |
+| `orbit_merge_gate` | gate | `[0.500, 0.8945]` | `width` 0.042, `facing_deg` 108, `default_state` "one_way" | flap span `[0.480, 0.888]` → `[0.520, 0.901]`, i.e. 18° above +x; length `sqrt(0.040² + 0.013²)` = 0.0421. Inner endpoint is `shooter_wall`'s top node (V014 distance **0.000**; the merged lane has no top post, above), outer endpoint is on the boundary's straight right leg, below its corner tangent y 0.910 (**0.000**). The 0.030 m V014 ray from `pos` along 108° runs `[0.500, 0.8945]` → `[0.49073, 0.92303]`, inside the lane. One lane-spanning element crosses that corridor — the orbit's own `<id>_right_switch` at y 0.920 (ray x 0.49171, all five tables) — and it is **not a collider**: an `open` gate never collides (09 §5.5) and 09 §8.1's collider list omits it. The ray therefore hits nothing V014 counts. **Keep-out, binding, two rules:** (a) *V014*: no table may put a **solid** collider (wall, post, target face, kicker rim, bumper body) in the right lane between y 0.8945 and y 0.9231. (b) *Stuck balls*: no table may put a **spinner** anywhere in the merged right lane above the gate line y 0.888. A spinner is "a trigger plus a 1-D plate angular model, not a solid collider **(except when too slow to pass)**" (08 §6.6) — under `s_pass` 0.15 m/s the plate is a `steel` wall for that contact — and the whole straight leg (y 0.900 to the corner tangent at 0.910) lies inside the V014 corridor, so a plate there spans the lane at a height every plunge reaches. With the plate level (normal 90°, the one normal that carries gravity, above) a ball that crossed upward at just over 0.15 m/s re-crosses downward at `v − 0.12` < 0.15 and comes to rest **on** it; tilting it does not help, because a plate that spans its lane (Common pitfalls) makes a wedge with a lane wall whose two normals bracket 90°. There is therefore no valid spinner position in the right leg on any table; the only table with a plate near this junction, cosmic-carnival, carries it in the **left** leg (§4.3), where keep-out (c) below — not "off the plunge path", which the left leg is not — is what makes it safe |
 
 **Keep-out (c), spinners on an orbit leg (binding, all five tables).** (b)
 empties the merged **right** leg. The mirror case is the **left** leg, which
@@ -412,8 +448,9 @@ What it does, in the three directions a ball can take:
   centre on x = 0.4665 (0.0135 off the wall face, which is vertical, so gravity
   is tangent to it) and rolls down into open playfield above the right flipper —
   on cosmic-carnival, straight into `cannon_breech`. This is exactly the
-  contact cone the old post broke: 48.86° with 108° *did* bracket 90°, which is
-  why that V held balls forever. A ball inboard of the flap's lower end drops
+  contact cone a `<id>_top_post` would break: its 48.86° with the flap's 108°
+  *does* bracket 90°, and that V holds balls forever — which is why the merged
+  variant emits no post. A ball inboard of the flap's lower end drops
   straight through the 0.037 m mouth instead. Either way it never reaches the
   closed shooter gate and never comes to rest at the junction.
 - **At rest — the stuck-ball case, closed.** The shooter gate's shelf (ball
@@ -437,7 +474,7 @@ up-lane deceleration is `g·sin 6.5° + μ·g·cos 6.5° = 1.1105 + 0.2437 =
 | stub | `1.524 ≤ v < 1.5427` | passes the one-way shooter gate but not the merge flap: its apex ball-centre falls short of y 0.90869, so it settles back on the closed gate shelf, which the flap overlaps (the *at rest* case above), is pushed up-left onto the flap and off its lower end. Same exit as a soft plunge, but it never enters the orbit leg |
 | **soft** | `1.5427 ≤ v < 1.6028` | clears the flap — at x 0.500 the flap face is at y 0.8945, so the ball centre must reach `0.8945 + 0.0135/cos 18°` = **0.90869**, i.e. `sqrt(2·1.3542·0.87869)` = 1.5427 — then stalls in the right leg or the top corner, comes back down and is turned out of the right mouth into open playfield — **this is the skill-shot feed** |
 | grey | `1.6028 ≤ v < 1.6906` | reaches the guide's corner (ball-center apex y = 0.9785, i.e. `Δh` 0.9485 off the plunger ⇒ `sqrt(2·1.3542·0.9485)` = **1.60278**) and up to the boundary-arc apex, but cannot pay for the whole top run; falls back down the right leg, or dies on the top run — where the lane floor is the guide's horizontal top run (y 0.965, ball centre 0.9785) and only 11-game-framework.md §4.6's stuck-ball impulses get it moving again. **Never authored against**, and the reason no skill shot is keyed to a plunge above 21.4 % |
-| **full** | `v ≥ 1.6906` | **completes** the loop. Reaching the boundary-arc apex (ball center y = 1.0265) is `Δy` 0.9965 over a **1.06300 m** path — the ball *centre* runs 0.0135 inside the boundary, so the straight run is `0.910 − 0.030` = **0.880** and the corner is a quarter of the centre's own arc, `0.1165·π/2` = **0.18300** (not the 0.918367 + 0.143882 the old row split it into, which put the tangent point in the wrong place on both terms) ⇒ `sqrt(2[1.11052·0.9965 + 0.24367·1.06300])` = 1.65267 — but that speed arrives with *zero* left, and the 0.260 m horizontal top run still costs `2·0.24367·0.260` = 0.12671 of `v²`, so the threshold is `sqrt(1.65267² + 0.12671)` = **1.69057**. Rides the top and comes down the left leg, out the left mouth at `entry_y_left` |
+| **full** | `v ≥ 1.6906` | **completes** the loop. Reaching the boundary-arc apex (ball center y = 1.0265) is `Δy` 0.9965 over a **1.06300 m** path — the ball *centre* runs 0.0135 inside the boundary, so the straight run is `0.910 − 0.030` = **0.880** and the corner is a quarter of the centre's own arc, `0.1165·π/2` = **0.18300** — split the path on the *centre* path's tangent point, never on the boundary's, or both terms come out long ⇒ `sqrt(2[1.11052·0.9965 + 0.24367·1.06300])` = 1.65267 — but that speed arrives with *zero* left, and the 0.260 m horizontal top run still costs `2·0.24367·0.260` = 0.12671 of `v²`, so the threshold is `sqrt(1.65267² + 0.12671)` = **1.69057**. Rides the top and comes down the left leg, out the left mouth at `entry_y_left` |
 
 Against `max_speed` 7.5 those are: **20.3 %** of plunger charge at 1.524,
 20.6 % at 1.5427, 21.4 % at 1.6028 and **22.5 %** at 1.6906. The window that
@@ -548,9 +585,10 @@ above y 0.888, with the §0.8 `orbit_merge_gate` at `[0.500, 0.8945]`;
 `pop_1` `[0.315, 0.830415]` (top cap y **0.861415**), `pop_2`
 `[0.280, 0.769793]`, `pop_3` `[0.350, 0.769793]`.
 
-The nest's surface gaps to its neighbours — an earlier draft collapsed the
-two `gear_bank` ones into a single wrong "0.036, passable", and they are not
-the same number:
+The nest's surface gaps to its neighbours. The two `gear_bank` gaps are
+**0.020082** and **0.037860** — measure each one separately and never collapse
+them into a single figure; they are on opposite sides of 09 §6's jam band and
+have opposite verdicts:
 
 - `pop_2` → the `gear_bank` row's up-table target `[0.300, 0.715]`, nearest
   point its upper face end `[0.288296, 0.719389]`: **0.020082**. This is the
@@ -568,17 +606,20 @@ the same number:
   **0.011772** — blocked, as intended (the R-P-M bank is entered from below,
   §0.8, never from the nest).
 
-Element roster (custom geometry):
+Element roster (custom geometry). In every §x.3 roster the **notes** column
+carries the derivation — why a value is what it is and what pins it — so a
+reader who only needs the authored values should read the **id / type / pos /
+key params** columns and skip notes until a value has to change.
 
 | id | type | pos | key params | notes |
 |---|---|---|---|---|
-| `upper_flipper` | flipper | `[0.448, 0.615]` | `length` 0.062, `rest_angle_deg` **−100**, `swing_deg` 46, `side` "right", `input` "right" | cross-field backhand into the left ramp; fires with right button. **Launch window (computed, binding):** 09 §4.3 sweeps `side` "right" from `rest_angle_deg` to `rest_angle_deg − swing_deg`, −100° → −146°, and the bat launches perpendicular in the sweep direction ⇒ **170° → 124°**. The `left_ramp` entrance line from this pivot is **163.83°** at 0.3051 m — **6.17°** inside the rest end, 39.83° above the swing end — and the mouth sits **0.085 m above** the pivot, so the ball climbs. The shipped `rest_angle_deg` 148 was a sign/mirror error: it swept 148° → 102° for launch bearings **58° → 12°**, up-*right* into `shooter_wall`, while the mouth it is supposed to feed lay at bearing **188.13°** and **0.040 m below** the old pivot `[0.435, 0.600]` — un-shootable by any flipper at any rest angle, so §1.4's "RF or UF" had no UF. Pivot and mouth both moved because neither alone fixes it: the gear-bank row runs across every flatter line, and this pivot's line clears `[0.396,0.679]`, the row's low end, by **0.04698** (the 0.04959 an earlier draft quoted here is the perpendicular to the *next* target up, `[0.364,0.691]`) and the pop nest by **0.13101** to the centroid `[0.315,0.790]` — 0.07086 to `pop_2`'s 0.031 cap, which is the nest's nearest surface to this line. At rest the bat spans `[0.4372,0.5539]`–`[0.448,0.615]`, **0.0347** off `nos_targets`' near end and **0.021** off the shooter wall (blocked, ≤ 0.024); swept to −146° the tip reaches `[0.39660,0.58033]`, **0.03348** from the right-ramp mouth at its `[0.370,0.560]` (0.037575 at the old 0.365; the move is capped at 0.370606 by this gap) — passable, clear of 09 §6's jam band at both ends of the sweep |
+| `upper_flipper` | flipper | `[0.448, 0.615]` | `length` 0.062, `rest_angle_deg` **−100**, `swing_deg` 46, `side` "right", `input` "right" | cross-field backhand into the left ramp; fires with right button. **Launch window (computed, binding):** 09 §4.3 sweeps `side` "right" from `rest_angle_deg` to `rest_angle_deg − swing_deg`, −100° → −146°, and the bat launches perpendicular in the sweep direction ⇒ **170° → 124°**. The `left_ramp` entrance line from this pivot is **163.83°** at 0.3051 m — **6.17°** inside the rest end, 39.83° above the swing end — and the mouth sits **0.085 m above** the pivot, so the ball climbs. **The sign of this rest angle is load-bearing, and a positive one is a mirror error:** `rest_angle_deg` 148 sweeps 148° → 102° for launch bearings **58° → 12°** — up-*right* into `shooter_wall`, away from the ramp entirely. Two rules follow, and both are binding on any upper flipper: check the *sign* of `rest_angle_deg` against the bearing of the thing it feeds before authoring it, and site the pivot **below** that mouth — a pivot at `[0.435, 0.600]` would put the ramp entrance at bearing **188.13°**, **0.040 m below** it, unreachable by any flipper at any rest angle, and §1.4's "RF or UF" would have no UF. Pivot and mouth are placed together because neither position alone is enough: the gear-bank row runs across every flatter line, and this pivot's line clears `[0.396,0.679]`, the row's low end, by **0.04698** — that low end is the binding target, **not** the next one up at `[0.364,0.691]`, whose perpendicular is the larger 0.04959 — and the pop nest by **0.13101** to the centroid `[0.315,0.790]` — 0.07086 to `pop_2`'s 0.031 cap, which is the nest's nearest surface to this line. At rest the bat spans `[0.4372,0.5539]`–`[0.448,0.615]`, **0.0347** off `nos_targets`' near end and **0.021** off the shooter wall (blocked, ≤ 0.024); swept to −146° the tip reaches `[0.39660,0.58033]`, **0.03348** from the right-ramp mouth at its `[0.370,0.560]` — this gap is what caps that mouth's x at **0.370606** (§1.3 `right_ramp`) — passable, clear of 09 §6's jam band at both ends of the sweep |
 | `left_ramp` | ramp | path `[0.155,0.700]` → arc up-left → across top mid → `[0.408,0.300]` | `height_profile` `[{"s":0,"z":0},{"s":0.35,"z":0.055},{"s":0.85,"z":0.045},{"s":1,"z":0.025}]`, `drop_exit` true | "climb"; exits onto right inlane |
-| `right_ramp` | ramp | path `[0.370,0.560]` → arc up-left → `[0.0375,0.895]` (2-D length S ≈ 0.46) | `height_profile` `[{"s":0,"z":0},{"s":0.45,"z":0.052},{"s":0.80,"z":0.052},{"s":1,"z":0.030}]`, `drop_exit` true | "drop"; crosses left_ramp on layer 1 and drops into the left orbit lane above `drift_lock`. Grades (V010, |dz/ds| ≤ 0.60): 0.052/0.207 = **0.25**, 0, −0.022/0.092 = **−0.24** — and the profile ends at `s` 1 as V010 requires. **Entrance x 0.370, not 0.365 (computed).** At 0.365 the mouth's 0.022 half-width sat **0.03729** off the LF→`right_orbit` ray (67.574°, §0.8's right-mouth aim point) — **+0.00179**, 1.21 mm under §2.4's binding +0.003 floor. This is §4.4's family: the LF→right-mouth bearing is 67.574° on every table, so any right-ramp entrance in the x 0.35–0.38 band lands within a few mm of what a ramp mouth needs, and §5.3 fixed its copy by moving 0.008 outboard. **0.008 is not available here:** at 0.373 `upper_flipper`'s swept tip `[0.39660, 0.58033]` would sit **0.03113** from the mouth, inside 09 §6's 0.025–0.032 jam band; the cap that keeps that gap passable (≥ 0.033) is x **0.370606**. At **0.370** the orbit ray clears by **+0.00642** — §5.3's +0.00612 class — the tip gap is **0.03348**, and the binding obstacle on that shot becomes the right mouth's own aperture nodes at +0.00497 (§1.4) |
+| `right_ramp` | ramp | path `[0.370,0.560]` → arc up-left → `[0.0375,0.895]` (2-D length S ≈ 0.46) | `height_profile` `[{"s":0,"z":0},{"s":0.45,"z":0.052},{"s":0.80,"z":0.052},{"s":1,"z":0.030}]`, `drop_exit` true | "drop"; crosses left_ramp on layer 1 and drops into the left orbit lane above `drift_lock`. Grades (V010, abs(dz/ds) ≤ 0.60): 0.052/0.207 = **0.25**, 0, −0.022/0.092 = **−0.24** — and the profile ends at `s` 1 as V010 requires. **Entrance x 0.370, and the window is narrow (computed).** This is §4.4's family: the LF→right-mouth bearing is 67.574° on every table, so any right-ramp entrance in the x 0.35–0.38 band lands within a few mm of what a ramp mouth needs. Below x **0.36631** the mouth falls under §2.4's binding +0.003 floor against that ray — the perpendicular runs 0.926 m per m of x, so 0.365 gives 0.03729 against the 0.0355 a 0.022 half-width plus ball needs ⇒ **+0.00179**, 1.21 mm short, and §5.3's copy of the same problem is solved by moving 0.008 outboard. **0.008 is not available here:** at 0.373 `upper_flipper`'s swept tip `[0.39660, 0.58033]` sits **0.03113** from the mouth, inside 09 §6's 0.025–0.032 jam band, so the cap that keeps that gap passable (≥ 0.033) is x **0.370606**. The whole usable band is therefore **0.36631–0.370606**, 4.3 mm wide, and this row sits in it. At **0.370** the orbit ray clears by **+0.00642** — §5.3's +0.00612 class — the tip gap is **0.03348**, and the binding obstacle on that shot becomes the right mouth's own aperture nodes at +0.00497 (§1.4) |
 | `drift_magnet` | magnet | `[0.0375, 0.880]` | `strength` 1.8, `radius` 0.110 | on the left orbit lane center (§0.8); bends and catches orbit shots when on |
 | `drift_lock` | ball_lock | `[0.0375, 0.862]` | `capacity` 2, `style` "visible", `eject_angle_deg` 90, `eject_speed` 3.0 | on the lane center, fed by the right_ramp drop exit 0.033 above it; drawn as a magnet catch (art). The lane runs through it, so the sim captures every left-orbit ball (08 §6.14): when the lock is unlit the script calls `tb.release_lock("drift_lock", 1)` in its `ball_lock` handler and the +90° eject fires the ball on around the orbit (the mandatory unlit-lock pattern, 10-scripting.md) |
-| `gear_bank` | drop_target_bank | 4 targets `[0.300,0.715]`, `[0.332,0.703]`, `[0.364,0.691]`, `[0.396,0.679]` | `facing_deg` **249**, `reset` "script" | gears 1–5. Explicit `targets` array (09 §4.8), so the three numbers must agree: the row spans `sqrt(0.096² + 0.036²)` = **0.102528** over 3 gaps ⇒ pitch **0.03418** (the old "0.032" was the per-target *x* step, not the pitch; face gap 0.03418 − 0.025 = 0.0092, inside 09 §5.10's 0.004–0.020). Row bearing −20.6°, so the outward normal is **249.4°**, authored as 249 — the face looks back down-table at the left flipper that shoots it (§1.4, −19.6° ⇒ bearing 70.4°, 1.0° off the row's own normal). The old 235 pointed 14° off the row's own perpendicular. The whole row also sits **0.003 m up-table** of the first draft (`[0.300,0.712]` …), a pure translation that leaves span, pitch and bearing untouched: it takes the controlling `pop_2` gap above from 0.023044 — blocked, but only 0.002 under the jam band, inside one §0.7 tuning step — down to 0.020082, a decisive 0.004918 clear of it, while the `pop_3` gap stays passable at 0.037860 |
-| `pit_scoop` | kicker | `[0.180, 0.480]` | `style` "scoop", `eject_angle_deg` -57, `eject_speed` 3.0 | mode start / wizard start. **x 0.180, not 0.100 (computed).** §0.8 makes the left orbit an RF shot across the band **118.95683°–121°**, and at y 0.480 that band's ball-centre corridor is x ∈ [**0.11969**, **0.13704**] — the scoop stood just under its low side. The floor ray cleared the rim by 0.03241 (+0.00491) but the 121° rest-end ray passed **0.01687** against the 0.0275 a 0.014 rim plus ball needs (**−0.01063**), so only bearings ≤ **119.60270°** cleared and **68.4 %** of the band was unusable — the scoop had been tested only as a *target* (§1.4's old "the RF line is 123.22°"), never as an obstacle, exactly as with §3.3's `control_booth` and §2.3's `shaker`. **Left is not available:** clearing the 121° ray on that side needs x ≤ **0.08760**, whose rim would reach x 0.0736 and cut the orbit guide at 0.075. So it crosses to the far side of the corridor: x ≥ **0.16847** clears, x ≥ **0.17189** holds §2.4's +0.003 floor, and **0.180** clears the whole band — **+0.01009** at the 118.95683° floor, its worst point, rising to **+0.02420** at 121°, so all **2.04317°** are usable (§1.4). It also clears the lines it now sits nearer: RF→`left_ramp` (107.460°) by **+0.01466**, LF→pops (75.545°) by **+0.02585**, LF→`gear_bank` (70.421°) by **+0.05807**, and its rim keeps 0.091 of clear surface to the orbit guide — nothing in 09 §6's 0.025–0.032 jam band |
+| `gear_bank` | drop_target_bank | 4 targets `[0.300,0.715]`, `[0.332,0.703]`, `[0.364,0.691]`, `[0.396,0.679]` | `facing_deg` **249**, `reset` "script" | gears 1–5. Explicit `targets` array (09 §4.8), so the three numbers must agree: the row spans `sqrt(0.096² + 0.036²)` = **0.102528** over 3 gaps ⇒ pitch **0.03418** — the pitch is the step **along the row**, never the per-target *x* step (0.032 here), and the face gap 0.03418 − 0.025 = 0.0092 is inside 09 §5.10's 0.004–0.020. Row bearing −20.6°, so the outward normal is **249.4°**, authored as 249 — the face looks back down-table at the left flipper that shoots it (§1.4, −19.6° ⇒ bearing 70.4°, 1.0° off the row's own normal); a facing taken from anything but the row's own perpendicular (235, say) misses by 14°. **This row's y is pinned by the `pop_2` gap and may not slide down-table.** At these coordinates that controlling gap is **0.020082** — blocked, and a decisive 0.004918 clear of 09 §6's 0.025 jam-band edge — while the `pop_3` gap is **0.037860**, passable. Translate the row 0.003 m down-table and the `pop_2` gap becomes 0.023044: still blocked, but only 0.002 under the band, i.e. one §0.7 step-5 post move from landing in it. Keep the two gaps as two numbers (§1.3 above); they are not interchangeable |
+| `pit_scoop` | kicker | `[0.180, 0.480]` | `style` "scoop", `eject_angle_deg` -57, `eject_speed` 3.0 | mode start / wizard start. **x 0.180 is pinned by the left-orbit corridor, not by the scoop's own sight line (computed).** §0.8 makes the left orbit an RF shot across the band **118.95683°–121°**, and at y 0.480 that band's ball-centre corridor is x ∈ [**0.11969**, **0.13704**]. The scoop must sit clear of that corridor **as an obstacle**, on one side or the other — a scoop just under its low side (x ≈ 0.100) clears the floor ray by 0.03241 (+0.00491) but passes **0.01687** from the 121° rest-end ray against the 0.0275 a 0.014 rim plus ball needs (**−0.01063**), leaving only bearings ≤ **119.60270°** and killing **68.4 %** of the band. **Left is not available:** clearing the 121° ray on that side needs x ≤ **0.08760**, whose rim would reach x 0.0736 and cut the orbit guide at 0.075. So it sits on the far side of the corridor: x ≥ **0.16847** clears, x ≥ **0.17189** holds §2.4's +0.003 floor, and **0.180** clears the whole band — **+0.01009** at the 118.95683° floor, its worst point, rising to **+0.02420** at 121°, so all **2.04317°** are usable (§1.4). It also clears the lines it now sits nearer: RF→`left_ramp` (107.460°) by **+0.01466**, LF→pops (75.545°) by **+0.02585**, LF→`gear_bank` (70.421°) by **+0.05807**, and its rim keeps 0.091 of clear surface to the orbit guide — nothing in 09 §6's 0.025–0.032 jam band |
 | `speedo_spinner` | spinner | `[0.029, 0.690]` | `facing_deg` **76** | in the left orbit lane, on §0.8 keep-out (c)'s spinner offset (0.0085 outboard of the 0.0375 lane center) so the plate's inboard end opens a 0.03387 m escape gap. Crossings: **0.74228 m/s** slowest descent, **1.15109 m/s** slowest climb, against the 0.31 m/s wall floor |
 | `nos_targets` | standup_target ×3 | `[0.430,0.520]`, `[0.443,0.490]`, `[0.452,0.460]` | `facing_deg` 205 | N-O-S; lights Nitro Save |
 
@@ -597,11 +638,13 @@ inside 09 §6's jam band on top of the prefab guide.)
 | left_ramp | RF or UF | **+17.5°** (RF) / **+73.8°** (UF backhand) | climb ramp → right inlane |
 | right_ramp | LF | **-27.2°** | drop ramp → drift corner (entrance `[0.370, 0.560]`, §1.3; bearing 62.769°) |
 | gear_bank | LF | **-19.6°** | drop bank face |
-| pit_scoop | **LF** | **-6.1°** | mode scoop at `[0.180, 0.480]` (§1.3), bearing **83.901°** — **24.90°** above LF's 59° rest end and **27.10°** below its 111° swing end. Nothing stands between the pivot and the scoop; past it the `left_ramp` mouth is **+0.01273** and `pop_2` +0.02415. The old "**not** RF" reason (123.22°, past RF's rest end) died with the move: from `[0.180,0.480]` RF bears **113.539°**, inside its window but **5.42°** under §0.8's 118.957° entry floor, so a flat RF orbit miss now drops into the scoop instead of caroming off its rim. LF is still the aimed shot |
+| pit_scoop | **LF** | **-6.1°** | mode scoop at `[0.180, 0.480]` (§1.3), bearing **83.901°** — **24.90°** above LF's 59° rest end and **27.10°** below its 111° swing end. Nothing stands between the pivot and the scoop; past it the `left_ramp` mouth is **+0.01273** and `pop_2` +0.02415. From RF the scoop bears **113.539°** — inside RF's window, but **5.42°** under §0.8's 118.957° left-orbit entry floor, so it is not an RF *aim* point: it is where a flat RF orbit miss lands, dropping into the scoop rather than caroming off its rim. LF is the aimed shot |
 | nos_targets | **RF** | **-15.3°** | standup trio — **not** LF: the row runs 47.97°–54.49° from the LF pivot, 4.5°–11.0° flatter than LF's 59° rest end, and **71.86°–77.34°** from RF, inside its window throughout |
-| pops | LF or RF | **-14.5°** (LF) / **+2.0°** (RF) | up the middle into the nest at `[0.315, 0.790]` (the R-P-M bank sits above them and is entered from below, §0.8 — it does not feed the pops). **Both lines only with `gear_bank` down**: up, `[0.300,0.715]` sits **0.00420** off the LF ray, and `[0.332,0.703]` / `[0.300,0.715]` sit **0.01390** / **0.01766** off the RF ray, all against 0.026. Down, the tightest is `pit_scoop` `[0.180,0.480]` at **+0.02585** (LF) and the `right_ramp` mouth `[0.370,0.560]` at **+0.01129** (RF) — the mouth is +0.07517 on the LF line, and both RF/LF figures moved with §1.3's two relocations (they were +0.07033 / +0.00630 against the mouth at 0.365) |
+| pops | LF or RF | **-14.5°** (LF) / **+2.0°** (RF) | up the middle into the nest at `[0.315, 0.790]` (the R-P-M bank sits above them and is entered from below, §0.8 — it does not feed the pops). **Both lines only with `gear_bank` down**: up, `[0.300,0.715]` sits **0.00420** off the LF ray, and `[0.332,0.703]` / `[0.300,0.715]` sit **0.01390** / **0.01766** off the RF ray, all against 0.026. Down, the tightest is `pit_scoop` `[0.180,0.480]` at **+0.02585** (LF) and the `right_ramp` mouth `[0.370,0.560]` at **+0.01129** (RF); the mouth is +0.07517 on the LF line. Both figures are functions of §1.3's `pit_scoop` x and `right_ramp` entrance x — recompute them if either moves |
 
-Margins above are computed by §2.4's method and radii. **Two rows — three
+Margins above are computed by §2.4's method and radii, and carry §0.3's error
+bars: the sub-10 mm figures screen for blockage, they do not prove the shot —
+`shots[<id>].rate` settles it. **Two rows — three
 shot lines — are drop-dependent** and say so, because `gear_bank` stands across the middle of
 the field on the §1.3 coordinates that the `pop_2` / `pop_3` nest gaps pin
 from both sides: the row cannot translate without walking one of those gaps
@@ -808,21 +851,21 @@ Element roster:
 
 | id | type | pos | key params | notes |
 |---|---|---|---|---|
-| `counter_floor` | walls, layer 1 | region x 0.055–0.335, y 0.762–1.000 | outline on `layer` 1, closed except at the two ramp-end openings (`counter_ramp` end and the `counter_drop` chute — V011). Front wall = two segments meeting at the 0.036 m chute opening: `[0.055,0.815] → [0.217,0.762]` (**18.1°**) and `[0.335,0.789] → [0.253,0.762]` (**18.2°**) | the counter mini-playfield. 18° is not decoration: a ball resting against a wall only slides along it when `1.1105·sin θ` beats the 0.2437 m/s² rolling resistance of 08-physics.md §1.3, i.e. above **12.7°**; the old "≥ 1.5°" front wall would have parked balls on layer 1 forever |
+| `counter_floor` | walls, layer 1 | region x 0.055–0.335, y 0.762–1.000 | outline on `layer` 1, closed except at the two ramp-end openings (`counter_ramp` end and the `counter_drop` chute — V011). Front wall = two segments meeting at the 0.036 m chute opening: `[0.055,0.815] → [0.217,0.762]` (**18.1°**) and `[0.335,0.789] → [0.253,0.762]` (**18.2°**) | the counter mini-playfield. 18° is not decoration: a ball resting against a wall only slides along it when `1.1105·sin θ` beats the 0.2437 m/s² rolling resistance of 08-physics.md §1.3, i.e. above **12.7°**; a front wall at a token slope (1.5°, say) parks balls on layer 1 forever |
 | `counter_flipper` | flipper | `[0.125, 0.815]` | `length` 0.052, `radius_base` 0.009, `rest_angle_deg` -28, `swing_deg` 48, `side` "left", `input` "left", `strength` 0.7, `layer` 1 | shoots up-right at PIE; pivot sits 0.023 above the front wall's left segment. **Launch window (computed):** `side` "left" sweeps −28° → +20°, launching perpendicular in the sweep direction ⇒ **62° → 110°**. `pie_targets` bear **97.59° / 81.12° / 64.98°** (P/I/E) from this pivot, all inside it; E is the tight one at **2.98°** off the rest end, P has 12.41° at the swing end |
 | `pie_targets` | standup_target ×3 | `[0.105,0.965]`, `[0.150,0.975]`, `[0.195,0.965]` | `facing_deg` 275, `layer` 1 | P-I-E |
 | `counter_exit` | kicker | `[0.290, 0.930]` | `style` "saucer", `eject_angle_deg` -80, `eject_speed` 2.4, `layer` 1 | collects made shots; ejects down-counter into the `counter_ramp`'s upper end so the ball rides the ramp back to layer 0 (ramp ends are the only legal layer exits, 08-physics.md §6.11) |
-| `counter_drop` | ramp | path `[0.235,0.672]` → `[0.235,0.762]` (length **0.090**) | `height_profile` `[{"s":0,"z":0},{"s":1,"z":0.048}]`, `drop_exit` false | return chute. Grade `dz/ds` = 0.048/0.090 = **0.533** ≤ V010's 0.60 (the old 0.062 m path was 0.774, an error). Its upper end meets a 0.036 m opening in the counter's front wall and matches `layer1_z` (V011); a layer-1 ball rolling down-table crosses that seam ≈ 0° off the into-path tangent, so it binds and rolls out at the layer-0 end at ≈ 1.0 m/s |
-| `counter_hood` | wall | path `[0.198,0.650]` → `[0.270,0.632]` | `material` "wood" | the chute's deflector, **0.03125** below the layer-0 seam and 0.017–0.019 wider than it on both sides. It is what makes the chute un-backdoorable in 08-physics.md §6.10.2's terms: a ball travelling up-table from either flipper meets the hood and never reaches the seam, and the only remaining approaches are lateral (round the hood's ends), where the angle between `v` and the +y into-path tangent is ≈ 90° — far outside the 50° alignment gate — so such a ball crosses the seam **without binding**. **The lean is 14.0°, not 12.5° (computed).** `dy` 0.018 over `dx` 0.072 is `atan` = **14.0362°**, where the old `[0.270, 0.634]` gave 0.016/0.072 = **12.5288°** — *under* the **12.675°** at which `1.11052·sin θ` beats 08 §1.3's 0.24367 m/s² rolling resistance. A moving ball still rolled off the old hood (net **−0.00277 m/s²**, so the stated deflection held), but a ball that *stopped* on it could not restart, against `stuck_balls` 0 — the same threshold that already sets the 18.1° counter front wall, the 15.4° `tent_wall` and the 18° merge flap. At 14.0362° the net is **+0.02499 m/s²** down-slope. The west node does not move, so `shaker`'s 0.03553 surface gap (row below) is unchanged |
+| `counter_drop` | ramp | path `[0.235,0.672]` → `[0.235,0.762]` (length **0.090**) | `height_profile` `[{"s":0,"z":0},{"s":1,"z":0.048}]`, `drop_exit` false | return chute. Grade `dz/ds` = 0.048/0.090 = **0.533** ≤ V010's 0.60; the 0.090 m path length is what keeps it legal — shorten it to 0.062 m for the same 0.048 rise and the grade is 0.774, a V010 failure. Its upper end meets a 0.036 m opening in the counter's front wall and matches `layer1_z` (V011); a layer-1 ball rolling down-table crosses that seam ≈ 0° off the into-path tangent, so it binds and rolls out at the layer-0 end at ≈ 1.0 m/s |
+| `counter_hood` | wall | path `[0.198,0.650]` → `[0.270,0.632]` | `material` "wood" | the chute's deflector, **0.03125** below the layer-0 seam and 0.017–0.019 wider than it on both sides. It is what makes the chute un-backdoorable in 08-physics.md §6.10.2's terms: a ball travelling up-table from either flipper meets the hood and never reaches the seam, and the only remaining approaches are lateral (round the hood's ends), where the angle between `v` and the +y into-path tangent is ≈ 90° — far outside the 50° alignment gate — so such a ball crosses the seam **without binding**. **The lean is 14.0°, and the east node's y is what sets it (computed).** `dy` 0.018 over `dx` 0.072 is `atan` = **14.0362°**, net **+0.02499 m/s²** down-slope — above the **12.675°** at which `1.11052·sin θ` beats 08 §1.3's 0.24367 m/s² rolling resistance. Raise that node to `[0.270, 0.634]` and the lean is 0.016/0.072 = **12.5288°**, net −0.00277 m/s²: a *moving* ball still rolls off, so the deflection reads fine in a shot test, but a ball that **stops** on the hood can never restart, against `stuck_balls` 0. Any near-level deflector fails the same way; this is the threshold that also sets the 18.1° counter front wall, the 15.4° `tent_wall` and the 18° merge flap. The west node does not move, so `shaker`'s 0.03553 surface gap (row below) is unchanged |
 | `counter_ramp` | ramp | path `[0.360,0.545]` → arc up-right → `[0.300,0.775]` | `height_profile` `[{"s":0,"z":0},{"s":1,"z":0.048}]`, `drop_exit` false | ends on layer 1 counter |
-| `shaker` | captive_ball | slot `{a:[0.150,0.560], b:[0.150,0.640]}` | — | milkshake shaker; face at y 0.560, far end `b` at 0.640 — the end whose arrival at ≥ 0.3 m/s emits `captive_full_travel{"shaker"}` (§2.5). The slot top clears the left orbit mouth (`entry_y_left` 0.660) by 0.007, so the captive ball never sits in the lane. **x 0.150, not 0.085 (computed).** §0.8 makes the left orbit an RF shot on an entry bearing of **117.12°–121°**, and every ray in that band crosses x 0.085 between y 0.538 and y 0.611 — i.e. through this slot. At 0.085 the flattest legal ray (117.12°) passed **0.02322** from the resting captive centre against the 0.027 a ball plus a 0.0135 captive needs (**−0.0038**, worse toward 121°) and crossed the slot channel outright; only bearings ≤ 116.4° cleared the ball, and those miss the mouth. Moving the slot to the far side of the corridor fixes both: at 117.12° the ray now passes **0.03464** from the slot at every point (**+0.00764**), and the clearance only grows toward 121°. The slot's upper end is 0.03553 of clear surface from `counter_hood`'s west node — passable (≥ 0.033), outside 09 §6's 0.025–0.032 jam band |
+| `shaker` | captive_ball | slot `{a:[0.150,0.560], b:[0.150,0.640]}` | — | milkshake shaker; face at y 0.560, far end `b` at 0.640 — the end whose arrival at ≥ 0.3 m/s emits `captive_full_travel{"shaker"}` (§2.5). The slot top clears the left orbit mouth (`entry_y_left` 0.660) by 0.007, so the captive ball never sits in the lane. **x 0.150 is pinned by the left-orbit corridor (computed).** §0.8 makes the left orbit an RF shot on an entry bearing of **117.12°–121°**, and every ray in that band crosses x 0.085 between y 0.538 and y 0.611 — so the slot may not sit at the left wall. At x 0.085 the flattest legal ray (117.12°) passes **0.02322** from the resting captive centre against the 0.027 a ball plus a 0.0135 captive needs (**−0.0038**, worse toward 121°) and crosses the slot channel outright; only bearings ≤ 116.4° clear the ball, and those miss the mouth. On the far side of the corridor both tests pass: at 117.12° the ray passes **0.03464** from the slot at every point (**+0.00764**), and the clearance only grows toward 121°. The slot's upper end is 0.03553 of clear surface from `counter_hood`'s west node — passable (≥ 0.033), outside 09 §6's 0.025–0.032 jam band |
 | `order_window` | kicker | `[0.415, 0.560]` | `style` "scoop", `eject_angle_deg` 237, `eject_speed` 3.0 | order delivery / mode start |
 | `bur_targets` | standup_target ×3 | `[0.070,0.470]`, `[0.070,0.435]`, `[0.070,0.400]` | `facing_deg` 0 | B-U-R, left wall bank |
-| `ger_targets` | standup_target ×3 | `[0.328,0.416]`, `[0.339,0.384]`, `[0.349,0.352]` | `facing_deg` 195 | G-E-R, center-right. **Translated +0.031 m along −26.99° (computed);** the row's steps `[+0.011,−0.032]` / `[+0.010,−0.032]` and therefore its 195° perpendicular are unchanged. At the old `[0.300,0.430]` the G target sat **0.00127** from the LF→`counter_ramp` ray (bearing 63.010°) against the 0.026 a 0.025-wide face plus a ball needs — and a standup never drops, so the table's hardest shot was permanently blocked. The row is now threaded through the 0.035 m channel between that ray and the RF→`order_window` ray (80.308°): G clears the ramp line by **+0.00403** and R clears the scoop line by **+0.00404**, the two tightest numbers on this table |
+| `ger_targets` | standup_target ×3 | `[0.328,0.416]`, `[0.339,0.384]`, `[0.349,0.352]` | `facing_deg` 195 | G-E-R, center-right. **Threaded between two rays, and it may not move either way (computed).** The row runs down the 0.035 m channel between the LF→`counter_ramp` ray (bearing 63.010°) and the RF→`order_window` ray (80.308°): G clears the ramp line by **+0.00403** and R clears the scoop line by **+0.00404**, the two tightest numbers on this table. Translate it 0.031 m back along −26.99° (to `[0.300,0.430]` …) and G sits **0.00127** from the ramp ray against the 0.026 a 0.025-wide face plus a ball needs — and a standup never drops, so that would block the table's hardest shot permanently. The row's steps `[+0.011,−0.032]` / `[+0.010,−0.032]` and its 195° perpendicular are properties of the row itself and survive any pure translation; the clearances do not |
 
 (No hand-placed `left_orbit_guide`: the `orbit` instance already emits both
-walls of the left lane. The old arc would have run a second guide 0.030 from
-the prefab's — a corridor squarely inside 09 §6's 0.025–0.032 jam band.)
+walls of the left lane, and a second guide beside the prefab's would stand
+0.030 m off it — a corridor squarely inside 09 §6's 0.025–0.032 jam band.)
 
 ### 2.4 Shot map
 
@@ -837,7 +880,8 @@ the prefab's — a corridor squarely inside 09 §6's 0.025–0.032 jam band.)
 | pie_targets | MF (counter) | **+7.6° / -8.9° / -25.0°** (P/I/E) | only from `counter_flipper`, window 62°→110° (§2.3) |
 
 **Clearance record (computed, binding — the method every §x.4 uses, including
-the inline margins in §1.4 and §4.4).** For each row, take the ray from the named flipper's pivot on
+the inline margins in §1.4 and §4.4; read §0.3's "What the straight-ray model
+is worth" first — every number below inherits those error bars).** For each row, take the ray from the named flipper's pivot on
 the tested bearing, find every element it passes, and take the perpendicular
 distance from the ray to that element's nearest surface less the 0.0135 ball
 radius. A standup or drop target needs its 0.0125 half-width + 0.0135 =
@@ -846,11 +890,11 @@ radius. A standup or drop target needs its 0.0125 half-width + 0.0135 =
 0.022 half-width + 0.0135 = **0.0355**; a bare wall or divider node 0.0135;
 a **`ball_lock`** its capture radius **0.020 — with no ball radius added**,
 because 08 §6.14's capture region is a circle of radius 0.02 m tested against
-the ball **centre**, not a rim the ball's surface has to clear. That row was
-missing, which is why lock margins had been borrowed from the 0.0275 kicker
-figure or the 0.0135 bare-node one; every lock is re-run at 0.020 in §1.4,
-§4.3 and §5.4, and the tightest of the four is voltage-vandals' `vault_lock`
-on the RF `vault_scoop` line at **+0.00918**. No verdict changes.
+the ball **centre**, not a rim the ball's surface has to clear. A lock is
+therefore never measured with the 0.0275 kicker figure or the 0.0135 bare-node
+one; every lock in §1.4, §4.3 and §5.4 is measured at 0.020, and the tightest
+of the four is voltage-vandals' `vault_lock` on the RF `vault_scoop` line at
+**+0.00918**.
 **The floor is +0.003 m.** Magnets, rollovers, lights and spinners are not
 colliders (09 §8.1) and are not counted; neither are the §0.4 `sling_pair`
 triangles, whose bottom corners are 0.06 m from the pivot and flank the launch
@@ -871,7 +915,10 @@ the bearing of the aim node, and across that whole band.
 
 The two 4 mm rows — `counter_ramp` past G and `order_window` past R — are the
 squeeze §2.3's `ger_targets` note pins from both ends; move that row either
-way by 2 mm and one of them goes under the floor.
+way by 2 mm and one of them goes under the floor. Both sit far inside §0.3's
+indicative band, so they are a warning to keep that row still, not a promise
+that either shot lands: `shots.counter_ramp.rate` and `shots.order_window.rate`
+in the §0.7 suite are what decide it.
 
 ### 2.5 Rules
 
@@ -1072,17 +1119,17 @@ Element roster:
 | id | type | pos | key params | notes |
 |---|---|---|---|---|
 | `head_bank` | drop_target_bank | 3 targets centered `[0.260, 0.790]`, pitch 0.034 | `facing_deg` 270, `reset` "script" | robot head; faces down-table, 0.016 under the crane rail floor (blocked, not a jam gap) |
-| `torso_bank` | drop_target_bank | 4 targets `[0.310,0.560]`, `[0.3394,0.543]`, `[0.3688,0.526]`, `[0.3982,0.509]` | `facing_deg` 240, `reset` "script" | robot torso. Here the **facing** was the intent and the old east end `[0.412,0.596]` was the error: that row ran *up* to the right, whose outward normal is 289° and faces no flipper at all. Re-derived on 240's perpendicular from the unchanged west end: step `[+0.0294, −0.0170]` ⇒ pitch **0.03396** (face gap 0.0090) and row bearing **−30.0°**, whose outward normal is 240.0° — back down-table at the left flipper that shoots it (§3.4, −26.9° ⇒ bearing 63.07°, 3.1° off the row's own normal). West end unchanged, so `crane_dock`'s clearance below is unaffected. **This row screens three other shots, and §3.4 says so.** It is 0.102 m long and sits ⊥ to LF's sight line at 0.47 m, so it subtends LF bearings **56.87°–69.20°** — 12.33° of that flipper's 52° window. `gantry_ramp` (63.74°) and `right_orbit` (67.57°) fall inside it and are struck at 0.01143 and 0.01355 against 0.026; RF→`head_bank` (96.68°) grazes the west end at 0.02293. No translation fixes this — shifting the row along either its own axis or its normal moves its angular span by under a degree — and the ramp mouth cannot clear it either, since the first bearing that does (72.73°) is `crane_dock`'s. All three are therefore **drop-dependent**, which is the honest reading of a bank that stands in front of a ramp: with the row down its targets stop colliding and each line opens (margins in §3.4). §3.5's "bank stays down" on completion is what makes that a state the player holds |
-| `legs_bank` | drop_target_bank | 3 targets `[0.075,0.360]`, `[0.105,0.375]`, `[0.135,0.390]` | `facing_deg` **297**, `reset` "script" | robot legs, and now at the bottom of the robot. Span `sqrt(0.060² + 0.030²)` = 0.067082 over 2 gaps ⇒ pitch **0.03354** (face gap 0.0085); the row is a pure translation of the old one, so its bearing (+26.6°), its outward normal (**296.6°**, authored as 297) and its pitch are unchanged. **Why it moved down 0.110 (computed).** At `[0.085–0.145, 0.470–0.500]` the row lay straight across the only channel the RF up-left shots have: the §0.8 left-orbit entry band (119.96°–121°) passed **0.00924** from the middle target and **0.02425** from the top one against the 0.026 they need, and the RF→`control_booth` ray passed **0.01150** from the middle target — so both of §3.4's RF shots were blocked by a bank that is *up* at every ball start. Lowered, the row clears the orbit band by **+0.00723** at its worst point (121°, top target) and the booth line by **+0.06064**. The **shooter** is still the *left* flipper, and more emphatically: from RF the three targets now bear 137.14°/131.99°/126.57°, all three past its 121° rest end, while from LF they bear 105.08°/97.88°/91.25°, comfortably inside (§3.4, +7.9°). The ball arrives 18.7° off this face's normal — well inside the ±90° that makes it a face hit |
-| `crane_dock` | kicker | `[0.350, 0.786]` | `style` "scoop", `capture_ms` 1200, `eject_angle_deg` **120**, `eject_speed` 1.2 | lock pickup point, 0.022 m **below** the rail floor under its feed gap; the kick lobs the ball up-and-west through the gap into the channel (it is not an along-rail eject — that would fire into the underside of the floor wall). Reached from LF at −17.3° (bearing 72.70°, 13.70° inside LF's window). Its clearance is set by `torso_bank`'s west end, and the old "0.016" was a centre-to-centre figure with nothing taken out of it: the true perpendicular from the ray to `[0.310, 0.560]` is **0.02902**, so the ball margin is **+0.00302** — the tightest row on this table and the reason neither the dock nor that target may move toward the other |
-| `crane_rail` | wall ×3 | floor `[0.385,0.809]` → `[0.372,0.8086]` **and** `[0.310,0.8070]` → `[0.165,0.803]`; roof `[0.385,0.845]` → `[0.165,0.839]` | `material` "wood" | channel under the crane, open at both ends, **0.036 m** clear everywhere (ball 0.027 + 0.009 play): above 09 §6's 0.033 minimum lane width and outside its 0.025–0.032 jam band, which the old 0.028 channel sat inside. Floor tilt toward the bay = atan(0.006/0.220) = **1.56°**. The 0.062 m break in the floor is `crane_dock`'s feed gap; nothing rolls across it (every magnet is west of it) |
+| `torso_bank` | drop_target_bank | 4 targets `[0.310,0.560]`, `[0.3394,0.543]`, `[0.3688,0.526]`, `[0.3982,0.509]` | `facing_deg` 240, `reset` "script" | robot torso. **The row is derived from its `facing_deg`, not the reverse:** with 240 authored, the endpoints must lie on that facing's perpendicular from the west end — step `[+0.0294, −0.0170]` ⇒ pitch **0.03396** (face gap 0.0090) and row bearing **−30.0°**, whose outward normal is 240.0°, back down-table at the left flipper that shoots it. A row running *up* to the right instead (east end `[0.412,0.596]`) has outward normal 289° and faces no flipper at all, whatever its `facing_deg` says (§3.4, −26.9° ⇒ bearing 63.07°, 3.1° off the row's own normal). West end unchanged, so `crane_dock`'s clearance below is unaffected. **This row screens three other shots, and §3.4 says so.** It is 0.102 m long and sits ⊥ to LF's sight line at 0.47 m, so it subtends LF bearings **56.87°–69.20°** — 12.33° of that flipper's 52° window. `gantry_ramp` (63.74°) and `right_orbit` (67.57°) fall inside it and are struck at 0.01143 and 0.01355 against 0.026; RF→`head_bank` (96.68°) grazes the west end at 0.02293. No translation fixes this — shifting the row along either its own axis or its normal moves its angular span by under a degree — and the ramp mouth cannot clear it either, since the first bearing that does (72.73°) is `crane_dock`'s. All three are therefore **drop-dependent**, which is the honest reading of a bank that stands in front of a ramp: with the row down its targets stop colliding and each line opens (margins in §3.4). §3.5's "bank stays down" on completion is what makes that a state the player holds |
+| `legs_bank` | drop_target_bank | 3 targets `[0.075,0.360]`, `[0.105,0.375]`, `[0.135,0.390]` | `facing_deg` **297**, `reset` "script" | robot legs, at the bottom of the robot. Span `sqrt(0.060² + 0.030²)` = 0.067082 over 2 gaps ⇒ pitch **0.03354** (face gap 0.0085), row bearing +26.6°, outward normal **296.6°** (authored as 297) — all three are properties of the row's own shape and survive a pure translation. **Its y is what does not (computed).** This row must sit clear of the only channel the RF up-left shots have: at `[0.085–0.145, 0.470–0.500]` it lies straight across it, with the §0.8 left-orbit entry band (119.96°–121°) passing **0.00924** from the middle target and **0.02425** from the top one against the 0.026 they need, and the RF→`control_booth` ray passing **0.01150** from the middle target — both of §3.4's RF shots blocked by a bank that is *up* at every ball start. At the authored y, 0.110 lower, the row clears the orbit band by **+0.00723** at its worst point (121°, top target) and the booth line by **+0.06064**. The **shooter** is the *left* flipper, emphatically: from RF the three targets bear 137.14°/131.99°/126.57°, all three past its 121° rest end, while from LF they bear 105.08°/97.88°/91.25°, comfortably inside (§3.4, +7.9°). The ball arrives 18.7° off this face's normal — well inside the ±90° that makes it a face hit |
+| `crane_dock` | kicker | `[0.350, 0.786]` | `style` "scoop", `capture_ms` 1200, `eject_angle_deg` **120**, `eject_speed` 1.2 | lock pickup point, 0.022 m **below** the rail floor under its feed gap; the kick lobs the ball up-and-west through the gap into the channel (it is not an along-rail eject — that would fire into the underside of the floor wall). Reached from LF at −17.3° (bearing 72.70°, 13.70° inside LF's window). Its clearance is set by `torso_bank`'s west end: the perpendicular from the ray to `[0.310, 0.560]` is **0.02902**, less the 0.026 a target face plus ball needs ⇒ ball margin **+0.00302** — measure it that way, never centre-to-centre with nothing taken out (which reads 0.016 and means nothing). This is the tightest row on this table and the reason neither the dock nor that target may move toward the other |
+| `crane_rail` | wall ×3 | floor `[0.385,0.809]` → `[0.372,0.8086]` **and** `[0.310,0.8070]` → `[0.165,0.803]`; roof `[0.385,0.845]` → `[0.165,0.839]` | `material` "wood" | channel under the crane, open at both ends, **0.036 m** clear everywhere (ball 0.027 + 0.009 play): above 09 §6's 0.033 minimum lane width and outside its 0.025–0.032 jam band — narrow this channel at any point (0.028, say) and it lands inside that band. Floor tilt toward the bay = atan(0.006/0.220) = **1.56°**. The 0.062 m break in the floor is `crane_dock`'s feed gap; nothing rolls across it (every magnet is west of it) |
 | `crane_mag_a/b/c` | magnet ×3 | `[0.300,0.820]`, `[0.225,0.818]`, `[0.150,0.816]` | `strength` 1.6, `radius` **0.090**, `default_on` false | on the ball-centre line of the rail (floor + 0.0135). Spaced **0.075 < radius**, so each magnet's field reaches the previous one's core — that is what makes the hand-off chain work — and the three fields cover x ∈ [0.060, 0.390], i.e. the whole channel and the bay |
 | `assembly_bay` | ball_lock | `[0.150, 0.816]` | `capacity` 3, `style` "visible" | at `crane_mag_c`'s core, 0.015 past the rail's west mouth, so a ball held by the last magnet is in the lock mouth. 0.075 inboard of the left orbit guide (x 0.075), so orbit balls can never enter it. Re-run at 08 §6.14's **0.020 m** capture radius (§2.4) the tightest §3.4 line is `control_booth` at 0.08625 ⇒ **+0.06625**; every other row is ≥ +0.07107 |
 | `conv_1/2/3` | magnet ×3 | `[0.160,0.580]`, `[0.250,0.580]`, `[0.340,0.580]` | `strength` 0.5, `radius` 0.060, `default_on` false | conveyor |
-| `control_booth` | kicker | `[0.160, 0.560]` | `style` "scoop", `eject_angle_deg` -55, `eject_speed` 3.0 | mode start. **x 0.160, not 0.085, and the test is lateral not vertical (computed).** The old note argued only that the mouth tops out at 0.574, under the left orbit mouth at `entry_y_left` 0.600 — a y-only test that says nothing about a ray which crosses that height on its way past. It does cross it: the RF→left-mouth ray meets y 0.560 at x 0.08243 at §0.8's binding 119.96° entry bearing, i.e. **0.00217** from a scoop centred at 0.085, against the 0.0275 a 0.014 rim plus a ball needs. Displaced to the far side of the corridor the same ray clears the rim by **+0.03965**, and the scoop is still shot from RF, now at 111.91° — **9.09°** inside the rest end instead of 1.28°, and clear of `legs_bank` (§3.4) |
+| `control_booth` | kicker | `[0.160, 0.560]` | `style` "scoop", `eject_angle_deg` -55, `eject_speed` 3.0 | mode start. **x 0.160, and the test that fixes it is lateral, not vertical (computed).** Sitting below the left orbit mouth is *not* the test: a scoop whose rim tops out at y 0.574, under `entry_y_left` 0.600, still stands in the orbit ray, because the ray crosses that height on its way past. At §0.8's binding 119.96° entry bearing the RF→left-mouth ray meets y 0.560 at x 0.08243 — **0.00217** from a scoop centred at 0.085, against the 0.0275 a 0.014 rim plus a ball needs. On the far side of the corridor the same ray clears the rim by **+0.03965**, and the scoop is still shot from RF, at 111.91° — **9.09°** inside the rest end rather than 1.28° — and clear of `legs_bank` (§3.4). Test every scoop near a lane against the *ray*, not against the mouth's y |
 | `gantry_ramp` | ramp | path `[0.400,0.640]` → arc over top-right → `[0.112,0.300]` | `height_profile` `[{"s":0,"z":0},{"s":0.4,"z":0.052},{"s":1,"z":0.025}]`, `drop_exit` true | exits to left inlane |
 | `flywheel_spinner` | spinner | `[0.029, 0.700]` | `facing_deg` **76** | in the left orbit lane, on §0.8 keep-out (c)'s spinner offset (0.0085 outboard of the 0.0375 lane center) so the plate's inboard end opens a 0.03387 m escape gap. Crossings: **0.73051 m/s** slowest descent, **1.13791 m/s** slowest climb, against the 0.31 m/s wall floor |
-| `weld_targets` | standup_target ×2 | `[0.340,0.430]`, `[0.352,0.389]` | `facing_deg` 268 | weld points (modes light 5 virtual points across these + banks). **Moved out of the LF fan (computed).** At `[0.240,0.410]`/`[0.280,0.395]` the pair sat inside every left-flipper line this table has: 0.00289 from the `torso_bank` ray, 0.00078 from the `gantry_ramp` ray and 0.00679 from the `crane_dock` ray, all against 0.026 — and standups never drop, so those were not shots. The `right_orbit` ray appeared to thread between them at 0.02103/0.02167, but the pair's own clear surface gap is 0.042720 − 2·0.0125 = **0.01772**, under the 0.027 ball, so nothing could pass: correctly a blocked pair, not a lane. Re-sited east of the fan they clear `torso_bank` by **+0.00876**, `gantry_ramp` by **+0.01310** and RF→`head_bank` by **+0.01161**, keep the same 0.04272 centre separation (surface gap 0.01772 ≤ 0.024, blocked and outside 09 §6's jam band), and are shot from **RF** at 89.82°/87.28° — whence `facing_deg` 268, the pair's own perpendicular to those two arrivals. From LF they bear 57.72°/52.40°, below its 59° rest end |
+| `weld_targets` | standup_target ×2 | `[0.340,0.430]`, `[0.352,0.389]` | `facing_deg` 268 | weld points (modes light 5 virtual points across these + banks). **Sited east of the LF fan, and it must stay there (computed).** At `[0.240,0.410]`/`[0.280,0.395]` the pair sits inside every left-flipper line this table has: 0.00289 from the `torso_bank` ray, 0.00078 from the `gantry_ramp` ray and 0.00679 from the `crane_dock` ray, all against 0.026 — and standups never drop, so none of those would be shots. Nor is the pair's own centre gap a lane the `right_orbit` ray can thread: a ray 0.02103/0.02167 from the two centres looks clear, but the pair's **surface** gap is 0.042720 − 2·0.0125 = **0.01772**, under the 0.027 ball — always measure a pair's gap surface-to-surface. East of the fan they clear `torso_bank` by **+0.00876**, `gantry_ramp` by **+0.01310** and RF→`head_bank` by **+0.01161**, keep the same 0.04272 centre separation (surface gap 0.01772 ≤ 0.024, blocked and outside 09 §6's jam band), and are shot from **RF** at 89.82°/87.28° — whence `facing_deg` 268, the pair's own perpendicular to those two arrivals. From LF they bear 57.72°/52.40°, below its 59° rest end |
 
 **Crane sequence (scripted, binding).** On `kicker_enter` at `crane_dock`
 with a lock lit: hold 1200 ms (latch anim), then eject 1.2 m/s at 120°. The
@@ -1090,9 +1137,10 @@ ball leaves at `v = (−0.600, +1.039)` m/s and climbs under the 1.1105 m/s²
 in-plane gravity, so it rises the 0.022 m from `[0.350, 0.786]` to the floor
 plane in **21.4 ms**, crossing it at **x = 0.3372**. The floor's feed gap runs
 x 0.310 → 0.372, so the ball (radius 0.0135) passes through it with
-**0.0137 m** clear on the west edge and **0.0213 m** on the east — not the
-≈ 0.005 m an earlier draft quoted; the gap is a 0.062 m break and the eject
-is nowhere near either lip. It then touches the roof 0.045 m up at ≈ 0.99 m/s
+**0.0137 m** clear on the west edge and **0.0213 m** on the east: the gap is a
+0.062 m break and the eject crosses it nowhere near either lip. Compute that
+crossing x from the eject vector and the 0.022 m rise, never estimate it from
+the picture. It then touches the roof 0.045 m up at ≈ 0.99 m/s
 of climb, rebounds off wood (e = 0.30) and lands on the floor at x ≈ 0.30
 rolling west at ≈ 0.55 m/s —
 i.e. inside `crane_mag_a`'s field with almost no along-rail speed of its own.
@@ -1127,7 +1175,8 @@ magnet.
 | crane_dock | LF | **-17.3°** | scoop under the rail's feed gap at `[0.350, 0.786]` |
 | control_booth | RF | **+21.9°** | left scoop at `[0.160, 0.560]` (§3.3), bearing 111.91° — **9.09°** inside RF's rest end |
 
-**Clearance record (computed, binding; method and obstacle radii per §2.4).**
+**Clearance record (computed, binding; method and obstacle radii per §2.4,
+error bars per §0.3).**
 
 | Shot | Tested bearing | Tightest obstacle | ⊥ dist | Need | **Ball margin** |
 |---|---|---|---|---|---|
@@ -1147,7 +1196,9 @@ magnet.
 `torso_bank`'s west end nor the gantry mouth may move toward its ray. The
 three drop-dependent rows are measured with the row **down** — with it up they
 are −0.01245, −0.00307 and −0.01457, which is why they carry the qualifier
-rather than a margin.
+rather than a margin. Both millimetre rows are inside §0.3's indicative band:
+they say "do not crowd this line", not "this shot lands", and
+`shots.crane_dock.rate` / `shots.right_orbit.rate` are the verdict.
 
 ### 3.5 Rules
 
@@ -1323,34 +1374,34 @@ flipper on the right wall makes the tent shot the trickiest act on the bill.
 Prefabs: standard bottom (§0.4) **except `plunger_lane`**, which this table
 hand-places (see the shooter-lane rows below); `orbit` per **§0.8**
 (`mouth_x` 0.075, `top_radius` 0.130, `entry_y_left`
-**0.620** — the shipped value, **0.030 above §0.8's 0.590 floor** and worth
+**0.620** — **0.030 above §0.8's 0.590 floor** and worth
 **2.04317°** of mouth margin against RF's 121° rest end, and still under `tent_wall`'s left node at
 `[0.075, 0.630]`, which stays *on* the guide — `entry_y_right` 0.900) with the §0.8 merge (`orbit_merge_gate`); `top_lanes_n`
 n=3 labels B-I-G `pos` `[0.240, 0.880]`, `lane_length` 0.050 (lane centers x
 0.200 / 0.240 / 0.280); `pop_cluster` n=3 centroid `[0.290, 0.700]` spacing
 0.072 — moved down out of the §0.8 top band **and** clear of every cannon ray
 (§4.3 Cannon: the tightest is the 204° tent ray, which passes 0.05265 from
-`pop_1`'s centre, a **+0.00815 m** ball margin; the extra 0.014 m over the old
-`[0.290, 0.714]` is 0.0127 of that margin); `ramp_standard` ×2 (left ramp exits right inlane, right ramp
+`pop_1`'s centre, a **+0.00815 m** ball margin — 0.0127 of which is bought by
+the last 0.014 m of that drop, so the centroid may not rise); `ramp_standard` ×2 (left ramp exits right inlane, right ramp
 exits left inlane — mirrored returns).
 
 Element roster:
 
 | id | type | pos | key params | notes |
 |---|---|---|---|---|
-| `cannon_breech` | kicker | `[0.4625, 0.876]` | `style` "scoop", `capture_ms` 400, `eject_speed` 4.0, `eject_angle_deg` 90 | **in the right mouth's throat, 0.018 below the aperture** `[0.445, 0.900]`–`[0.480, 0.888]` (§0.8) and in open playfield: the guide wall does not start until y 0.900 and the shooter wall tops out at 0.888, so the breech still has line of sight across the whole field. x = 0.4625 is the mouth's mid-line and the only x from which a 90° eject threads the 0.037 m mouth — **0.0040 m** clear of the shooter wall's top node and the same of the guide wall's lower node, with nothing in between (the merged lane emits no top post, §0.8 — the old one was **0.015305** from this centre against the 0.0215 a post + ball needs, so the breech was inside it and no eject could resolve); the scoop's own 0.014 m rim stands 0.0035 m off `shooter_wall_high`, blocked (≤ 0.024) and clear of the jam band. It captures every ball that uses the right mouth **in either direction**: a LOAD shot from RF going in (§4.4 — the LF line is blocked), and the ball a soft plunge sends back out (§0.8) — which is what makes the skill shot a cannon shot. A **full plunge no longer passes here**: it merges into the orbit above the mouth and rides over the top, so the first-launch cannon load is won with the soft plunge, not the hard one. With LOAD unlit the script immediately kicks it on at the listed default (4.0 m/s at 90°, up the empty leg and around the top), so the right orbit still plays as a loop. Not a `vuk`: a vuk must bind to a ramp end within 0.03 m and ignores eject angles (08-physics.md §6.9, 09-table-format.md §4.12), and no ramp end is here; every aimed shot kicks with an explicit angle. **Post-deletion re-verification (computed).** *Held ball clears every surface:* centred at `[0.4625, 0.876]` the ball has **+0.0040** to `shooter_wall_high`'s face (x 0.480), **+0.00772** to its top node `[0.480, 0.888]` — which is also the coincident inner end of `orbit_merge_gate` and `shooter_gate`, centre distance `sqrt(0.0175² + 0.012²)` = 0.021219 − 0.0135 — and **+0.016203** to the guide wall's lower node `[0.445, 0.900]` (0.029703 − 0.0135); it sits 0.017027 perpendicular under the mouth line, i.e. 0.003527 below the aperture plane, and nothing else is inside 0.030. *The 90° eject resolves:* straight up the mouth's mid-line it passes both aperture nodes with **0.0040** to spare and meets no solid collider before the top corner, because §0.8's keep-out (a) bars one, keep-out (b) empties the leg of spinners, and the right entry switch is an `open` gate. *The soft-plunge load reaches the disc:* a ball turned out of §0.8's 72° fan descends hugging the wall on x 0.4665, so it passes the breech centre at **0.0040** — inside the 0.014 m capture disc (08 §6.9) with 0.010 to spare — and cannot slip between scoop and wall, that gap being 0.0035 against a 0.027 ball; a ball that drops straight through the 0.037 m mouth instead has its centre confined to x ∈ [0.4585, 0.4665], again **≤ 0.0040** off the disc centre. Capture is geometric, not lucky |
+| `cannon_breech` | kicker | `[0.4625, 0.876]` | `style` "scoop", `capture_ms` 400, `eject_speed` 4.0, `eject_angle_deg` 90 | **in the right mouth's throat, 0.018 below the aperture** `[0.445, 0.900]`–`[0.480, 0.888]` (§0.8) and in open playfield: the guide wall does not start until y 0.900 and the shooter wall tops out at 0.888, so the breech still has line of sight across the whole field. x = 0.4625 is the mouth's mid-line and the only x from which a 90° eject threads the 0.037 m mouth — **0.0040 m** clear of the shooter wall's top node and the same of the guide wall's lower node, with nothing in between (the merged lane emits no top post, §0.8 — a post there would stand **0.015305** from this centre against the 0.0215 a post + ball needs, putting the breech inside it with no eject able to resolve); the scoop's own 0.014 m rim stands 0.0035 m off `shooter_wall_high`, blocked (≤ 0.024) and clear of the jam band. It captures every ball that uses the right mouth **in either direction**: a LOAD shot from RF going in (§4.4 — the LF line is blocked), and the ball a soft plunge sends back out (§0.8) — which is what makes the skill shot a cannon shot. A **full plunge does not pass here**: it merges into the orbit above the mouth and rides over the top, so the first-launch cannon load is won with the soft plunge, not the hard one. With LOAD unlit the script immediately kicks it on at the listed default (4.0 m/s at 90°, up the empty leg and around the top), so the right orbit still plays as a loop. Not a `vuk`: a vuk must bind to a ramp end within 0.03 m and ignores eject angles (08-physics.md §6.9, 09-table-format.md §4.12), and no ramp end is here; every aimed shot kicks with an explicit angle. **Verification against a post-free mouth (computed) — re-run all three checks if any node here moves.** *Held ball clears every surface:* centred at `[0.4625, 0.876]` the ball has **+0.0040** to `shooter_wall_high`'s face (x 0.480), **+0.00772** to its top node `[0.480, 0.888]` — which is also the coincident inner end of `orbit_merge_gate` and `shooter_gate`, centre distance `sqrt(0.0175² + 0.012²)` = 0.021219 − 0.0135 — and **+0.016203** to the guide wall's lower node `[0.445, 0.900]` (0.029703 − 0.0135); it sits 0.017027 perpendicular under the mouth line, i.e. 0.003527 below the aperture plane, and nothing else is inside 0.030. *The 90° eject resolves:* straight up the mouth's mid-line it passes both aperture nodes with **0.0040** to spare and meets no solid collider before the top corner, because §0.8's keep-out (a) bars one, keep-out (b) empties the leg of spinners, and the right entry switch is an `open` gate. *The soft-plunge load reaches the disc:* a ball turned out of §0.8's 72° fan descends hugging the wall on x 0.4665, so it passes the breech centre at **0.0040** — inside the 0.014 m capture disc (08 §6.9) with 0.010 to spare — and cannot slip between scoop and wall, that gap being 0.0035 against a 0.027 ball; a ball that drops straight through the 0.037 m mouth instead has its centre confined to x ∈ [0.4585, 0.4665], again **≤ 0.0040** off the disc centre. Capture is geometric, not lucky |
 | `aim_lights` | light ×5 | arc r 0.06 around breech | `shape` "arrow", `direction_deg` per target | sweep 4 Hz through the five **computed, non-uniform** bearings of §4.3 Cannon: 195° `ringmaster` / 204° `tent_scoop` / 226° pop nest / 252° `right_ramp` / 266° `jug_targets` |
 | `ringmaster` | standup_target | `[0.185, 0.804]` | `facing_deg` 21 | the "ringmaster" board, faces the breech; the cannon's flattest lit angle and a lucky RF ricochet target. y 0.804 (not 0.795) is what buys the 195° ray its **+0.00827 m** margin under the B-I-G divider end while keeping 9° to the 204° tent ray. Its face ends 0.0393 from that divider end — passable (≥ 0.033), not jam band |
 | `tent_scoop` | kicker | `[0.100, 0.712]` | `style` "scoop", `eject_angle_deg` -50, `eject_speed` 3.0 | mode start, inside the tent: the alcove bounded by the left orbit guide (x 0.075), `tent_wall` below and open field to the east. Its 0.014 m rim stands **0.011 m** off the guide wall — blocked (≤ 0.024), clear of the jam band. Reachable only by the cannon's 204° ray and by `cannonade_flipper` (bearing 135.16°); both main flippers are walled off (`tent_wall`). The −50° eject leaves the alcove the same way a ball enters it, clearing the wall's east node by **0.0112** ball margin |
 | `tent_wall` | wall | path `[0.075, 0.630]` → `[0.155, 0.608]` | `material` "plastic" | the tent's canvas front, length 0.0830, sloping **15.4° down to the right** — above 08 §1.3's 12.7°, so a ball that lands in the alcove and misses the scoop always rolls off the east end instead of resting on it. Left node is *on* the orbit guide wall (gap 0.000); the east node clears the left ramp mouth's upper flange `[0.1656, 0.5755]` by **0.0342** (passable, ≥ 0.033) and `pop_2`'s cap by 0.0910. See §4.3 Tent wall for the blocking arithmetic |
-| `tent_lock` | ball_lock | `[0.100, 0.758]` | `capacity` 2, `style` "hidden" | behind (above) the tent scoop, 0.046 up-table of it; locked balls vanish into the tent. The 204° cannon ray — the rounded angle the cannon actually fires — passes **0.03964** from it, **+0.01964** against the **0.020 m** capture radius (08 §6.14 tests a circle of radius 0.02 m on the ball **centre**, so no ball radius comes off; §2.4's radius list carries the row now) [0.04191 ⇒ **+0.02191** at the exact 204.343° bearing]. The old **+0.01214** was the 0.014 m kicker-rim figure borrowed from `tent_scoop`. On the **195°** ringmaster ray the lock sits at 0.38122 — **0.09452 beyond** the `ringmaster` face that ray is aimed at — and clears the same circle by only **+0.00016** rounded [+0.00318 exact], so a shot that misses the standup and runs on is captured rather than lost; the unlit-lock `tb.release_lock` pattern (10-scripting.md) is what returns it |
+| `tent_lock` | ball_lock | `[0.100, 0.758]` | `capacity` 2, `style` "hidden" | behind (above) the tent scoop, 0.046 up-table of it; locked balls vanish into the tent. The 204° cannon ray — the rounded angle the cannon actually fires — passes **0.03964** from it, **+0.01964** against the **0.020 m** capture radius (08 §6.14 tests a circle of radius 0.02 m on the ball **centre**, so no ball radius comes off; §2.4's radius list carries the row now) [0.04191 ⇒ **+0.02191** at the exact 204.343° bearing]. Do not borrow the neighbouring `tent_scoop`'s 0.014 m kicker-rim figure for it — that reads +0.01214 and is the wrong radius for a lock. On the **195°** ringmaster ray the lock sits at 0.38122 — **0.09452 beyond** the `ringmaster` face that ray is aimed at — and clears the same circle by only **+0.00016** rounded [+0.00318 exact], so a shot that misses the standup and runs on is captured rather than lost; the unlit-lock `tb.release_lock` pattern (10-scripting.md) is what returns it |
 | `plate_l` | spinner | `[0.029, 0.680]` | `facing_deg` **76** | in the left orbit lane, on §0.8 keep-out (c)'s spinner offset (0.0085 outboard of the 0.0375 lane center) so the plate's inboard end opens a 0.03387 m escape gap. Crossings: **0.68117 m/s** slowest descent (0.50622 at `plate_r` above it, less that plate's 0.11644 axial loss, then 0.180 m of fall), **1.25355 m/s** slowest climb, against the 0.31 m/s wall floor |
-| `plate_r` | spinner | `[0.029, 0.860]` | `facing_deg` **76** | in the **left** orbit lane on §0.8 keep-out (c)'s spinner offset, 0.180 up-lane of `plate_l`; still spun by every ball the breech kicks on, because a 4.0 m/s eject is far past §0.8's 1.6906 full-loop threshold, so every kicked ball rides the top and comes back down this leg. **Why it is not in the right leg (computed).** It shipped at `[0.4825, 0.905]`, `facing_deg` 90 — a level plate whose wall normal is exactly 90°, the one normal that carries gravity. 08 §6.6 makes a spinner "not a solid collider **(except when too slow to pass)**": under `s_pass` 0.15 m/s the plate is a `steel` wall for that contact. A plunge reaching y 0.905 at 0.15 m/s is `v0` **1.54672**; passing costs 0.12 m/s, so the ball re-crossed downward at `v − 0.12`, under 0.15 for `v0` < **1.56293** — every plunge in **[1.54672, 1.56293)** came to rest **on** the plate, and that band sits inside the 1.524–1.6028 mouth-feed window this table's skill shot is authored on. Tilting it does not help (a plate spans its lane, Common pitfalls, so a tilted one wedges against a lane wall), and the whole straight leg lies inside §0.8's merge corridor, so §0.8's keep-out (b) now bars spinners from the merged right lane outright. **The left leg is not simply "off the plunge path" (corrected).** A ball descending it after the loop crosses y 0.860 at **0.50622 m/s** — `sqrt(2[1.11052·0.1665 − 0.24367·0.233])`, the path being the quarter arc **0.18300** plus the 0.050 straight run, not the 0.193882 the old row used — far above the wall band. But §4.4's own `left_orbit` row sends an RF ball **up** this leg past both plates, and a climbing ball can be arbitrarily slow, which is exactly the stall keep-out (b) describes, mirrored. §0.8 keep-out **(c)** is what closes it: the 0.0085 outboard offset and `facing_deg` 76 give the plate a 14.0° lean and a 0.03387 m inboard escape gap, so nothing rests on it. Slowest climb here is **0.89750 m/s** (0.78107 to finish the loop from y 0.860, plus the 0.11644 axial loss), **+0.58750** over the 0.31 m/s floor |
-| `hoop` | spinner | `[0.290, 0.600]` | `facing_deg` **76** | center lane feeding the pop nest **0.0482** above it: nest bottom caps y 0.6482 (`pop_2`/`pop_3` y 0.679215 − the 0.031 cap) against the plate centre y 0.600, and **0.04518** from the plate's own high end (half-span 0.0125 along its **14.0°** span ⇒ y 0.603024). Passable on either measure (≥ 0.033). **Re-faced 92 → 76 (§0.8 keep-out (c)):** at 92 the plate leaned 2°, under the 12.675° at which gravity restarts a stopped ball, so a ball that settled on it stayed — the one spinner here that is *not* in a lane, and therefore the one the 14.0° lean alone fixes, because both plate ends open on field and a restarted ball rolls straight off the low end |
+| `plate_r` | spinner | `[0.029, 0.860]` | `facing_deg` **76** | in the **left** orbit lane on §0.8 keep-out (c)'s spinner offset, 0.180 up-lane of `plate_l`; still spun by every ball the breech kicks on, because a 4.0 m/s eject is far past §0.8's 1.6906 full-loop threshold, so every kicked ball rides the top and comes back down this leg. **Why no plate may sit in the right leg (computed).** Put one at `[0.4825, 0.905]`, `facing_deg` 90 and it is a level plate whose wall normal is exactly 90°, the one normal that carries gravity. 08 §6.6 makes a spinner "not a solid collider **(except when too slow to pass)**": under `s_pass` 0.15 m/s the plate is a `steel` wall for that contact. A plunge reaching y 0.905 at 0.15 m/s is `v0` **1.54672**; passing costs 0.12 m/s, so the ball re-crosses downward at `v − 0.12`, under 0.15 for `v0` < **1.56293** — every plunge in **[1.54672, 1.56293)** comes to rest **on** the plate, and that band sits inside the 1.524–1.6028 mouth-feed window this table's skill shot is authored on. Tilting it does not help (a plate spans its lane, Common pitfalls, so a tilted one wedges against a lane wall), and the whole straight leg lies inside §0.8's merge corridor — which is why §0.8's keep-out (b) bars spinners from the merged right lane outright. **"Off the plunge path" is not what makes the left leg safe.** A ball descending it after the loop crosses y 0.860 at **0.50622 m/s** — `sqrt(2[1.11052·0.1665 − 0.24367·0.233])`, the path being the quarter arc **0.18300** plus the 0.050 straight run (split the arc on the ball *centre*'s tangent point, §0.8, or the path reads 0.193882 and the speed comes out wrong) — far above the wall band. But §4.4's own `left_orbit` row sends an RF ball **up** this leg past both plates, and a climbing ball can be arbitrarily slow, which is exactly the stall keep-out (b) describes, mirrored. §0.8 keep-out **(c)** is what closes it: the 0.0085 outboard offset and `facing_deg` 76 give the plate a 14.0° lean and a 0.03387 m inboard escape gap, so nothing rests on it. Slowest climb here is **0.89750 m/s** (0.78107 to finish the loop from y 0.860, plus the 0.11644 axial loss), **+0.58750** over the 0.31 m/s floor |
+| `hoop` | spinner | `[0.290, 0.600]` | `facing_deg` **76** | center lane feeding the pop nest **0.0482** above it: nest bottom caps y 0.6482 (`pop_2`/`pop_3` y 0.679215 − the 0.031 cap) against the plate centre y 0.600, and **0.04518** from the plate's own high end (half-span 0.0125 along its **14.0°** span ⇒ y 0.603024). Passable on either measure (≥ 0.033). **`facing_deg` 76, not a near-level 92 (§0.8 keep-out (c)):** at 92 the plate leans 2°, under the 12.675° at which gravity restarts a stopped ball, so a ball that settles on it stays. This is the one spinner here that is *not* in a lane, and therefore the one the 14.0° lean alone secures: both plate ends open on field, so a restarted ball rolls straight off the low end |
 | `left_ramp` | ramp | `[0.150,0.560]` → cross right → `[0.408,0.300]` | profile as neon-drift left_ramp | "trapeze L" |
 | `right_ramp` | ramp | `[0.352,0.545]` → cross left → `[0.112,0.300]` | mirrored profile | "trapeze R" |
 | `jug_targets` | standup_target ×3 | `[0.442,0.560]`, `[0.452,0.528]`, `[0.459,0.496]` | `facing_deg` 200 | J-U-G |
-| `cannonade_flipper` | flipper | `[0.462, 0.352]` | `length` 0.055, `rest_angle_deg` **−132**, `swing_deg` 42, `side` "right", `input` "right", `strength` 0.85 | wall-mounted (pivot 0.018 off `shooter_wall_high`, 0.007 clear of its `radius_base` 0.011); shoots up-left at the tent. **Launch window (computed, binding).** 09 §4.3 sweeps a `side` "right" flipper from `rest_angle_deg` to `rest_angle_deg − swing_deg` — here **−132° → −174°** (228° → 186°) — and the bat launches perpendicular to itself in the sweep direction, so the ball leaves on **138° → 96°**. The tent line from this pivot is **135.16°** (§4.3 Tent wall), **2.84°** inside the rest end; `tent_scoop`'s 0.014 m capture disc at 0.5105 m subtends **±1.571°**, so the entire capture cone **133.59°–136.73°** falls inside the window, with **1.27°** to spare at the top and 37.59° at the bottom. The old `rest_angle_deg` 128 was a mirror error: it swept 128° → 86° for bearings **38° → −4°** — up-*right*, into `shooter_wall_high` 0.018 m away — so the tent was unreachable by any flipper and §4.7's 14 §8.3 exception had no feeder. Same convention reproduces every other flipper here: standard RF (−149, 52) ⇒ 121°→69°, bracketing all of §4.4's RF shots; standard LF (−31, 52) ⇒ 59°→111°, bracketing its LF shots. At rest the bat spans `[0.4252, 0.3111]`–`[0.462, 0.352]`, under and left of `feed_gate`'s drop, and the sweep lifts that span up-left through the drop zone; the tip is below the pivot at every angle from −132° to −174°, so the **whole swept envelope tops out at y 0.363** (`pos.y` 0.352 + `radius_base` 0.011) |
+| `cannonade_flipper` | flipper | `[0.462, 0.352]` | `length` 0.055, `rest_angle_deg` **−132**, `swing_deg` 42, `side` "right", `input` "right", `strength` 0.85 | wall-mounted (pivot 0.018 off `shooter_wall_high`, 0.007 clear of its `radius_base` 0.011); shoots up-left at the tent. **Launch window (computed, binding).** 09 §4.3 sweeps a `side` "right" flipper from `rest_angle_deg` to `rest_angle_deg − swing_deg` — here **−132° → −174°** (228° → 186°) — and the bat launches perpendicular to itself in the sweep direction, so the ball leaves on **138° → 96°**. The tent line from this pivot is **135.16°** (§4.3 Tent wall), **2.84°** inside the rest end; `tent_scoop`'s 0.014 m capture disc at 0.5105 m subtends **±1.571°**, so the entire capture cone **133.59°–136.73°** falls inside the window, with **1.27°** to spare at the top and 37.59° at the bottom. **The sign matters here too:** a positive `rest_angle_deg` (128) sweeps 128° → 86° for bearings **38° → −4°** — up-*right*, into `shooter_wall_high` 0.018 m away — leaving the tent unreachable by any flipper and §4.7's 14 §8.3 exception with no feeder. The same convention reproduces every other flipper here: standard RF (−149, 52) ⇒ 121°→69°, bracketing all of §4.4's RF shots; standard LF (−31, 52) ⇒ 59°→111°, bracketing its LF shots. At rest the bat spans `[0.4252, 0.3111]`–`[0.462, 0.352]`, under and left of `feed_gate`'s drop, and the sweep lifts that span up-left through the drop zone; the tip is below the pivot at every angle from −132° to −174°, so the **whole swept envelope tops out at y 0.363** (`pos.y` 0.352 + `radius_base` 0.011) |
 | `shooter_wall_low` | wall | path `[0.480,0.000]` → `[0.480,0.412]` | `material` "wood" | lower half of the hand-placed shooter lane; starts at y 0 so the lane is watertight against the bottom wall (09 §5.2) |
 | `shooter_wall_high` | wall | path `[0.480,0.448]` → `[0.480,0.888]` | `material` "wood" | upper half, topping out **on** 09 §5.2's gate line `y_gate = top_y + 0.008 = 0.888` — which is also the inner endpoint of §0.8's `orbit_merge_gate` and the outer edge of the right orbit mouth. The 0.036 m break between the two walls is `feed_gate`'s aperture |
 | *(no top post)* | — | — | — | this lane merges into the orbit, so it takes 09 §5.2's **merged variant**: three elements, no `<id>_top_post`. A post at `[0.472, 0.888]` would sit 0.002595 from the mouth line and leave 0.021547 to the guide's lower node (§0.8) — the right mouth would pass nothing, `cannon_breech` at `[0.4625, 0.876]` would be **0.015305** from the post centre where 0.0215 is needed (i.e. geometrically inside it, no eject resolvable), and the post + closed flap would trap balls at `[0.486145, 0.904192]`. `shooter_wall_high`'s top node is a rounded end cap on its own |
@@ -1362,7 +1413,7 @@ Element roster:
 The four hand-placed shooter-lane elements **are** the documented
 `plunger_lane` expansion in its **merged variant** (09-table-format.md §5.2
 with `lane_width` 0.040, `top_y` 0.880, `max_speed` 7.5 — three children, no
-top post, the wall shipped here in two halves), copied into `elements` and the prefab instance deleted,
+top post, the wall authored here in two halves), copied into `elements` and the prefab instance deleted,
 because `feed_gate` needs a hole in the lane wall and 09 §5 forbids relying
 on edits to generated elements. Ids differ from the generated
 `<instance>_wall`… names on purpose: nothing may look like a prefab child.
@@ -1370,7 +1421,7 @@ on edits to generated elements. Ids differ from the generated
 Every coordinate above is that expansion's arithmetic, not a hand guess.
 With `W = 0.520`: `xw = W − lane_width = 0.480` and
 `y_gate = top_y + 0.008 = 0.888`, giving `<id>_wall` `[0.480,0.000]` →
-`[0.480,0.888]` (shipped here as the two `shooter_wall_*` halves),
+`[0.480,0.888]` (authored here as the two `shooter_wall_*` halves),
 `<id>_gate`
 `[W − lane_width/2, y_gate]` = `[0.500,0.888]` width 0.040, and
 `<id>_plunger` `[0.500,0.030]`; `<id>_top_post` is not emitted, because the
@@ -1435,10 +1486,11 @@ floor for every row is **0.006 m**:
 | **266°** | 266.288° | `jug_targets` top `[0.442, 0.560]` | 0.3167 | `right_ramp` mouth `[0.352, 0.545]`, half-width 0.022 | 0.08714 | **+0.05164** [+0.05334] |
 
 The **204° tent row is the tightest** at **8.15 mm** (6.88 mm at the exact
-bearing), with the 195° ringmaster row next at 8.27 mm (6.98 mm exact) — *not*
-the 252° row, which the old table called tightest on a figure that had never
-had the ball radius taken out of it. Both tight rows clear the 0.006 m floor
-at the rounded angle and at the exact bearing.
+bearing), with the 195° ringmaster row next at 8.27 mm (6.98 mm exact). The
+252° row only *looks* tightest if its figure is read without the ball radius
+taken out — every row in this table has it taken out, and any re-run must too.
+Both tight rows clear the 0.006 m floor at the rounded angle and at the exact
+bearing, and both sit inside §0.3's indicative band.
 The arithmetic behind them: `pop_cluster` centroid `[0.290, 0.700]`,
 `spacing` 0.072, so vertices sit `d = 0.072/√3 = 0.041569` out (09 §5.9) —
 `pop_1` (90°) `[0.290, 0.741569]`, `pop_2` (210°) `[0.254, 0.679215]`,
@@ -1464,10 +1516,12 @@ divider end. Raise the tent and the 204° ray closes on 195°; drop it and
 Adjacent lit angles differ by **9°, 22°, 26° and 14°** — all above the 8°
 distinguishability floor, and deliberately non-uniform because the targets
 are. Rounding to whole degrees costs at most 2.8 mm of aim error at the target
-(252°), inside every target's own capture width. The old five
-(200/222/244/266/288 from a breech inside the 0.040 m shooter lane) bore on
-nothing: every leftward eject hit the lane wall 0.025 m away, and 266/288
-pointed at empty playfield.
+(252°), inside every target's own capture width. **Never author these five as
+an even fan**: a uniform set such as 200/222/244/266/288 fired from a breech
+inside the 0.040 m shooter lane bears on nothing — every leftward eject meets
+the lane wall 0.025 m away, and the two flattest point at empty playfield.
+Each angle is `bearing(breech → that target)`, recomputed whenever the breech
+or a target moves.
 
 **Tent wall (computed, binding).** `tent_wall` `[0.075, 0.630]` →
 `[0.155, 0.608]` is what makes the tent a mini-flipper shot instead of a
@@ -1502,9 +1556,9 @@ means the alcove drains east rather than holding a ball.
 the five lit-angle rows above: perpendicular from the **unbounded** 204° ray
 to the wall segment, minus the 0.0135 ball radius. The controlling point is
 the wall's **west** node `[0.075, 0.630]` at ⊥ 0.06712 ⇒ **0.05362**
-(0.05092 at the exact 204.343° bearing). Clamp the path at the scoop centre
-instead — the perpendicular foot falls 0.056 m *past* `tent_scoop` — and it
-reads 0.07219, the figure the old row quoted. The unbounded one binds: a
+(0.05092 at the exact 204.343° bearing). **Do not clamp the path at the scoop
+centre** — the perpendicular foot falls 0.056 m *past* `tent_scoop`, so a
+clamped measure reads a slacker 0.07219. The unbounded ray is what binds: a
 ball that misses the 0.014 m disc keeps going.
 
 **The 0.03418 flange gap: declared, not widened.** It clears the band's
@@ -1530,13 +1584,17 @@ only a design edit can move this gap, and any such edit re-checks it against
 | Shot | From | Angle | Path |
 |---|---|---|---|
 | left_orbit | RF | **+27.6°** | `plate_l` then `plate_r`, around top |
-| right_orbit | **RF** | **-9.0°** | into `cannon_breech` at the mouth: LOAD unlit → kicked straight on up the empty leg and around the top (the loop still counts); LOAD lit → the ball stays for the aim sequence. **Not LF**: at 67.574° that ray passes the `right_ramp` mouth at **0.03100** against the 0.0355 a 0.044 m mouth plus ball needs (**−0.00450**) and grazes `pop_3` at **0.04424** against 0.0445 (**−0.00026**) — and the two lie on *opposite* sides of the line, so the free channel is 0.07524 wide. **The widest channel is 0.07590 at 67.24°, not 0.07776 at 66.31° (corrected).** 66.320° points straight *at* the wall node `[0.480, 0.888]`, so 66.31° misses the aperture outboard and is not a right-orbit bearing at all; the LF bearings that actually thread it — `perp` ≥ 0.0135 from **both** nodes, i.e. `66.3201 + asin(0.0135/0.84403)` to `68.8306 − asin(0.0135/0.84182)` — are **67.2365°–67.9117°**, and across that band the channel runs 0.07591 down to 0.07456, widest **0.07590** at 67.24°. Against the 0.0800 a ball needs (0.022 mouth + 0.031 cap + 0.027 ball) that is **−0.00410** at the best bearing, so **no** LF bearing threads it — the conclusion is unchanged and the margin against it is 2.5 mm larger than the old row claimed. From RF at 80.991° the tightest is `jug_targets` J at 0.03205 ⇒ **+0.00605**, then the mouth's own aperture nodes at 0.01822 ⇒ +0.00472. Shared cause with voltage-vandals' §5.4 row: the LF→right-mouth bearing is 67.574° on every table, so a right-ramp entrance anywhere in the x 0.35–0.38 band lands within a few mm of what a ramp mouth needs |
+| right_orbit | **RF** | **-9.0°** | into `cannon_breech` at the mouth: LOAD unlit → kicked straight on up the empty leg and around the top (the loop still counts); LOAD lit → the ball stays for the aim sequence. **Not LF**: at 67.574° that ray passes the `right_ramp` mouth at **0.03100** against the 0.0355 a 0.044 m mouth plus ball needs (**−0.00450**) and grazes `pop_3` at **0.04424** against 0.0445 (**−0.00026**) — and the two lie on *opposite* sides of the line, so the free channel is 0.07524 wide. **Search the channel only across bearings that actually enter the mouth.** 66.320° points straight *at* the wall node `[0.480, 0.888]`, so a bearing just under it (66.31°, where the channel reads a wider 0.07776) misses the aperture outboard and is not a right-orbit bearing at all. The LF bearings that thread the mouth — `perp` ≥ 0.0135 from **both** nodes, i.e. `66.3201 + asin(0.0135/0.84403)` to `68.8306 − asin(0.0135/0.84182)` — are **67.2365°–67.9117°**, and across that band the channel runs 0.07591 down to 0.07456, widest **0.07590** at 67.24°. Against the 0.0800 a ball needs (0.022 mouth + 0.031 cap + 0.027 ball) that is **−0.00410** at the best bearing, so **no** LF bearing threads it. From RF at 80.991° the tightest is `jug_targets` J at 0.03205 ⇒ **+0.00605**, then the mouth's own aperture nodes at 0.01822 ⇒ +0.00472. Shared cause with voltage-vandals' §5.4 row: the LF→right-mouth bearing is 67.574° on every table, so a right-ramp entrance anywhere in the x 0.35–0.38 band lands within a few mm of what a ramp mouth needs |
 | left_ramp | RF | **+23.0°** | crosses to right inlane |
 | right_ramp | LF | **-26.1°** | crosses to left inlane |
 | hoop lane | RF or LF | **+5.8°** (RF) / **-17.1°** (LF) | center spinner at `[0.290, 0.600]` into the pop nest above it |
 | ringmaster | **cannon** (195°); off the flippers a lucky RF ricochet only | **—** (no clean flipper line) | left-of-centre standup. RF *does* bear on it — 102.599°, §0.3 angle +12.6°, well inside RF's window — but that ray passes **0.04012** from `pop_2` `[0.254, 0.679215]` against the 0.0445 a 0.031 cap plus ball needs: a **−0.00438** ball margin, and it falls **80.6 %** of the way down the 0.7060 m line, so the straight shot feeds the nest instead. LF is worse — 86.346° passes 0.01938 from the `left_ramp` mouth (**−0.01612**). So no angle is listed: this is the cannon's flattest lit angle (§4.3) and, from a flipper, a ricochet off the nest |
 | jug_targets | **RF** | **-15.2°** | right standup trio — **not** LF: the row runs 50.15°–55.93° from the LF pivot, 3.1°–8.9° flatter than its 59° rest end, and 72.53°–76.98° from RF |
 | tent | MF (or an aimed cannon shot) | up-left **+45.2°** (pivot line 135.16°, `cannonade_flipper` window 138°→96°) | into the alcove east of `tent_wall`; **`tent_wall` blocks both main flippers' lines** — LF's crosses it at `[0.1062, 0.6214]`, RF's at `[0.1400, 0.6121]`, cone-checked against the scoop's 0.014 m capture disc (§4.3 Tent wall) |
+
+Margins above and in §4.3's cannon table use §2.4's method and carry §0.3's
+error bars; the millimetre figures screen for blockage and `shots[<id>].rate`
+settles makeability.
 
 ### 4.5 Rules
 
@@ -1563,8 +1621,10 @@ as §0.8 has it ignore the two orbit entry switches and `orbit_merge_gate`.
 
 **Juggling Multiball.** `plate_l` and `plate_r` share the left orbit lane
 (§4.3), so one loop rips both: the pair lights a tent lock every **50**
-cumulative spins across the two (doubled during Plate Spinner) — the same
-spin work the old one-plate-per-leg pair asked for, now on one shot. Lock 2 at `tent_lock`; then
+cumulative spins across the two (doubled during Plate Spinner). Both plates
+being in one leg is why 50 is the right number: one loop rips both, so the
+count is the same spin *work* a plate-per-leg pair would ask for, delivered on
+a single shot. Lock 2 at `tent_lock`; then
 LOAD the cannon and fire at the tent = 3-ball. Jackpot alternates strictly
 L-side (left_ramp/left_orbit) / R-side (right_ramp/right_orbit): correct
 side = 400,000 + 200,000 × streak (max 5); wrong side resets the streak, no
@@ -1745,7 +1805,7 @@ Prefabs: standard bottom (§0.4) with each `inlane_outlane_pair`'s
 `divider_top` moved 0.002 m inboard (left `[0.064, 0.268]`, right mirrored)
 so the outlane channel is ≈ **0.040 m** (hardest table); `orbit` per **§0.8**
 (`mouth_x` 0.075, `top_radius` 0.130, `entry_y_left`
-**0.620** — the shipped value, **0.030 above §0.8's 0.590 floor**, worth
+**0.620** — **0.030 above §0.8's 0.590 floor**, worth
 **2.04317°** of mouth margin against RF's 121° rest end —
 `entry_y_right` 0.900) with the §0.8 merge (`orbit_merge_gate`); `top_lanes_n`
 n=3 labels C1-C2-C3 ("cameras") `pos` **`[0.330, 0.880]`**, `lane_length`
@@ -1760,10 +1820,10 @@ Element roster:
 |---|---|---|---|---|
 | `vault_bank` | drop_target_bank | 3 targets centered `[0.245, 0.845]`, pitch 0.034 | `facing_deg` 268, `reset` "script" | guards the vault scoop |
 | `vault_scoop` | kicker | `[0.245, 0.895]` | `style` "scoop", `eject_angle_deg` -62, `eject_speed` 3.2 | lock / MB start; reachable only while bank is down |
-| `vault_lock` | ball_lock | `[0.215, 0.900]` | `capacity` 2, `style` "hidden" | locked balls vanish into the vault; a held ball's top edge sits `0.900 + 0.0135` = 0.9135, **0.0515** under the §0.8 orbit guide's top run at y 0.965 (the old "0.0065" was arithmetic, not a tight fit). Tightest clearance line is the RF `vault_scoop` ray at 0.02918 ⇒ **+0.00918** against its 0.020 m capture radius (§2.4) — the tightest lock figure on any of the five |
+| `vault_lock` | ball_lock | `[0.215, 0.900]` | `capacity` 2, `style` "hidden" | locked balls vanish into the vault; a held ball's top edge sits `0.900 + 0.0135` = 0.9135, **0.0515** under the §0.8 orbit guide's top run at y 0.965 — measure that headroom from the ball's top edge to the guide's run, not from the lock `pos` to anything else, or it reads a spurious 0.0065. Tightest clearance line is the RF `vault_scoop` ray at 0.02918 ⇒ **+0.00918** against its 0.020 m capture radius (§2.4) — the tightest lock figure on any of the five |
 | `grid_a/b/c` | magnet ×3 | `[0.165,0.700]`, `[0.260,0.760]`, `[0.350,0.700]` | `strength` 2.2, `radius` 0.080, `default_on` false | alarm grid |
 | `van_scoop` | kicker | `[0.430, 0.555]` | `style` "scoop", `eject_angle_deg` 235, `eject_speed` 3.0 | heist start + banking |
-| `volt_targets` | standup_target ×4 | V `[0.175,0.615]`, O `[0.310,0.645]`, L `[0.235,0.530]`, T `[0.260,0.490]` | `facing_deg` **288 / 273 / 257 / 282** (V/O/L/T) | V-O-L-T. **Re-angled, because the old cluster could not be played (computed).** Four separately-aimed standups need four separated bearings, and `[0.205,0.610]`/`[0.245,0.625]`/`[0.220,0.520]`/`[0.260,0.535]` had none: from RF they bore 105.15°/100.44°/106.37°/100.65°, so shooting V passed **0.0094** from L and shooting O passed **0.0016** from T, against 0.026 — V and O were unreachable behind their own partners. The same four also stood in the vault lines: V was **0.00645** off the LF→`vault_bank` ray and **0.00199** off the LF→`vault_scoop` ray, and T was **0.00129** off the RF→`vault_bank` ray. Three targets are now shot from **RF** at 108.16° (V), 93.13° (O) and 101.90° (T) — 6.3° and 8.8° apart — and **L from LF** at 77.24°, in the 84°–111° band that flipper has entirely to itself; every one of the four clears every other by ≥ **+0.00403**, and the vault lines clear the cluster by ≥ **+0.00446** (§5.4). Each `facing_deg` is its own target's perpendicular to its own arrival. Surface gaps: L–T 0.0222 (≤ 0.024, blocked), every other pair ≥ 0.104 — none in 09 §6's 0.025–0.032 jam band |
+| `volt_targets` | standup_target ×4 | V `[0.175,0.615]`, O `[0.310,0.645]`, L `[0.235,0.530]`, T `[0.260,0.490]` | `facing_deg` **288 / 273 / 257 / 282** (V/O/L/T) | V-O-L-T. **Four separately-aimed standups need four separated bearings, and that is what sets these coordinates (computed).** A tighter cluster such as `[0.205,0.610]`/`[0.245,0.625]`/`[0.220,0.520]`/`[0.260,0.535]` has none: from RF those bear 105.15°/100.44°/106.37°/100.65°, so shooting V passes **0.0094** from L and shooting O passes **0.0016** from T, against 0.026 — V and O sit unreachable behind their own partners. Such a cluster also stands in the vault lines: V **0.00645** off the LF→`vault_bank` ray and **0.00199** off the LF→`vault_scoop` ray, T **0.00129** off the RF→`vault_bank` ray. Both tests bind on any re-siting here. Three targets are shot from **RF** at 108.16° (V), 93.13° (O) and 101.90° (T) — 6.3° and 8.8° apart — and **L from LF** at 77.24°, in the 84°–111° band that flipper has entirely to itself; every one of the four clears every other by ≥ **+0.00403**, and the vault lines clear the cluster by ≥ **+0.00446** (§5.4). Each `facing_deg` is its own target's perpendicular to its own arrival. Surface gaps: L–T 0.0222 (≤ 0.024, blocked), every other pair ≥ 0.104 — none in 09 §6's 0.025–0.032 jam band |
 | `fence_spinner` | spinner | `[0.029, 0.690]` | `facing_deg` **76** | "the fence", in the left orbit lane on §0.8 keep-out (c)'s spinner offset (0.0085 outboard of the 0.0375 lane center) so the plate's inboard end opens a 0.03387 m escape gap. Crossings: **0.74228 m/s** slowest descent, **1.15109 m/s** slowest climb, against the 0.31 m/s wall floor |
 | `left_kickback` | kicker | `[0.088, 0.160]` | `style` "saucer", `eject_angle_deg` 105, `eject_speed` 4.5 | in left outlane channel (fires up-lane along the §0.4 side wall) |
 | `right_kickback` | kicker | `[0.392, 0.160]` | `style` "saucer", `eject_angle_deg` 75, `eject_speed` 4.5 | in right outlane channel, mirrored |
@@ -1804,9 +1864,11 @@ buttons are ignored — no purchase.
 | right_ramp | LF | **-27.0°** | → left inlane (entrance `[0.380, 0.585]`, §5.3) |
 | vault_bank / vault_scoop | LF or RF | **-8.1°** / **+7.3°** (bank), **-7.6°** / **+6.9°** (scoop) | center; scoop only when bank down |
 | van_scoop | **RF** | **-11.7°** | right-center scoop — **not** LF: `[0.430, 0.555]` is 56.70° from the LF pivot, 2.30° flatter than its 59° rest end; from RF it is 78.31° |
-| volt_targets | **RF** (V, O, T) / **LF** (L) | **+18.2° / +3.1° / +11.9°**, **-12.8°** | four separately-aimed standups at the §5.3 coordinates. L is **not** an RF shot: from RF it would bear 106° behind V, which is why the old all-RF cluster had two unreachable letters |
+| volt_targets | **RF** (V, O, T) / **LF** (L) | **+18.2° / +3.1° / +11.9°**, **-12.8°** | four separately-aimed standups at the §5.3 coordinates. L is **not** an RF shot: from RF it bears 106°, behind V — assign all four to RF and two letters have no line at all (§5.3) |
 
-**Clearance record (computed, binding; method and obstacle radii per §2.4).**
+**Clearance record (computed, binding; method and obstacle radii per §2.4,
+error bars per §0.3 — this table has the most sub-10 mm rows of the five, so
+its `shots[<id>].rate` measurements carry correspondingly more of the verdict).**
 
 | Shot | Tested bearing | Tightest obstacle | ⊥ dist | Need | **Ball margin** |
 |---|---|---|---|---|---|
@@ -1826,18 +1888,17 @@ buttons are ignored — no purchase.
 | volt L (LF) | 77.238° | `volt_targets` T `[0.260, 0.490]` | 0.03322 | 0.026 | **+0.00722** |
 | volt T (RF) | 101.896° | `right_ramp` mouth — nothing nearer | 0.13046 | 0.0355 | **+0.09496** |
 
-Two rows were mis-stated and are corrected above. `left_orbit` had been tested
-at **119.26°**, labelled "§0.8 floor + slack" — but the floor for
-`entry_y_left` 0.620 is **118.95683°** (`117.5993 + 1.3575`, §0.8), and testing
-*above* the floor understates the worst case, since the ray flattens toward it.
-Re-run at the true floor the row is still clean: 0.05343 ⇒ **+0.01793**, and
-0.07149 ⇒ +0.03599 at RF's 121° rest end. `right_orbit` had named the
-`right_ramp` mouth as tightest at +0.00612; on the same 67.574° ray the right
-mouth's own aperture nodes bind first at **+0.00497**. cosmic-carnival's §4.4
-already counts those nodes on its RF line and neon-drift's §1.4 on its LF one —
-this table was the only one omitting them. `vault_lock` is now measured at 08
-§6.14's 0.020 m capture radius (§2.4): **+0.00918** on the RF `vault_scoop`
-line, still clear of the +0.003 floor and behind that row's C1 divider end.
+Two conventions this table is easy to get wrong, both binding. **Test an orbit
+row at §0.8's true floor, never above it.** For `entry_y_left` 0.620 that floor
+is **118.95683°** (`117.5993 + 1.3575`, §0.8) — a nominal "floor + slack"
+bearing such as 119.26° understates the worst case, because the ray flattens
+toward the floor. **Count the right mouth's own aperture nodes on every
+`right_orbit` line.** On the 67.574° ray they bind first, at **+0.00497**,
+ahead of the `right_ramp` mouth's +0.00612; cosmic-carnival's §4.4 counts them
+on its RF line and neon-drift's §1.4 on its LF one, and every table must.
+`vault_lock` is measured at 08 §6.14's 0.020 m capture radius (§2.4):
+**+0.00918** on the RF `vault_scoop` line, clear of the +0.003 floor and behind
+that row's C1 divider end.
 
 `vault_scoop` keeps its "only when the bank is down" qualifier from the row
 above — that is a rules gate, not a clearance one; its margins here are
@@ -1983,14 +2044,23 @@ table-select menu.
   §8.2 report) ≥ the table's floor before writing rules on it. The tent
   (cosmic-carnival) must be impossible from the main flippers yet reliable
   from the mini flipper.
+- **Mistaking a clearance margin for proof that a shot lands.** Every margin
+  in this document comes from §0.3's straight-ray model, which omits path
+  droop under slope gravity (≈ 5.6 mm on a 5 m/s shot over 0.50 m, ≈ 10 mm on
+  a 4 m/s shot over 0.55 m) and the offset of the real launch point along the
+  bat face — both larger than a typical margin. Below ~10 mm the number is
+  **indicative**: it screens for gross blockage and tells you which element
+  may not move, and `shots[<id>].rate` from the §0.7 `tb_autoplay` suite is
+  what decides makeability. Never retune geometry off a paper margin alone.
 - **Magnet holds instead of pulses.** Crane and conveyor (tilt-o-tron) use
   timed `tb.magnet_pulse` chains; only the alarm grid (voltage-vandals) uses
   sustained `tb.magnet_on`, guarded by the 2.0 s script watchdog. A magnet
   left on is a stuck ball and fails `stuck_balls` 0.
 - **Placing orbit furniture off the lane center.** An orbit hugs the
   boundary, so with §0.8's `mouth_x` 0.075 the lane centers are
-  `mouth_x/2` = 0.0375 and `W − mouth_x/2` = 0.4825 — not the 0.0975 / 0.4225
-  of the old inset model, which now falls outside the lane entirely. A magnet,
+  `mouth_x/2` = 0.0375 and `W − mouth_x/2` = 0.4825. Do **not** compute them as
+  if the lane were inset from the wall (0.0975 / 0.4225): those x's fall
+  outside the lane entirely, and a magnet,
   lock or light that misses the center line simply misses the ball. A
   `spinner` is the one deliberate exception: its 0.025 m plate is offset 0.0085
   **outboard** (x 0.029 / 0.491) and leaned 14.0°, because a plate centred in a
@@ -2041,9 +2111,10 @@ table-select menu.
   or `rest + 90` → `rest + 90 + swing` ("left") — 52° wide for the standard
   pair (§0.4), which is far narrower than a layout picture suggests. Elements
   near a side wall at mid height are usually shot from the **far** flipper,
-  not the near one: §1.4 `pit_scoop`, §2.4 `order_window` / `bur_targets` /
-  `ger_targets`, §3.4 `legs_bank`, §4.4 `jug_targets` and §5.4 `van_scoop`
-  all shipped naming the wrong flipper. Compute `bearing(pivot → aim point)`
+  not the near one — §1.4 `pit_scoop`, §2.4 `order_window` / `bur_targets` /
+  `ger_targets`, §3.4 `legs_bank`, §4.4 `jug_targets` and §5.4 `van_scoop` are
+  all cross-field shots, and each row says so explicitly because the near
+  flipper is the intuitive wrong answer. Compute `bearing(pivot → aim point)`
   per §0.3 and check it against the window before writing a §x.4 row.
 - **Shipping without `meta.replay_score`.** The framework falls back to
   5,000,000 (11-game-framework.md §3.3), which is under every table's
@@ -2125,7 +2196,10 @@ table-select menu.
       lean, 0.03387 m inboard escape gap, and a recorded slowest crossing
       above the **0.31 m/s** wall floor in each direction its leg carries.
 - [ ] Every shot-map shot meets its `shots[<id>].rate` floor and the tent shot
-      is unmakeable from the main flippers, measured by the §0.7 protocol.
+      is unmakeable from the main flippers, **measured** by the §0.7 protocol —
+      the §x.4 clearance records are §0.3's straight-ray screening, not
+      evidence for this box, and where the two disagree the measurement wins
+      and the geometry is retuned by §0.7's steps.
 - [ ] All §x.7 difficulty targets pass on one uninterrupted §0.7 suite per
       table (three 500-run `--balls 3` sweeps at skills 0/1/2 + the single
       skill-1 300 s coverage session; `--runs 20` iteration numbers never

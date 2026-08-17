@@ -36,8 +36,13 @@ These apply to every milestone; individual milestones do not restate them.
 5. **Size bands:** S ≈ under 800 added LOC, M ≈ 800–1,800, L ≈ 1,800–3,000.
    Above ~3,000 projected → split per 03-process.md §5.
 6. **Requirement IDs** R1–R10 in acceptance criteria are PLAN.md §3.
-7. **Test naming:** files `tests/<module>/<topic>_test.cpp`, gtest names
-   `Suite.Case` as listed per milestone; conventions in 16-testing-ci.md.
+7. **Test naming:** files `tests/<module>/<topic>_test.cpp`.
+   **16-testing-ci.md §2 owns the naming convention.** The PascalCase
+   `Suite.Case` labels listed per milestone name required *coverage*, not
+   literal gtest ids: implement each under §2's
+   `unit_`/`det_`/`feel_`/`script_`/`perf_` taxonomy, whose prefixes drive the
+   CI filter regexes. An id already spelled in taxonomy form here — M0's
+   `unit_scaffold.sanity` — is quoted verbatim from §2/§3.2, never re-coined.
 8. Each milestone is self-contained: a fresh LLM session with PLAN.md, this
    file, and the cited spec docs must be able to execute it.
 
@@ -53,7 +58,8 @@ gates every future PR.
 file that workflow reads on the same commit** (the `tb-setup` composite
 action, `tests/lsan.supp`, `tests/quarantine.txt`), formatting config,
 doc/journal seeds, stub sources so every canonical target links, the three
-vendored OFL fonts, and `main` branch protection.
+vendored OFL fonts, the vendored `picosha2.h` their test hashes them with,
+and `main` branch protection.
 **Scope out:** any windowing, rendering, or simulation logic; SDL is a
 declared dependency but not yet initialized.
 
@@ -61,9 +67,14 @@ declared dependency but not yet initialized.
 
 1. Commit `/.clang-format` (exact content: 03-process.md §1.4) and
    `/.gitignore` (below).
-2. Commit `vcpkg.json` (below) and pin the baseline: run
-   `vcpkg x-update-baseline --add-initial-baseline` and commit the resulting
-   `builtin-baseline` field.
+2. Commit `vcpkg.json` (below) and pin the baseline. With a local vcpkg
+   clone: `vcpkg x-update-baseline --add-initial-baseline`. **Without one**
+   — no step of this plan requires a local clone — take the 40-char SHA from
+   `git ls-remote https://github.com/microsoft/vcpkg HEAD` and write it into
+   `builtin-baseline` by hand. The field is **not optional**: `tb-setup` runs
+   `jq -r '."builtin-baseline"' vcpkg.json` and then `git checkout` on the
+   result (16-testing-ci.md §3.1), so a missing field fails every job with a
+   confusing `checkout null`.
 3. Top-level `CMakeLists.txt` + per-module `CMakeLists.txt` creating all
    canonical targets (PLAN.md §5.1) with stub sources.
 4. `CMakePresets.json`: byte-authoritative content in 16-testing-ci.md §4.1
@@ -98,13 +109,23 @@ declared dependency but not yet initialized.
      `file(STRINGS ...)` read, and skip the `set_tests_properties(...
      DISABLED TRUE)` loop when the resulting list is empty. An empty or
      absent file must never fail configure or disable a test.
+   - `tests/CMakeLists.txt` also carries the `TB_SOURCE_DIR` compile
+     definition that `tb::test::data_path()` is built on, exactly as
+     16-testing-ci.md specifies it. From M0 on, no test resolves a
+     repo-relative path through the process working directory.
    - `tests/CMakeLists.txt` also declares
      `option(TB_TOOLS_READY "Register per-table tb_validate/tb_autoplay
      tests" OFF)` and wraps 16-testing-ci.md §2's per-table `foreach` loop in
      `if(TB_TOOLS_READY)`. It stays OFF until the M15 PR flips it (D15), so
      the tables that exist from M5 never invoke tool stubs and never turn CI
      red.
-8. `README.md` stub: name, one-line description, build commands — Linux/macOS
+8. `README.md` stub: name, one-line description, the **local prerequisite the
+   presets impose** (16-testing-ci.md §4.1) — clone and bootstrap vcpkg
+   anywhere, then export `VCPKG_ROOT` (`export VCPKG_ROOT=/path/to/vcpkg`;
+   PowerShell `$env:VCPKG_ROOT = "C:\path\to\vcpkg"`), since every configure
+   preset names `$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake` as its
+   toolchain file and every documented command below fails on a clean machine
+   without it — then the build commands: Linux/macOS
    `cmake --preset release && cmake --build --preset release && ctest
    --preset release`, Windows `cmake --preset windows && cmake --build
    --preset windows-release && ctest --preset windows-release` (the presets
@@ -144,6 +165,13 @@ corrections are new entries. Format: 03-process.md §3.1.
     upstream path per file) and **`assets/fonts/SHA256SUMS`** (the verbatim
     `sha256sum` output over the three vendored `.ttf` files, in
     `sha256sum -c` format, one line per file). There is no `FONTS.md`.
+    The **test** recomputes those digests in-process with the public-domain
+    single-header `picosha2.h`, vendored in this same PR at
+    `/tests/third_party/picosha2.h` with its provenance recorded like any
+    other vendored asset (`/tests/third_party/SOURCES.md`: upstream repo,
+    40-char pinned commit, fetch date, license). No crypto port joins
+    `vcpkg.json` and nothing shells out to `sha256sum`, which windows-latest
+    does not ship.
     Fallback if the download is impossible offline: substitute any available
     OFL geometric / display face, record the substitution as an ADR in
     02-decisions.md plus a
@@ -169,10 +197,12 @@ corrections are new entries. Format: 03-process.md §3.1.
 /src/main.cpp  /src/core/version.h  /src/core/version.cpp
 /src/{core,platform,sim,render,audio,table,game}/CMakeLists.txt + anchor .cpp
 /src/tools/CMakeLists.txt  /src/tools/{tb_validate,tb_autoplay,tb_screenshot}_main.cpp (stubs printing usage, exit nonzero; real CLI contracts land at M15)
-/tests/CMakeLists.txt  /tests/core/smoke_test.cpp
+/tests/CMakeLists.txt  /tests/core/scaffold_test.cpp
 /tests/lsan.supp        (comment-only; the asan preset points LSAN_OPTIONS at it)
 /tests/quarantine.txt   (empty; read at configure time, guarded by if(EXISTS))
 /tests/render/font_assets_test.cpp   (13-art-direction.md §5.1)
+/tests/third_party/picosha2.h        (public-domain SHA-256, single header)
+/tests/third_party/SOURCES.md        (upstream repo + pinned commit + fetch date + license)
 /assets/fonts/{Orbitron-Bold.ttf,Monoton-Regular.ttf,Righteous-Regular.ttf}
 /assets/fonts/{Orbitron-OFL.txt,Monoton-OFL.txt,Righteous-OFL.txt}
 /assets/fonts/SOURCES.md   (upstream repo + pinned commit + fetch date + upstream path per file)
@@ -243,15 +273,26 @@ CMakeUserPresets.json
 **Key interfaces.** `const char* tb::version_string();` in
 `src/core/version.h` — nothing else yet.
 
-**Tests.** `tests/core/smoke_test.cpp`: `Smoke.VersionStringNonEmpty` asserts
-`tb::version_string()` is non-empty and matches `^\d+\.\d+\.\d+$`.
+**Tests.** `tests/core/scaffold_test.cpp`: **`unit_scaffold.sanity`** asserts
+`tb::version_string()` is non-empty and matches `^\d+\.\d+\.\d+$`. This is the
+first test id in the repo, its `unit_` prefix is what the CI filter regexes
+select on, and 16-testing-ci.md (§2 taxonomy, §3.2 workflow note) owns and
+already spells it — use it verbatim, in that case, with no PascalCase variant
+anywhere. Without it the main `ctest` step hits the presets'
+`noTestsAction: error`.
 `tests/render/font_assets_test.cpp`: `FontAssets.VendoredFontsPresentAndParse`
 — the assertions are 13-art-direction.md §5.1's and are implemented verbatim
 from there: for each of the three `/assets/fonts/*.ttf` files the file exists,
 its SHA-256 matches `assets/fonts/SHA256SUMS`, `stbtt_InitFont` succeeds on
 its bytes, and the glyph/metric checks §5.1 lists pass; each `*-OFL.txt`
-exists and is non-empty. It needs no GPU, so it runs in every CI job — a
-truncated or LFS-pointer download fails here, at M0, not at M13.
+exists and is non-empty. The SHA-256 is computed **in-process** with the
+vendored `/tests/third_party/picosha2.h` (task 12) — the assertion is exact
+and must never be weakened to a size or a magic-number check, because
+catching a truncated download or a committed LFS pointer at M0 is the whole
+reason it exists. The `.ttf` files and `SHA256SUMS` are located with
+`tb::test::data_path()`, never relative to the process working directory. It needs no GPU, so it runs in
+every CI job — a truncated or LFS-pointer download fails here, at M0, not at
+M13.
 
 **Acceptance criteria.**
 
@@ -902,7 +943,7 @@ the sim thread; Neon Drift plays a scored game start to finish.
 **Scope in:** Lua 5.4 + sol2; sandbox per canon §5.7 (no `io`, `os`,
 `require`, `load`; `math.random`/`math.randomseed` replaced by
 `tb.rng`/`tb.rng_range` per 10-scripting.md §1.2; instruction-count
-watchdog on a budget shared across all handlers per tick — 100,000
+watchdog on a budget shared across all handlers per tick — **10,000**
 instructions at 1,000-instruction hook granularity, ADR-006 and
 10-scripting.md §2.4); the **complete** canonical event list and action
 list of PLAN.md §5.7 as currently written — every name, no additions, no
@@ -1405,7 +1446,7 @@ are exercised through `tb_validate`, not the loader);
 fixture, not a designed table, so 14-authoring-guide.md §8.3's **22–60 s**
 `ball_time_s.p50` band — which is defined at **skill 1 for designed tables**
 — does not apply to it and must not be cited here. (14 §8.3 is the authority
-for that band; any 25–60 s quotation is stale.) The test proves the
+for that band; read it from there, never from this file.) The test proves the
 harness keeps a ball alive and never wedges it, nothing more.
 `Screenshot.WritesExpectedSizePng` (GPU CI-skip rule applies);
 `Tools.ExitCodesPerContract`.
@@ -1522,8 +1563,9 @@ milestone before hardening.
 keys + Start, cabinet-friendly): table select (art cards via TBArt), players
 1–4, settings (display override UI writing `displays.json`, audio volumes,
 quality toggles for bloom/particles), input remap (capture-next-key flow
-writing `input.json`, covering all InputState buttons, per-device on the raw
-paths); **Duel mode** per 11-game-framework.md (2 players head-to-head:
+writing the `input` block of `settings.json` — 05-engine-core.md §11.1 is the
+single authoritative key list and there is no separate input file — covering
+every action of 05-engine-core.md §9.1, per-device on the raw paths); **Duel mode** per 11-game-framework.md (2 players head-to-head:
 simultaneous scoring windows, steal/attack rules as specified there);
 pause/resume (sim freeze, not process freeze; determinism preserved).
 **Scope out:** any new table content; online anything (non-goal).
@@ -1601,9 +1643,9 @@ etc. or CPack config per 16-testing-ci.md).
 §2.10 release gates — `perf_startup.cold_boot_to_attract`,
 `perf_frame.gate_render_frame_time`, `perf_load.table_under_2s` — at their
 release thresholds, green on every PR from now on (the frame-time gate may
-report SKIPPED on a software-rasterized runner, never deleted;
-`cold_boot_to_attract` replaces the previously-named
-`Startup.ColdStartUnderBudget`, which cited a budget no document defined);
+report SKIPPED on a software-rasterized runner, never deleted; the cold-start
+box is `perf_startup.cold_boot_to_attract` against §2.10's threshold — the
+only cold-start gate that exists, and the only budget for it);
 `TB_RELEASE_GATES` flips ON in this PR, exactly as `TB_TOOLS_READY` did at
 M15;
 `Package.SmokeBootsFromArchive` (CI job, all 3 OS);
@@ -1698,14 +1740,21 @@ test: `Version.Is100` (version string matches the tag).
   `tests/quarantine.txt` at configure time. Any one of them missing turns M0
   red before a single line of C++ compiles, and the failure looks like a
   toolchain problem rather than a missing file.
-- **Restating another document's owned type in this file.** M3 once carried
-  a competing immediate-mode `class Renderer`; 06-rendering.md §2 owns
-  `IRenderer`. The same rule covers `Ball` (08 §1.2), the `tb_autoplay` CLI
-  (14 §8.2), the FT bands (08 §5.7) and ramp seam layers (08 §6.10.2/§6.10.6,
-  09 §4.21 — the M8 sketch once carried an `exit_layer` field that exists in
-  no schema, no loader, and no struct): this file wires milestones together,
-  it never re-declares an interface. Two declarations means one is already
-  wrong.
+- **Reaching outside the repo for SHA-256 at M0.** The font test hashes the
+  `.ttf` bytes with the vendored `tests/third_party/picosha2.h`. Shelling out
+  to `sha256sum` fails on `windows-latest` (no such tool), adding a crypto
+  port changes `vcpkg.json` away from PLAN.md §5.2, and hand-rolling a digest
+  inside an S-sized milestone is how the assertion quietly degrades into a
+  file-size check that catches nothing.
+- **Restating another document's owned type in this file.** 06-rendering.md
+  §2 owns `IRenderer`, and it is the only renderer interface — an
+  immediate-mode `class Renderer` alongside it is a defect. The same rule
+  covers `Ball` (08 §1.2), the `tb_autoplay` CLI (14 §8.2), the FT bands
+  (08 §5.7) and ramp seam layers (08 §6.10.2/§6.10.6, 09 §4.21, which are
+  derived — an `exit_layer` field exists in no schema, no loader and no
+  struct, and writing one is unknown key V026): this file wires milestones
+  together, it never re-declares an interface. Two declarations means one is
+  already wrong.
 - **Turning an FT scenario into a replay tape.** FT-01…FT-10 run on the
   08-physics.md §5.6 rig — built in test code, no `table.json`, no
   `.tbreplay`, seed `0x54425354`, state-triggered input. There is no
@@ -1717,10 +1766,12 @@ test: `Version.Is100` (version string matches the tag).
   it) precisely so a perfectly good table never reddens CI on a stub's exit
   code.
 - **Gating on a budget no document defines, or on a gate id nobody
-  registers.** "Table load < 2 s per 09-table-format.md" and "cold start
-  under budget per 16-testing-ci.md" were both phantoms; so were the invented
-  spellings `gate_all_tables`, `gate_frame_time`, `gate_table_load` and
-  `gate_cold_start`. The real ids are `perf_tick.gate_synthetic` and
+  registers.** A perf box cites a registered gate id and nothing else: never
+  a prose budget ("table load < 2 s per 09-table-format.md", "cold start
+  under budget per 16-testing-ci.md" — neither document defines one), and
+  never a plausible-looking abbreviation of a real id. The gate ids are
+  exactly these seven; anything shorter or tidier is invented. The real ids
+  are `perf_tick.gate_synthetic` and
   `perf_tick.gate_tables` (16-testing-ci.md §2.9),
   `perf_startup.cold_boot_to_attract`, `perf_frame.gate_render_frame_time`
   and `perf_load.table_under_2s` (§2.10), plus
@@ -1790,16 +1841,21 @@ test: `Version.Is100` (version string matches the tag).
       `perf_frame.gate_render_frame_time`, `perf_load.table_under_2s` — every
       id and threshold read from 16-testing-ci.md §2.9 (tick, latency,
       particles) and §2.10 (release), none invented here.
-- [ ] All named tests in this document exist under `/tests` with the stated
-      names and are green on main.
+- [ ] Every test named in this document exists under `/tests` and is green on
+      main, spelled under **16-testing-ci.md §2's taxonomy** — which owns the
+      naming convention; the PascalCase labels here name required coverage,
+      not gtest ids (global rule 7) — starting with M0's
+      `unit_scaffold.sanity`, quoted verbatim from there.
 - [ ] The repository layout, targets, and dependency rule match PLAN.md §5.1
       at every merge point.
 - [ ] From M0 onward the repo contains everything CI reads —
       `.github/actions/tb-setup/action.yml`, `tests/lsan.supp`,
       `tests/quarantine.txt` — and the three vendored OFL faces with their
       licenses, `assets/fonts/SOURCES.md` and `assets/fonts/SHA256SUMS`
-      under `/assets/fonts/`, green under
-      `FontAssets.VendoredFontsPresentAndParse`; `main` branch
+      under `/assets/fonts/`, hashed in-process against `SHA256SUMS` by
+      `FontAssets.VendoredFontsPresentAndParse` using the vendored
+      `tests/third_party/picosha2.h` (no crypto port, no `sha256sum`
+      subprocess); `main` branch
       protection is configured per 03-process.md, or its "no admin rights"
       fallback is recorded in JOURNAL.md.
 - [ ] All five tables + test-lab exist as pure text packs passing

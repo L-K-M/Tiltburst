@@ -1,6 +1,7 @@
 # 02 — Architecture Decision Records (ADR-005+)
 
 Part of the Tiltburst implementation plan. Canon: ../../PLAN.md
+
 Depends on: 01-product.md, ../../ARCHITECTURE.md (which this document amends).
 
 ARCHITECTURE.md carries ADR-001–ADR-004. This document adds ADR-005–ADR-014
@@ -51,6 +52,14 @@ step exists anywhere in `tb_render`. Antialiasing is analytic in the SDF
 fragment shaders, which is both cheaper and sharper for the glow-heavy neon
 look, and it is why the ball stays crisp at 12 m/s.
 
+The rest of that §5 paragraph goes with it, and this is the largest single
+departure from ARCHITECTURE.md: v1 is a **2-D instanced SDF vector renderer**
+(06-rendering.md §1) with no 3-D meshes and no shadows. The ball's "dynamic
+cubemap" becomes a procedural fake-chrome gradient computed in the fragment
+shader (06-rendering.md §11), and "baked lighting for the playfield" becomes
+no lighting bake at all — inserts and flashers are per-instance fill and glow
+multipliers over emissive vector art (13-art-direction.md).
+
 ### Consequences
 
 No MoltenVK; §7's Vulkan-queue open question is moot — all GPU
@@ -80,7 +89,7 @@ compiled rules would put binaries in packs and a toolchain in the loop.
 Lua 5.4 embedded via sol2, one `lua_State` per loaded table, running on the
 sim thread at tick granularity. Sandbox and API in 10-scripting.md (surface
 is canon §5.7). Frame-time risk is handled by an instruction-count watchdog
-(10-scripting.md §2.4 is normative): a **shared budget of 100,000 VM
+(10-scripting.md §2.4 is normative): a **shared budget of 10,000 VM
 instructions per tick**, not per handler, reset at the start of each tick's
 script step and enforced with `lua_sethook(L, hook, LUA_MASKCOUNT, 1000)` —
 the hook fires every 1,000 instructions, decrements the tick budget, and at
@@ -91,7 +100,9 @@ game** (a disabled timer callback also cancels its timer), the remaining
 handler invocations for that tick are skipped, and the game continues with
 the budget refilled next tick. Disabling is deterministic: same inputs →
 same overrun at the same tick. `tb_validate`/`tb_autoplay` treat an overrun
-as a hard failure.
+as a hard failure. The budget is the latency bound expressed in instructions:
+10,000 is ≈ 100 µs at Lua 5.4's ~100M instr/s ceiling, which is exactly the
+< 100 µs per tick the revisit criterion below allows scripting to take.
 
 ### Consequences
 
@@ -104,8 +115,8 @@ as a hard failure.
 - vcpkg ports `lua` (pinned 5.4.x), `sol2`; `SOL_ALL_SAFETIES_ON` in debug.
 - Watchdog tuning: if a legitimate tick exceeds the shared budget, profile
   first; raise only if that tick's scripting still completes in < 100 µs on
-  Profile A. The headroom is large — a full event burst in the shipped
-  tables measures under 3,000 instructions against the 100,000 budget
+  Profile A. Headroom is about 3× — a full event burst in the shipped tables
+  measures under 3,000 instructions against the 10,000 budget
   (10-scripting.md §2.4). Acceptance: all shipped tables run `tb_autoplay`
   with zero watchdog aborts.
 
@@ -379,6 +390,8 @@ Where ARCHITECTURE.md disagrees with a row below, the amendment wins (canon
 | §4 (ADR-001) | "Budget real time for a table-authoring tool" (GUI editor) | No GUI editor; text authoring + tb_validate / tb_autoplay / tb_screenshot + guide | ADR-008 |
 | §5 (ADR-002) | Vulkan accepted; SDL3 GPU is the fallback | Inverted: SDL3 GPU accepted for v1; raw Vulkan is the revisit path | ADR-005 |
 | §5 (ADR-002) | Rendering approach "forward rendering with MSAA" | Forward stands; MSAA is a v1 non-goal — single-sampled RGBA16F targets, analytic SDF antialiasing (06-rendering.md §1) | ADR-005 |
+| §5 (ADR-002) | "Dynamic cubemap on the ball, updated at reduced rate" | No cubemap and no reflection probe: the ball is a procedural fake-chrome gradient in the SDF fragment shader (06-rendering.md §11) — a 2-D renderer has no 3-D scene to reflect | ADR-005 |
+| §5 (ADR-002) | "Baked lighting for the playfield, dynamic only for inserts and flashers" | No lightmaps, meshes, or shadows anywhere: the playfield is 2-D instanced SDF vector art lit emissively, and every insert/flasher is a per-instance fill+glow multiplier recomputed each frame (06-rendering.md §1, §14; 13-art-direction.md) | ADR-005 |
 | §6 (ADR-003) | "Fixed timestep, 1000–2000 Hz" | Fixed 1000 Hz exactly, dt = 0.001 s (canon §5.3) | — (canon) |
 | §6 (ADR-003) | "Determinism … careful float discipline" | Sharpened: per-platform bit-exact; cross-platform bit-exactness a non-goal; fast-math forbidden in `tb_sim` | ADR-013 |
 | §7 (ADR-004) | Backglass "separate thread, own submission", frames in flight 2 | All GPU submission on the main thread; backglass ~30 Hz via non-blocking acquire, frame skipped if unavailable; device-wide frames-in-flight 1 (canon §5.4) | ADR-005 |
@@ -406,11 +419,15 @@ Where ARCHITECTURE.md disagrees with a row below, the amendment wins (canon
   `random`/`randomseed`); never `luaL_openlibs` (10-scripting.md).
 - **Shipping Lua with a randomized string-hash seed.** `pairs` order varies
   per process; replays desync intermittently. Pin the seed at build time.
-- **Treating the instruction budget as per handler.** It is 100,000
+- **Treating the instruction budget as per handler.** It is 10,000
   instructions **shared by every script invocation in one tick**, hooked
   every 1,000 (ADR-006); an overrun permanently disables the offending
   handler and skips the tick's remaining handlers. Sizing a handler against
   the whole budget will starve the ones registered after it.
+- **Building 3-D because ARCHITECTURE.md §5 describes it.** No meshes,
+  shadows, cubemap on the ball, or baked playfield lighting exist in v1 —
+  the amendment table's §5 rows replace all four with 2-D SDF vector art,
+  fake chrome, and per-instance light multipliers.
 - **Adding an MSAA target "for quality".** Every render target is
   single-sampled RGBA16F; SDF edges are antialiased analytically (ADR-005
   row 5). A resolve step buys blur and bandwidth, not quality.
@@ -442,7 +459,7 @@ Where ARCHITECTURE.md disagrees with a row below, the amendment wins (canon
       builds green with the toolchain absent.
 - [ ] Lua sandbox tests prove: no `io`/`os`/`require`/`load`; `math.random`
       absent; `tb.rng` deterministic; the watchdog aborts a spin loop at the
-      shared 100,000-instruction tick budget, permanently disables that
+      shared 10,000-instruction tick budget, permanently disables that
       handler, skips the tick's remaining handlers, and refills next tick;
       `pairs` order stable across 1,000 runs.
 - [ ] Determinism suite green on all three OSes with platform-tagged

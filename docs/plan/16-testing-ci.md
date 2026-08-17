@@ -80,14 +80,41 @@ Fixture layout:
     /script/{windows,linux,macos}/test-lab.log
     /screenshots/{windows,linux,macos}/<slug>.png
     /synth/hashes.json                      # per-OS PCM hashes
+  /third_party
+    picosha2.h        # public-domain single-header SHA-256, vendored
   quarantine.txt
   lsan.supp
 ```
+
+**Test data paths (normative — one mechanism, no alternatives).** Under CTest
+the working directory is the preset's `binaryDir` (`build/<preset>/`), not the
+source root, so **no test may depend on the process working directory**. The
+test target carries
+`target_compile_definitions(tb_tests PRIVATE TB_SOURCE_DIR="${CMAKE_SOURCE_DIR}")`
+and every repo-relative path is resolved through the single helper
+`tb::test::data_path(rel)` (in `tests/support/data_path.h`), which joins
+`TB_SOURCE_DIR` with `rel` and returns a `std::filesystem::path`. Everything
+under `tests/fixtures/**`, `tests/golden/**`, `assets/**` and `tables/**` is
+opened that way — starting with the first test written, M0's
+`FontAssets.VendoredFontsPresentAndParse` (04-milestones.md M0), which reads
+`assets/fonts/*.ttf` and `assets/fonts/SHA256SUMS`. `fopen("tests/…")`,
+`../../tests/…`, and per-test `WORKING_DIRECTORY` properties are all
+forbidden: they work from one build layout and break from the next. The CTest
+command tests (`validate_`, `smoke_`, `bounds_`) get absolute paths from
+`${CMAKE_SOURCE_DIR}` at registration time (snippet below) for the same
+reason. SHA-256 inside tests comes from the vendored public-domain
+`tests/third_party/picosha2.h` (recorded like any vendored asset) — never a
+vcpkg crypto port and never a shell-out to `sha256sum`, which windows-latest
+does not have.
 
 CMake registration (`tests/CMakeLists.txt`):
 
 ```cmake
 include(GoogleTest)
+# Repo-relative test data: tests resolve paths through tb::test::data_path(),
+# never the process working directory (see "Test data paths" above).
+target_compile_definitions(tb_tests PRIVATE TB_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+
 # Three discovery passes give per-class timeouts. Fallback if multiple passes
 # on one target misbehave: a single pass with TIMEOUT 2400.
 gtest_discover_tests(tb_tests DISCOVERY_MODE PRE_TEST
@@ -771,8 +798,10 @@ corrected to these, never the reverse.
 **Perf gate inventory (complete).** 04-milestones.md global rule 4 defers
 *every* gate id to this document, so every id in the plan is one of these
 seven. All are selected by the `^perf_` prefix (§2), all are Release-only,
-and all run in the `perf-gates` job (`ctest -R '^perf_' -j1`); each row
-carries its own protocol and thresholds in the section that owns it.
+and all run in the `perf-gates` job
+(`ctest --preset release -R '^perf_' -E '^$' -j1` — the `-E '^$'` is
+load-bearing, see §3.2's filter rule); each row carries its own protocol and
+thresholds in the section that owns it.
 
 | Gate id | From | Defined in | Gates |
 |---|---|---|---|
@@ -886,6 +915,24 @@ M13 evidences it with the F12 capture `docs/audit/m13/multiball.png`, and
 from M19 `perf_frame.gate_render_frame_time` covers frame time on any runner
 with a hardware GPU.
 
+**Which 06-rendering.md §17.1 budgets a CI job can enforce.** §17.1 heads its
+table "binding; gated in 16-testing-ci.md perf jobs", and this section is
+where that claim is cashed out — for the runner-independent rows only. The
+budgets are all binding on the product; they are not all *gateable on a
+hosted runner*, because those runners are software-rasterized (§2.10b):
+
+| §17.1 row | Where it is enforced |
+|---|---|
+| CPU encode / particle CPU cost ≤ 1.5 ms | **gated on any runner** — `perf_particles.two_thousand_live_at_60fps`, headless, no GPU |
+| Playfield ≤ 200 and backglass ≤ 40 draw calls, ≤ 6000 SDF instances, ≤ 8192 particle pool | **countable on any runner** — a software rasterizer issues the same draw calls and builds the same instances; they are CPU-side counts read from the F1 overlay (06 §17.2) and reviewed with the M13/M19 capture evidence. No `perf_` gate asserts them today, and none may be coined outside §2.9's seven-id inventory without an ADR. |
+| Playfield GPU time ≤ 4.0 ms, VRAM ≤ 256 MB | **hardware-only** — not measurable on llvmpipe/lavapipe/WARP; evidence is the M13 F12 capture and the M19 hardware run of `perf_frame.gate_render_frame_time`, which reports CTest SKIPPED on every hosted runner (§2.10b) |
+
+So "exceeding a budget is a CI failure, not a note" holds for row 1 and, once
+a count is in front of a reviewer, row 2. For row 3 the honest statement is
+that CI cannot see it: the failure surfaces at M19 on hardware. Never widen a
+§17.1 threshold, or a §2.10(b) limit, because a software rasterizer missed
+it — the correct hosted-runner result there is SKIPPED.
+
 ### 2.10 Release gates (M19/M20)
 
 04-milestones.md M19 gates on a cold-start budget, a frame-time gate, and a
@@ -984,7 +1031,7 @@ milliseconds go into `perf_report.json`.
 command per OS:
 
 ```sh
-ctest --preset <release|windows-release> -R '^det_' \
+ctest --preset <release|windows-release> -R '^det_' -E '^$' \
       --repeat until-fail:100 --output-junit junit-det-soak.xml
 ```
 
@@ -1186,7 +1233,7 @@ jobs:
       - name: Determinism tests (never retried)
         shell: bash
         run: |
-          ctest --preset ${{ matrix.test_preset }} -R '^det_' \
+          ctest --preset ${{ matrix.test_preset }} -R '^det_' -E '^$' \
             --no-tests=ignore --output-junit junit-det.xml
 
       - name: Record determinism goldens (artifact for intentional sim changes)
@@ -1250,7 +1297,7 @@ jobs:
       - name: Test under ASan+UBSan (excludes det/fuzz/perf)
         run: ctest --preset asan -E '^(det_|fuzz_sim_|perf_)' --repeat until-pass:2
       - name: Determinism under ASan (never retried)
-        run: ctest --preset asan -R '^det_' --no-tests=ignore
+        run: ctest --preset asan -R '^det_' -E '^$' --no-tests=ignore
 
   perf-gates:
     name: perf-gates
@@ -1264,12 +1311,16 @@ jobs:
         run: |
           cmake --preset release
           cmake --build --preset release
+      # Every step below pairs -R with -E '^$': the release test preset
+      # excludes ^(fuzz_sim_|perf_|bounds_), a CLI -R replaces only the
+      # preset's include, and without the -E the selection is empty (§3.2
+      # implementor notes).
       - name: Fuzz invariants (1M ticks per table, fixed seed)
-        run: ctest --preset release -R '^fuzz_sim_' --no-tests=ignore
+        run: ctest --preset release -R '^fuzz_sim_' -E '^$' --no-tests=ignore
       - name: Autoplay bounds (--balls 3 sweeps, §2.8b; none before M15)
-        run: ctest --preset release -R '^bounds_' --no-tests=ignore
+        run: ctest --preset release -R '^bounds_' -E '^$' --no-tests=ignore
       - name: Perf gates (Release, serial; §2.9 + §2.10)
-        run: ctest --preset release -R '^perf_' -j1 --no-tests=ignore
+        run: ctest --preset release -R '^perf_' -E '^$' -j1 --no-tests=ignore
       - name: Upload perf report
         if: always()
         uses: actions/upload-artifact@v4
@@ -1293,7 +1344,7 @@ jobs:
           cmake --preset asan
           cmake --build --preset asan
       - name: Randomized fuzz under ASan (seed = run id, logged by the test)
-        run: ctest --preset asan -R '^fuzz_sim_' --no-tests=ignore
+        run: ctest --preset asan -R '^fuzz_sim_' -E '^$' --no-tests=ignore
       - name: Quarantined tests (informational, may fail)
         continue-on-error: true
         shell: bash
@@ -1302,7 +1353,7 @@ jobs:
         run: |
           if [ -s tests/quarantine.txt ]; then
             RE=$(paste -sd'|' tests/quarantine.txt)
-            ctest --preset asan -R "^(${RE})$" --no-tests=ignore
+            ctest --preset asan -R "^(${RE})$" -E '^$' --no-tests=ignore
           fi
 
   # Determinism soak (§2.10d): the runnable form of 01-product.md §9's
@@ -1339,7 +1390,7 @@ jobs:
       - name: 100 consecutive determinism runs (stops at first failure)
         shell: bash
         run: |
-          ctest --preset ${{ matrix.test_preset }} -R '^det_' \
+          ctest --preset ${{ matrix.test_preset }} -R '^det_' -E '^$' \
             --repeat until-fail:100 --no-tests=ignore \
             --output-junit junit-det-soak.xml
       - name: Upload soak junit
@@ -1374,8 +1425,24 @@ Implementor notes:
 - `--repeat until-pass:2` implements the flake policy (§6) for everything
   except determinism: a `det_` test passing on retry is itself a determinism
   bug, so those steps never retry.
-- CLI `-R`/`-E` flags override the preset's filter; CI therefore passes the
-  full exclusion union explicitly where it matters.
+- **Filter rule (get this wrong and a required check goes green forever).** A
+  command-line `-R` overrides only a preset's `filter.include.name`; the
+  preset's `filter.exclude.name` still applies. Every test preset inherits
+  `test-base`'s `exclude: ^(fuzz_sim_|perf_|bounds_)` (§4.1), so
+  `ctest --preset release -R '^perf_'` intersects "perf only" with "no perf"
+  and selects **zero** tests — which `--no-tests=ignore` then reports as a
+  pass. Therefore every step that pairs `-R` with a preset carrying an
+  exclude also passes an explicit non-matching `-E '^$'`, which replaces the
+  preset exclude. The main test step needs no `-R`, so it instead states the
+  full exclusion union in its own `-E`.
+- **Prove the selection is non-empty at M2.** The first perf gate
+  (`perf_tick.gate_synthetic`) lands at M2; run
+  `ctest --preset release -R '^perf_' -E '^$' -N` and confirm it lists that
+  test (`Total Tests: 1` or more). Dropping the `-E` prints `Total Tests: 0`,
+  which is exactly the silent-green failure above. Repeat the `-N` check for
+  `-R '^fuzz_sim_'` and `-R '^bounds_'` in the PR that lands each category's
+  first test (`bounds_` at M15); before that an empty list is legitimate and
+  `--no-tests=ignore` is why the steps stay green.
 - The `format` job needs no vcpkg or compiler — it fails in under a minute
   on an unformatted file, before the matrix finishes configuring.
 
@@ -1563,9 +1630,13 @@ not a required check — it never runs on PRs.
 }
 ```
 
-Local prerequisite: clone vcpkg anywhere and export `VCPKG_ROOT`. The preset
-filter excludes fuzz/perf/bounds by default; CLI `-R`/`-E` overrides it,
-which is exactly how CI selects them. To exercise the tool-driven per-table
+Local prerequisite: clone vcpkg anywhere and export `VCPKG_ROOT`. The
+`test-base` filter excludes fuzz/perf/bounds from every test preset by
+default. A CLI `-R` replaces only the preset's *include*, so selecting an
+excluded category takes **both** flags — `-R '^perf_' -E '^$'` — and a bare
+`-R '^perf_'` silently selects nothing; a CLI `-E` is what replaces the
+preset exclude. That pairing is exactly how CI selects them (§3.2). To
+exercise the tool-driven per-table
 tests locally before M15 flips the default, configure with
 `-DTB_TOOLS_READY=ON` (they will fail against the stubs — that is the
 point of the option).
@@ -1575,10 +1646,14 @@ point of the option).
 ```sh
 cmake --preset debug && cmake --build --preset debug   # build
 ctest --preset debug                                    # default suite
-ctest --preset debug -R '^det_'                         # just determinism
-ctest --preset release -R '^fuzz_sim_'                  # fuzz locally
-ctest --preset release -R '^bounds_' --no-tests=ignore  # autoplay bounds
-ctest --preset release -R '^det_' --repeat until-fail:100   # soak (§2.10d)
+# -E '^$' is mandatory with -R: it replaces the preset's exclude filter,
+# which otherwise cancels the selection outright (§3.2 filter rule).
+ctest --preset debug   -R '^det_'      -E '^$'          # just determinism
+ctest --preset release -R '^fuzz_sim_' -E '^$'          # fuzz locally
+ctest --preset release -R '^perf_'     -E '^$' -j1      # perf gates (§2.9)
+ctest --preset release -R '^perf_'     -E '^$' -N       # what would run
+ctest --preset release -R '^bounds_'   -E '^$' --no-tests=ignore  # bounds
+ctest --preset release -R '^det_' -E '^$' --repeat until-fail:100 # soak §2.10d
 # One test, straight from the binary (fastest iteration):
 ./build/debug/tb_tests --gtest_filter='unit_sweep.segment_endpoint_cap'
 # Windows: build\windows\Debug\tb_tests.exe --gtest_filter=...
@@ -1692,8 +1767,26 @@ No percentage gate, no coverage tooling in CI. Binding rules:
   to PR-controlled build scripts (CMake runs arbitrary code). Build/test
   uses plain `pull_request`; only the pinned review workflow uses
   `pull_request_target`, and it never builds the tree.
+- **Passing `-R` without `-E '^$'` against a preset that excludes the
+  category.** A CLI `-R` replaces only `filter.include.name`; every test
+  preset still excludes `^(fuzz_sim_|perf_|bounds_)` (§4.1), so
+  `ctest --preset release -R '^perf_'` selects zero tests and
+  `--no-tests=ignore` turns that into a green required check — a perf gate
+  that never runs and never complains. Pair every `-R` with `-E '^$'`, and
+  prove it with `-N` in the PR that lands the category's first test (§3.2).
+- **Opening a fixture by a path relative to the process working directory.**
+  Under CTest the cwd is the preset's `binaryDir`, not the repo root, so
+  `fopen("tests/fixtures/…")` passes for whoever ran the binary by hand and
+  fails in CI. Everything repo-relative — fixtures, goldens, `assets/`,
+  `tables/` — goes through `tb::test::data_path()` on `TB_SOURCE_DIR` (§2).
+- **Reading 06-rendering.md §17.1's "exceeding a budget is a CI failure" as
+  covering the GPU rows.** Hosted runners are software-rasterized: GPU ms and
+  VRAM are hardware-only and surface at M19, while draw calls, SDF instances
+  and the 1.5 ms particle CPU cost are runner-independent and do hold in CI
+  (§2.9). Trying to make llvmpipe meet the 4 ms GPU budget ends in a widened
+  threshold that gates nothing.
 - **Forgetting `--no-tests=ignore` on filtered ctest steps.** Before a
-  category's milestone lands, `-R '^det_'` matches nothing and
+  category's milestone lands, `-R '^det_' -E '^$'` matches nothing and
   `noTestsAction: error` fails the job. The main step must error on zero
   tests; the filtered steps must not.
 - **Gating on a single perf run.** Shared runners jitter; one p99 sample is
@@ -1799,6 +1892,17 @@ No percentage gate, no coverage tooling in CI. Binding rules:
       `if(TB_TOOLS_READY)` (default OFF, flipped ON in the M15 PR), so no
       milestone from M5 to M14 can go red on a stub tool; the §2.10 release
       gates sit behind `TB_RELEASE_GATES` (flipped ON in the M19 PR).
+- [ ] Every `-R` step in §3.2 also passes `-E '^$'`, and
+      `ctest --preset release -R '^perf_' -E '^$' -N` lists at least
+      `perf_tick.gate_synthetic` from M2 (the same `-N` check run for
+      `^fuzz_sim_` and `^bounds_` when their first tests land), so the
+      `perf-gates` required check provably selects a non-empty set instead of
+      passing on zero tests.
+- [ ] `tb_tests` is built with `TB_SOURCE_DIR="${CMAKE_SOURCE_DIR}"` and every
+      repo-relative path in every test goes through `tb::test::data_path()` —
+      from M0's `FontAssets.VendoredFontsPresentAndParse` onward — so
+      `ctest` passes from any working directory and no test carries a
+      `WORKING_DIRECTORY` property (§2).
 - [ ] The five worked examples of §2.1 exist as passing gtest cases with the
       exact given inputs, expected values, and tolerances.
 - [ ] Every V-code has a `tests/fixtures/schema/<vcode>_pass/` pack and one
@@ -1863,7 +1967,9 @@ No percentage gate, no coverage tooling in CI. Binding rules:
       at `dt` = 16.67 ms, per-frame particle CPU cost < **1.5 ms** (the
       06-rendering.md §17.1 budget, 9.0 % of a 60 Hz frame — never the
       16.67 ms period) with zero allocations, picked up by the existing
-      `^perf_` step with no workflow edit (§2.9).
+      `^perf_` step with no workflow edit (§2.9) — it is the only
+      06-rendering.md §17.1 row a hosted runner can gate outright; the GPU-ms
+      and VRAM rows are hardware-only evidence (§2.9 split table).
 - [ ] All seven `perf_` gate ids in the plan are the seven of §2.9's
       inventory table — none coined elsewhere, none missing — which is what
       makes 04-milestones.md global rule 4's "gate ids are owned by

@@ -312,9 +312,11 @@ create branch → commits → push → open PR (not draft)
    CI runs (3 OS) ──red──► fix, push, wait again
       │green
       ▼
-   poll for GLM 5.3 review, every 2–3 min, ≤ 20 min
+   poll for GLM 5.3 review, every 2–3 min, ≤ 20 min,
+   extended while a run is still in_progress (hard stop 35 min)
       │                              │
-      │review posted                 │no review in 20 min
+      │review, inline, or            │deadline hit AND no run
+      │issue comment posted          │in flight (§2.7 gate)
       ▼                              ▼
    classify EVERY comment      reviewer-unavailable fallback:
    1) actionable-correct         self-review checklist (§2.7)
@@ -409,13 +411,52 @@ workflow's concurrency rule: a new push **cancels** an in-progress review run
 and starts a fresh one — so do not push while waiting for a review you intend
 to read.
 
-Poll every 2–3 minutes for up to 20 minutes after CI goes green:
+Poll every 2–3 minutes for up to 20 minutes after CI goes green. The reviewer
+posts its output in one of **three** places — a formal review, inline review
+comments, or a plain issue comment — and the loop must break on any of them,
+so all three are counted mechanically. Issue comments have no `commit_id`, so
+they are detected by comparing a **baseline count taken before the wait**
+against the current count, ignoring comments authored by the PR author (the
+implementor's own `gh pr comment` replies must not look like a review) and
+ignoring anything older than the head commit (a reply from a previous review
+cycle must not look like this cycle's review):
 
 ```bash
 head_sha=$(gh pr view "$pr" --json headRefOid --jq .headRefOid)
-deadline=$(( $(date +%s) + 1200 ))
+author=$(gh pr view "$pr" --json author --jq .author.login)
+title=$(gh pr view "$pr" --json title --jq .title)
+pushed_at=$(gh pr view "$pr" --json commits --jq '.commits[-1].committedDate')
+
+# Issue comments the PR author did not write, no older than the head commit.
+n_issue() {
+  gh api "repos/{owner}/{repo}/issues/$pr/comments" -F per_page=100 \
+      --jq "[.[] | select(.user.login != \"$author\"
+                          and .created_at > \"$pushed_at\")] | length"
+}
+# Review runs fire on pull_request_target, so they are attached to the BASE
+# ref (main), never to the milestone branch — never filter them by --branch.
+review_state() {
+  gh run list --workflow zai-code-review.yml --event pull_request_target \
+      --limit 5 --json status,conclusion,displayTitle,url \
+      --jq "[.[] | select(.displayTitle == \"$title\")][0]
+            | if . == null then \"missing/none\"
+              else \"\(.status)/\(.conclusion // \"none\")\" end"
+}
+review_running() {
+  case "$(review_state)" in
+    queued/*|requested/*|waiting/*|pending/*|in_progress/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+n_issue_base=$(n_issue)                 # baseline BEFORE the wait
 found=0
-while [ "$(date +%s)" -lt "$deadline" ]; do
+# A non-zero baseline means the reviewer already posted while CI was running:
+# that is output, not noise — skip the wait and read it.
+if [ "$n_issue_base" -gt 0 ]; then found=1; fi
+
+# True as soon as reviewer output exists in ANY of the three places.
+output_posted() {
   # 1) formal reviews (summary + verdict)
   n_reviews=$(gh api "repos/{owner}/{repo}/pulls/$pr/reviews" \
       --jq "[.[] | select(.commit_id == \"$head_sha\")] | length")
@@ -423,23 +464,40 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
   n_inline=$(gh api "repos/{owner}/{repo}/pulls/$pr/comments" \
       --jq "[.[] | select(.commit_id == \"$head_sha\")] | length")
   # 3) plain issue comments (some reviewer output lands here)
-  gh pr view "$pr" --comments   # read and count manually vs. last cycle
-  if [ "$n_reviews" -gt 0 ] || [ "$n_inline" -gt 0 ]; then found=1; break; fi
-  # also check the workflow actually ran and did not skip
-  gh run list --workflow zai-code-review.yml --branch "$(git branch --show-current)" --limit 3
+  n_new_issue=$(( $(n_issue) - n_issue_base ))
+  [ "$n_reviews" -gt 0 ] || [ "$n_inline" -gt 0 ] || [ "$n_new_issue" -gt 0 ]
+}
+
+deadline=$(( $(date +%s) + 1200 ))      # 20 min nominal
+hard_stop=$(( $(date +%s) + 2100 ))     # 35 min = workflow's 30 min cap + margin
+# Extend past the nominal deadline while a run is still executing (§2.7).
+while [ "$found" -eq 0 ] \
+      && { [ "$(date +%s)" -lt "$deadline" ] || review_running; } \
+      && [ "$(date +%s)" -lt "$hard_stop" ]; do
+  if output_posted; then found=1; break; fi
+  echo "review run: $(review_state)"    # did it run, skip, or fail?
   sleep 150
 done
+# One final read: a run that concluded during the last sleep may have posted
+# just as the loop condition went false.
+if [ "$found" -eq 0 ] && output_posted; then found=1; fi
 ```
+
+`found=1` means output exists: read all three sources (`gh pr view "$pr"
+--comments` for the issue-comment text) and go to §2.5. `found=0` means the
+loop ran out of time — do **not** go straight to the fallback; apply the §2.7
+run-status gate first.
 
 If `commit_id` filtering misses comments (the API sometimes reports
 `original_commit_id`), fall back to filtering by `created_at` later than the
-last push timestamp. If the workflow run shows the "Skipping Z.ai review
-because ZAI_API_KEY is not configured." step, stop polling immediately and go
-to the reviewer-unavailable fallback (§2.7).
+last push timestamp. If `review_state` reports `completed/skipped`, or the run
+shows the "Skipping Z.ai review because ZAI_API_KEY is not configured." step,
+stop polling immediately and go to the reviewer-unavailable fallback (§2.7).
 
 ### 2.5 Classify and answer every comment
 
-Read every review comment (inline and summary). Classify each into exactly
+Read every review comment — inline, review summary, and plain issue comments
+(all three surfaces of §2.4). Classify each into exactly
 one bucket and act:
 
 | # | Bucket | Test | Action |
@@ -480,8 +538,27 @@ non-new and does not block steady state.
 
 ### 2.7 Reviewer-unavailable fallback
 
-If no review appears within 20 minutes of green CI (missing `ZAI_API_KEY`,
-workflow failure, API outage), and one rate-limit retry (§3.2 fallback
+**Run-status gate — check this before declaring anything.** The 20-minute
+poll window is shorter than the review workflow's own `timeout-minutes: 30`,
+so "nothing posted yet" does not mean "no reviewer". Read `review_state`
+(§2.4) and act on `status` first:
+
+| `review_state` | Meaning | Action |
+|---|---|---|
+| `queued/*`, `in_progress/*` | a run is still executing | **Keep waiting.** The workflow caps itself at 30 minutes, so this is bounded; re-poll §2.4 until it reaches a conclusion, then re-read this table |
+| `completed/success` with no review, inline, or issue comment | ran, produced nothing | fallback below |
+| `completed/failure`, `completed/cancelled`, `completed/timed_out` | workflow failure, API outage, cancelled by a push | §3.2 "Review bot rate-limited / errored" retry first, then fallback below |
+| `completed/skipped` | drafts / fork branch / missing `ZAI_API_KEY` | fallback below immediately, no retry |
+| `missing/none` | no run was ever created for this PR | fallback below |
+
+The honest worst-case wait is therefore **~35 minutes** from green CI (30-min
+workflow cap plus a polling margin), not 20 — the 20 minutes is only the
+nominal window before the run-status gate takes over. PLAN.md §7's "~20 min"
+is that nominal figure.
+
+Once the gate says the reviewer produced no output for this head SHA (missing
+`ZAI_API_KEY`, workflow failure, API outage, run concluded empty — never
+while a run is still `in_progress`), and one rate-limit retry (§3.2 fallback
 matrix) has been exhausted, run the **self-review checklist**: re-read the
 complete diff with `gh pr diff "$pr"`, hunk by hunk, asking for each hunk:
 
@@ -505,8 +582,9 @@ complete diff with `gh pr diff "$pr"`, hunk by hunk, asking for each hunk:
    TODO discipline.
 
 Fix what the checklist finds, push, wait for CI green, then merge with a
-JOURNAL note: `Merged under reviewer-unavailable fallback; self-review
-completed.` **Never merge a known correctness bug, even if the reviewer is
+JOURNAL note naming the concluded run state that justified the fallback:
+`Merged under reviewer-unavailable fallback (review run completed/skipped —
+no ZAI_API_KEY); self-review completed.` **Never merge a known correctness bug, even if the reviewer is
 silent.** A known bug either blocks the merge or is fixed first.
 
 ### 2.8 Merge
@@ -561,7 +639,7 @@ Never wait for a human.
 | Flaky test (passes on rerun, fails intermittently) | Same test flips outcome without code change | CI already retries once (`--repeat until-pass:2`); a pass on attempt 2 is a **flake occurrence** — record it in `docs/JOURNAL.md` (test name, job, run link) before merging. On a **second occurrence of the same test within 30 days**, quarantine per 16-testing-ci.md §6: append the exact `suite.case` name (one per line) to `tests/quarantine.txt` — never edit the test source, no `GTEST_SKIP()`; CMake reads the file at configure time and sets the `DISABLED` property, and `weekly-deep` keeps running it informationally. The JOURNAL entry states the suspected cause and the milestone by which it will be fixed; deflake (and remove the line) within two milestones or delete the test with a JOURNAL justification. More than 5 entries in `quarantine.txt` blocks further quarantines — fix the flakiest first. Determinism (`det_`) tests never retry and never quarantine — a flaky one is a live correctness bug, fix it |
 | Reference hardware (Profile A cabinet) unavailable | A milestone's acceptance criteria require the physical cabinet (08-physics.md §9 perf figures, 12-audio.md §12 latency gate, 07-displays.md Done-when display cases, the hardware-bound M20 audit rows) and the implementor does not have it | Run the same instrumented protocol unchanged on whatever machine is available, record the measured **deltas** against the specified targets plus the **machine spec** in `docs/JOURNAL.md`, and tag those acceptance rows as **measured-on-non-reference** (PROVISIONAL-PASS in the M20 audit, per the 01-product.md §3 hardware-fallback rule); a tagged row satisfies its milestone's acceptance criteria. **Never block a merge on hardware the implementor does not have** (R10) — and never weaken the documented target itself, which stays the number to confirm on the cabinet |
 | Perf gate failure | CI perf job red | Profile (per 16-testing-ci.md tooling) and fix the regression. **Never weaken, delete, or skip the gate** |
-| Review bot rate-limited / errored | Workflow run failed or review truncated with an API error | Wait 5 minutes, retrigger once with an empty commit (`git commit --allow-empty -m "chore: retrigger review" && git push`); if it fails again, apply §2.7 reviewer-unavailable fallback |
+| Review bot rate-limited / errored | `review_state` (§2.4) reports `completed/failure` or `completed/timed_out`, or the review is truncated with an API error. A `queued`/`in_progress` run is **not** a failure — wait it out per the §2.7 run-status gate | Wait 5 minutes, retrigger once with an empty commit (`git commit --allow-empty -m "chore: retrigger review" && git push`); if it fails again, apply §2.7 reviewer-unavailable fallback |
 | Branch protection cannot be configured | The §1.8 `PUT` returns 403/404 — no admin rights on the repository, or the endpoint is unavailable | Proceed **without** protection; it is a safety net, not the enforcing mechanism. The enforcing mechanism is then the per-PR checklist (§4): `gh pr checks "$pr" --watch --fail-fast` (§2.3) must show all six §1.8 contexts green before every `gh pr merge`, and a red check blocks the merge exactly as protection would. Record the exact error, the date, and this decision in `docs/JOURNAL.md`; retry the `PUT` once at the next milestone in case rights changed. **Never block a milestone on it** |
 | Pinned third-party asset undownloadable (vendored OFL font, etc.) | The fetch of the pinned `github.com/google/fonts` commit fails (offline runner, path gone at that commit) or the file's committed SHA-256 does not match | Substitute any available OFL face of the same class — Orbitron → geometric square sans, Monoton → inline/neon display, Righteous → rounded geometric display — copy it into `/assets/fonts/` with its `OFL.txt`, update that file's committed SHA-256, and keep the logical names (`orbitron`, `monoton`, `righteous`) so `art.json` and 13-art-direction.md §5 stay valid. Record the substitution **and its visual delta** (which §5 typography rules the substitute breaks: cap height, minimum rendered size, letter-spacing) as an ADR in 02-decisions.md plus a JOURNAL bullet. **Never block a milestone on a download** — fonts are acquired at M0 and only consumed from M13 |
 | A test, tool run, or the game appears to hang | A CI job hits the workflow timeout, `ctest` stops producing output, or `tb_autoplay` stops advancing ticks | It is never the sim waiting on a captured ball: on `tilt` (and on Duel timeout) every captured ball — kickers including script holds, and ball locks — is force-ejected at its element default (11-game-framework.md §5), an unclaimed lock auto-releases after 3,000 ms (08-physics.md §6.14), and if no ball is free and none is in the plunger lane for 30,000 ticks the framework runs a ball search that **does** eject kickers and locks, logs an error, and plays on (11-game-framework.md §4.6). Treat the hang as a harness bug: a wall-clock `sleep`/poll in a test, an unbounded `while` around `step()` waiting for a condition, or a blocking read. Fix the harness — never add a sleep, never raise the job timeout to hide it |
@@ -639,6 +717,24 @@ Rules:
 - **Pushing while a review run is in progress.** The workflow's concurrency
   group cancels the running review and you lose it. Batch fixes, then push
   once, then poll.
+- **Polling only for formal reviews and inline comments.** The reviewer may
+  post its whole summary as a plain **issue** comment, which carries no
+  `commit_id` and appears in neither `pulls/$pr/reviews` nor
+  `pulls/$pr/comments`. Count it against a pre-wait baseline (§2.4) and break
+  on any of the three surfaces; eyeballing `gh pr view --comments` inside a
+  non-interactive loop detects nothing and ends in a false "reviewer
+  unavailable".
+- **Filtering review runs with `--branch`.** The review workflow triggers on
+  `pull_request_target`, so its runs are associated with the **base** ref, not
+  `milestone/M<NN>-<slug>`; a `--branch` filter can match nothing forever. Use
+  `--event pull_request_target` and select the run by PR title or number
+  (§2.4 `review_state`).
+- **Declaring the reviewer unavailable while its run is still executing.**
+  The 20-minute poll window is shorter than the workflow's
+  `timeout-minutes: 30`. Apply the §2.7 run-status gate: a `queued` or
+  `in_progress` run means keep waiting (bounded by that 30-minute cap, ~35
+  minutes worst case), never self-merge out from under a slow-but-healthy
+  review.
 - **Treating every review comment as an order.** Bucket-2 comments that
   contradict the plan docs must be declined with a citation. Changing
   spec-mandated behavior to satisfy a reviewer breaks the build sequence for
@@ -707,8 +803,11 @@ Rules:
 - [ ] Every merged PR body follows the §2.2 template with test evidence and
       demo artifact.
 - [ ] Every review comment on every merged PR has a reply (fix, citation, or
-      rebuttal); no PR merged before steady state, cycle cap, or the
-      documented fallback.
+      rebuttal) — including reviewer output posted as a plain issue comment;
+      no PR merged before steady state, cycle cap, or the documented fallback.
+- [ ] No reviewer-unavailable fallback was ever taken while a review run was
+      still `queued` or `in_progress`; each one names the concluded
+      `review_state` (§2.7 gate) in its JOURNAL bullet.
 - [ ] `main` carries the §1.8 protection from M0 on: exactly the six
       16-testing-ci.md §3 contexts, `strict: true`,
       `required_pull_request_reviews: null`, `enforce_admins: false`,

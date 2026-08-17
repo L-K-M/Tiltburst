@@ -911,10 +911,10 @@ area 0.52 × 1.04, standard bottom of 15 §0.4 (`flipper_pair_standard` pivots
 | `pie_targets` ×3 | `[0.105,0.965]`, `[0.150,0.975]`, `[0.195,0.965]`, `facing_deg` 275, layer 1 |
 | `counter_exit` kicker | `[0.290, 0.930]`, saucer, `eject_angle_deg` −80, `eject_speed` 2.4, layer 1 |
 | `counter_ramp` / `counter_drop` | ramp `[0.360,0.545]` → arc → `[0.300,0.775]` (up), **no `width` key ⇒ 09 §4.13's 0.044 default**; chute `[0.235,0.672]` → `[0.235,0.762]` (down), length 0.090, grade 0.048/0.090 = **0.533** ≤ V010's 0.60 |
-| `counter_hood` | wall `[0.198,0.650]` → `[0.270,0.632]`, `material` "wood" — the chute's deflector, **0.03125** below the layer-0 seam and wider than it on both sides, so a ball coming up-table cannot back-door the chute; its **14.0°** down-right lean (dy 0.018 over dx 0.072 ⇒ 14.0362°) rolls the exiting ball into mid-field. The old dy 0.016 gave **12.5288°**, under the **12.675°** at which `1.11052·sin θ` beats 08 §1.3's 0.24367 m/s² rolling resistance: a moving ball still rolled off (net −0.00277 m/s²) but a stopped one could not restart, against `stuck_balls` 0. At 14.0362° the net is **+0.02499 m/s²** (15 §2.3) |
-| `shaker` captive ball | slot `{a:[0.150,0.560], b:[0.150,0.640]}`; struck face at y 0.560; far end `b` is the one whose arrival at ≥ 0.3 m/s emits `captive_full_travel{id}`. **x 0.150, not 0.085:** §0.8 makes `left_orbit` an RF shot on an entry bearing of 117.12°–121°, and every ray in that band crosses x 0.085 between y 0.538 and y 0.611 — through the old slot. At 0.085 the flattest legal ray passed 0.02322 from the resting captive against the 0.027 a ball plus a captive needs (**−0.0038**); at 0.150 it passes **0.03464** (**+0.00764**), and the margin only grows toward 121° (15 §2.3/§2.4) |
+| `counter_hood` | wall `[0.198,0.650]` → `[0.270,0.632]`, `material` "wood" — the chute's deflector, **0.03125** below the layer-0 seam and wider than it on both sides, so a ball coming up-table cannot back-door the chute; its **14.0°** down-right lean (dy 0.018 over dx 0.072 ⇒ 14.0362°) rolls the exiting ball into mid-field. That lean is a floor, not a taste call: `1.11052·sin θ` only beats 08 §1.3's 0.24367 m/s² rolling resistance above **12.675°**, so a shallower hood — dy 0.016 over the same dx is 12.5288°, net **−0.00277 m/s²** — lets a moving ball roll off but leaves a stopped one unable to restart, against `stuck_balls` 0. At 14.0362° the net is **+0.02499 m/s²** (15 §2.3) |
+| `shaker` captive ball | slot `{a:[0.150,0.560], b:[0.150,0.640]}`; struck face at y 0.560; far end `b` is the one whose arrival at ≥ 0.3 m/s emits `captive_full_travel{id}`. **x 0.150, not 0.085:** §0.8 makes `left_orbit` an RF shot on an entry bearing of 117.12°–121°, and every ray in that band crosses x 0.085 between y 0.538 and y 0.611 — straight through a slot placed on the natural left-of-centre line. At 0.085 the flattest legal ray passes 0.02322 from the resting captive against the 0.027 a ball plus a captive needs (**−0.0038**); at 0.150 it passes **0.03464** (**+0.00764**), and the margin only grows toward 121° (15 §2.3/§2.4) |
 | `order_window` kicker | `[0.415, 0.560]`, scoop, `eject_angle_deg` 237, `eject_speed` 3.0 |
-| `bur_targets` / `ger_targets` | left wall x 0.070 at y 0.470/0.435/0.400, `facing_deg` 0; centre-right `[0.328,0.416]`, `[0.339,0.384]`, `[0.349,0.352]`, `facing_deg` 195. The G-E-R row is the old `[0.300,0.430]`/`[0.312,0.398]`/`[0.322,0.366]` row translated down-right by **≈ 0.031 m** (+0.027…+0.028 in x, −0.014 in y; the row's steps and its 195° perpendicular are unchanged): at `[0.300,0.430]` the G target sat 0.00127 from the LF→`counter_ramp` ray against the 0.026 a standup face plus a ball needs, permanently blocking this table's hardest shot. Threaded through the 0.035 m channel between that ray (63.010°) and the RF→`order_window` ray (80.308°), G clears the ramp line by **+0.00403** and R the scoop line by **+0.00404** — the two tightest numbers on the table, and what makes both shots below legal (15 §2.3/§2.4) |
+| `bur_targets` / `ger_targets` | left wall x 0.070 at y 0.470/0.435/0.400, `facing_deg` 0; centre-right `[0.328,0.416]`, `[0.339,0.384]`, `[0.349,0.352]`, `facing_deg` 195. The G-E-R row sits **≈ 0.031 m** down-right of the obvious `[0.300,0.430]`/`[0.312,0.398]`/`[0.322,0.366]` placement (+0.027…+0.028 in x, −0.014 in y, with the row's steps and its 195° perpendicular unchanged) and must stay there: at `[0.300,0.430]` the G target is 0.00127 from the LF→`counter_ramp` ray against the 0.026 a standup face plus a ball needs, permanently blocking this table's hardest shot. Threaded through the 0.035 m channel between that ray (63.010°) and the RF→`order_window` ray (80.308°), G clears the ramp line by **+0.00403** and R the scoop line by **+0.00404** — the two tightest numbers on the table, and what makes both shots below legal (15 §2.3/§2.4) |
 
 Layer bookkeeping: `playfield.layer1_z` = 0.048, and both counter ramps'
 final keyframe is `z` 0.048, so each end seams to layer 1 — the exit layer
@@ -944,25 +944,26 @@ flatters α, and is the commonest way a shot map lies about difficulty.
 | `ger_targets` | **RF** | 8.7° | 0.0° | 0.300 | 0.070 (bank face) | 4.10° | **1** |
 | `pie_targets` | MF | 2.3–17.3° | +7.6 / −8.9 / −25.0° | 0.18 | 0.090 (three faces) | 10.1° | 1 |
 
-The three re-assigned rows — `order_window`, `bur_targets`, `ger_targets` —
+The three bolded From cells — `order_window`, `bur_targets`, `ger_targets` —
 take 15 §2.4's flippers, and not as a matter of taste: 15 §0.4's launch
-windows are the binding validity test, and this section's earlier column
-failed it. `order_window` bears **58.38°** from the LF pivot,
+windows are the binding validity test, so the From column is derived from
+them and never assigned by eye. `order_window` bears **58.38°** from the LF pivot,
 0.62° *flatter* than LF's 59° rest end, so LF cannot put a ball there at all
 (from RF: 80.31°). `bur_targets` runs **127.15°–133.35°** from RF, 6.2°–12.4°
 past its 121° rest end (from LF: 101.31°–104.00°). `ger_targets` runs
 **48.73°–58.15°** from LF, the whole row below the 59° rest end (from RF:
 87.58°–92.09°, near-vertical). `counter_ramp` has no `width` key in 15 §2.3,
-so 09 §4.13's **0.044** default applies — not the 0.060 "ramp + funnel" figure
-an earlier draft here invented, which flattered α by nearly a full degree and
-hid a difficulty-5 shot. 15 §2.4's own clearance record confirms the default:
+so 09 §4.13's **0.044** default applies. Clear mouth w is always read off the
+element's declared or default width, never estimated as a "ramp + funnel"
+aperture: 0.060 here would flatter α by nearly a full degree and hide a
+difficulty-5 shot. 15 §2.4's own clearance record confirms the default:
 it needs "a ramp mouth its **0.022** half-width + 0.0135".
 
 Spread checks: 7 labeled shots (5–8 ✓); **LF owns 2** (`counter_ramp`,
 `bur_targets`), **RF owns 4** (`left_orbit`, `shaker`, `order_window`,
 `ger_targets`), the counter flipper owns the seventh. LF is one under §4.2's
-"each flipper owns 3–5" floor — and that is the shipped table, not a slip
-here: the two shots that would balance it are the two the launch windows put
+"each flipper owns 3–5" floor — and that is 15 §2.3's roster, not a
+transcription slip: the two shots that would balance it are the two the launch windows put
 out of LF's reach entirely (above). `bur_targets` backhands from LF at
 θ 18.6° ≤ 30° ✓. **Exactly one difficulty-5 shot,** `counter_ramp` at
 α 1.00°, which is the cap §4.2 sets; it gates no mode start — every mode on
@@ -1147,7 +1148,11 @@ Record pass/fail evidence for every item in `design.md` §Ship.
   inflates α by a whole difficulty band. Correct: d runs sweet spot → mouth,
   and for an orbit the mouth is the lane centre at the instance's `entry_y`
   (§4.2; §10's `left_orbit` is 0.627 from `entry_y_left` 0.660, not 0.591
-  from a point 40 mm lower).
+  from a point 40 mm lower). The twin error inflates the numerator: clear
+  mouth w is the element's declared width, or the 09 §4 default when the
+  roster declares none (a `ramp` with no `width` key is 0.044, not a wider
+  "ramp + funnel" estimate) — a 16 mm overstatement moves a difficulty-5
+  shot to a 4.
 - **Fixing score with ball time.** EGS is low, so the author lengthens
   ball save. Correct: EGS is fixed with the economy rows of the tuning
   matrix; ball-time knobs are for ball-time metrics only.

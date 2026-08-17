@@ -232,14 +232,60 @@ while (!g_quit):
                                               # unchanged — 06 §4.2, 07 §8
 
     perf.note_frame(t_frame_begin, now_ns())                         # §14.2
+
+    # 7. Frame cap (§5.1) — on by default; skipped entirely when
+    #    frame_cap_ns == 0 (video.max_fps = -1)
+    if frame_cap_ns > 0:
+        next_frame_ns = max(next_frame_ns + frame_cap_ns, t_frame_begin)
+        if now_ns() < next_frame_ns - SPIN_MARGIN_NS:
+            sleep_until(next_frame_ns - SPIN_MARGIN_NS)
+        while now_ns() < next_frame_ns:
+            cpu_pause()
 ```
 
 Every acquired command buffer is submitted (after drawing) or cancelled (on
 a skipped frame) **exactly once** — never both, never neither (06 §4).
 
-Rules: the main loop has **no sleep** of its own — pacing comes from the
-blocking playfield acquire (VSYNC) or runs uncapped (MAILBOX). The main loop
-never waits on the sim thread and never holds any lock the sim thread takes.
+Rules: the main loop's only sleep is the §5.1 frame cap; it otherwise
+paces on the blocking playfield acquire (VSYNC) or on the cap alone
+(MAILBOX). The main loop never waits on the sim thread and never holds any
+lock the sim thread takes.
+
+### 5.1 Frame cap (binding)
+
+The playfield loop is **capped by default**. `video.max_fps` (§11.1)
+resolves once at startup, and again on display change (07 §9), to
+`frame_cap_ns`:
+
+| `video.max_fps` | `frame_cap_ns` |
+|---|---|
+| `0` (default) | `1e9 / playfield refresh_hz` — match the display (07 §2; unknown/0 Hz ⇒ treat as 60) |
+| `n` (30 .. 1000, clamped + warned per §11.1) | `1e9 / n` |
+| `-1` | `0` — truly uncapped, for latency experiments (§14.4) only |
+
+The wait reuses the §6.2 sleep-then-spin shape with the same
+`SPIN_MARGIN_NS` (300 µs): at 60 fps that spin is < 2% of one core, three
+orders of magnitude cheaper than the frames it replaces.
+
+Present mode is **unchanged**: MAILBOX stays preferred (canon §5.4,
+07 §7). The cap decides how often a frame is produced, not how presents are
+queued, and under VSYNC the blocking acquire already paces the loop — there
+the cap only bites when it is set below the refresh rate.
+
+Why cap: with frames-in-flight 1 the loop serialises CPU encode with GPU
+work (≤ 1.5 ms and ≤ 4.0 ms budgets, 06 §17.1), so on the reference cabinet
+an uncapped loop free-runs at roughly 150–300 fps into a 60 Hz panel. Three
+of every four frames are discarded undisplayed and the GPU sits pinned at
+100%, all to buy at most a fraction of a frame of latency. In a sealed
+wooden cabinet with no forced airflow that is a bad trade: continuous heat
+and audible fan noise, a foot from the player's hands, for latency a 60 Hz
+panel cannot show. `-1` exists so §14.4 can measure the uncapped path
+deliberately, not as a shipping default.
+
+The cap is a *render*-side constant only: the sim thread stays at 1000 Hz
+(§6) regardless. R1 (≥ 60 fps) is measured on presented frames, so a
+setting below 60 is a dev/diagnostic choice that knowingly fails R1 on the
+cabinet.
 
 ## 6. Sim-thread loop
 
@@ -338,6 +384,12 @@ in 16-testing-ci.md); overruns in normal play indicate a bug, not load.
 - **Tuning procedure** if the acceptance test fails: raise `SPIN_MARGIN_NS`
   in 100 µs steps (upper bound 1 000 000 ns = full spin) until it passes;
   commit the new constant with a JOURNAL.md note. Do not add config for it.
+  The margin is spun, so it is bought with power: it burns
+  `SPIN_MARGIN_NS / 1 ms` of a core continuously — 30% at the default,
+  a whole core at the 1 000 000 ns bound, inside a sealed wooden cabinet
+  that also runs a capped GPU (§5.1). Stop at the first value that passes
+  the acceptance test; a margin above 500 µs must be justified in the
+  JOURNAL note against that heat/noise cost.
 
 ### 6.3 Tick phase order (binding)
 
@@ -965,6 +1017,10 @@ that is not here does not exist.
     "present_mode": "auto",        // "auto" | "mailbox" | "vsync"
                                    // auto = MAILBOX if supported else VSYNC
                                    // (applied per window in 07-displays.md §7)
+    "max_fps": 0,                  // playfield frame cap (§5.1). 0 = match the
+                                   // playfield display's refresh rate (default);
+                                   // n = cap at n fps, clamped to 30 .. 1000;
+                                   // -1 = uncapped, latency experiments only
     "brightness": 1.0              // 0.5 .. 1.5, final-blit multiplier (06)
   },
   "render": {                      // consumed by 06-rendering.md / 13-art-direction.md
@@ -1026,6 +1082,10 @@ that is not here does not exist.
   "last_table": "neon-drift"       // slug; empty/unknown -> neon-drift
 }
 ```
+
+`video.max_fps` has domain `{-1, 0} ∪ [30, 1000]`: `0` and `-1` are
+sentinels (§5.1), not out-of-range values, and are never clamped; any other
+value outside 30 .. 1000 clamps into that range with a `warn`.
 
 An unknown scancode name in `input` is skipped with a `warn`; an action
 whose list becomes empty falls back to its default binding. Multiple names
@@ -1239,6 +1299,11 @@ External photodiode measurement of true motion-to-photon:
 - **Sleeping the whole tick interval.** `sleep_until(target)` alone
   oversleeps by up to 1 ms on Windows. Follow §6: sleep to target − 300 µs,
   then spin. Conversely, do not spin the full millisecond (burns a core).
+- **Leaving the playfield loop uncapped "for latency".** MAILBOX plus
+  frames-in-flight 1 free-runs at 150–300 fps into a 60 Hz cabinet panel:
+  most frames are discarded, the GPU is pinned, and the win is a fraction
+  of a frame. The cap of §5.1 is on by default; `video.max_fps = -1` is a
+  measurement tool (§14.4), not a performance setting.
 - **Queueing framework events for the next tick.** Phase 3 dispatches
   `ball_end`, `tilt`, `multiball_start`, … to Lua *synchronously while the
   FSM emits them*, inside the tick that produced them (§6.3). Deferring
@@ -1316,6 +1381,11 @@ External photodiode measurement of true motion-to-photon:
       TB_DEV_BUILD`, the same expression at both call sites (§1 step 9 and
       06 §3): a shipping Release run without `--dev` creates the device with
       the debug layer off, and the same binary with `--dev` creates it on.
+- [ ] Frame cap (§5.1): on a 60 Hz playfield with the default
+      `video.max_fps = 0`, the F1 fps readout holds 60 ± 1 with idle gaps
+      between frames; `video.max_fps = 90` holds 90 ± 1; `-1` free-runs
+      above the refresh rate; present mode is MAILBOX in all three and the
+      sim thread still ticks 1000 Hz with zero overruns.
 - [ ] Sim thread holds 1000 Hz: 60 s idle run on reference hardware shows
       p99 jitter ≤ 100 µs, max ≤ 500 µs, zero overruns (§6.2 acceptance).
 - [ ] Artificially loading a tick (test hook: 200 ms sleep in `sim.step`)

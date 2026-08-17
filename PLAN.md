@@ -65,7 +65,7 @@ used in milestone acceptance criteria.
 | ID | Requirement |
 |----|-------------|
 | R1 | Playfield ≥ 60 fps at all times on reference hardware; supports native refresh up to 240 Hz |
-| R2 | Lowest achievable input latency: flipper input → sim response < 4 ms; end-to-end motion-to-photon < 25 ms at 120 Hz-class hardware, hardware-limited at 60 Hz |
+| R2 | Lowest achievable input latency: OS-delivered key edge → sim response < 4 ms (the measurement boundary — encoder debounce and USB polling sit outside it; 01-product.md R2.1, end-to-end photodiode path in 05-engine-core.md §14.4); end-to-end motion-to-photon < 25 ms at 120 Hz-class hardware, hardware-limited at 60 Hz |
 | R3 | Modern neon retro look: particle effects, glow/bloom, 90s arcade + 60s atomic-age styling |
 | R4 | Automatic display detection: portrait display → playfield, squarest display → backglass; manual override; single-display fallback |
 | R5 | Ships with 5 distinct complete tables |

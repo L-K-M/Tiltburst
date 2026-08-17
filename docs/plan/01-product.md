@@ -1,6 +1,7 @@
 # 01 — Product Specification
 
 Part of the Tiltburst implementation plan. Canon: ../../PLAN.md
+
 Depends on: none (root product document). Cross-references: 02-decisions.md,
 05-engine-core.md, 07-displays.md, 08-physics.md, 11-game-framework.md,
 14-authoring-guide.md, 15-launch-tables.md, 16-testing-ci.md.
@@ -73,7 +74,7 @@ Each row is a testable statement. "Verification" names the objective check;
 | R1.1 | On Profile A, playfield presents at 60 fps with zero missed vsync during a 5-minute `tb_autoplay` run on every shipped table | Frame-time ring buffer exported by the F1 overlay; assert max frame gap < 17.5 ms | M19 |
 | R1.2 | Render loop sustains native refresh up to 240 Hz without slowing the 1000 Hz sim | High-refresh or IMMEDIATE-present run; sim tick counter must advance 1000 ± 1 ticks/s | M19 |
 | R1.3 | Backglass can never stall the playfield | Debug command injects a 1 s backglass stall; playfield frame times unaffected | M12 |
-| R2.1 | Flipper key edge → flipper torque applied in sim: **p99.9 < 4 ms over ≥ 10,000 scripted press edges** — percentile and sample count are one inseparable statement, and p99 is never the gate | F3 latency overlay histogram exported from that same ≥ 10,000-press-edge scripted run; 04-milestones.md M4 (`Latency.InputToTickUnder4ms` + acceptance) and 05-engine-core.md Done-when state this sentence identically | M4 |
+| R2.1 | Flipper key edge → flipper torque applied in sim: **p99.9 < 4 ms over ≥ 10,000 scripted press edges** — percentile and sample count are one inseparable statement, and p99 is never the gate. **Measurement boundary** (canon §3 R2): the clock starts at the *OS-delivered* key edge (the SDL event's timestamp), so everything upstream of it is outside this number — on Profile A the cabinet buttons reach the OS through a keyboard encoder whose debounce and USB polling add ~1 ms on an iPac and up to ~8 ms on cheaper encoders. That budget is not ours to spend and the 4 ms target does not absorb it; the honest end-to-end figure is the photodiode `--latency-test` path (05-engine-core.md §14.4) | F3 latency overlay histogram exported from that same ≥ 10,000-press-edge scripted run; 04-milestones.md M4 (`Latency.InputToTickUnder4ms` + acceptance) and 05-engine-core.md Done-when state this sentence identically | M4 |
 | R2.2 | Motion-to-photon < 25 ms on 120 Hz-class hardware | Instrumented software estimate (input timestamp → present timestamp + 1 refresh period) | M19 |
 | R2.3 | At 60 Hz, software-estimated motion-to-photon ≤ 40 ms; input→sim budget unchanged | Same instrumentation on Profile A | M19 |
 | R3.1 | Glow/bloom post pass present, per-table tunable, toggleable in settings (`render.bloom_enabled`, §7) | **F12 capture protocol** (06-rendering.md §15.1): a capture pair of the same Neon Drift frame with `render.bloom_enabled` true/false, plus a second pair showing the per-table tuning path (one primitive's `art.json` `glow.intensity` at two values — 13-art-direction.md §3.2; bloom is earned by glow, 06-rendering.md §12.1), reviewed against the 13-art-direction.md style checklist in the M13 PR — eyeball review, never pixel-gated (16-testing-ci.md §5). `tb_screenshot` is a stub until M15 and is **not** this row's evidence | M13 |
@@ -333,7 +334,9 @@ Settings pages (full spec in 11-game-framework.md, built in M18):
 
 - **Display:** display assignment override (playfield/backglass per connected
   display), playfield rotation override (0/90/180/270°), backglass on/off,
-  vsync/present-mode selection, show refresh info, glow/bloom on-off
+  vsync/present-mode selection, frame cap (`video.max_fps`: 0 = match the
+  display refresh rate, an integer caps it, −1 = uncapped), show refresh
+  info, glow/bloom on-off
   (`render.bloom_enabled` — the R3.1 toggle) and bloom strength
   (`render.bloom_strength`). Exactly the `video`/`render` keys of the
   05-engine-core.md §11.1 settings schema, no others: a setting that is not
@@ -383,7 +386,8 @@ Measured before the M20 Definition-of-Done audit; all must pass.
 | Metric | Target | Source |
 |--------|--------|--------|
 | Missed vsync on Profile A, 5-min autoplay, all 5 tables | 0 | R1.1 capture |
-| Input→sim latency | **p99.9 < 4 ms over ≥ 10,000 scripted press edges** (the percentile and the sample count are one gate; a p99 figure or an unstated sample count does not satisfy this row) | F3 overlay export of that run (R2.1) |
+| Input→sim latency, measured from the OS-delivered key edge (encoder debounce and USB polling are outside this boundary — R2.1) | **p99.9 < 4 ms over ≥ 10,000 scripted press edges** (the percentile and the sample count are one gate; a p99 figure or an unstated sample count does not satisfy this row) | F3 overlay export of that run (R2.1) |
+| End-to-end press→light on Profile A (the honest player-facing number: encoder debounce + USB polling + the row above + scanout) | Measured and filed; no numeric gate — the gate is the row above, and this row passes by existing | Photodiode `--latency-test` CSV (05-engine-core.md §14.4) |
 | Sim tick cost p99 on Profile A | < 500 µs (half the 1 ms budget) | F1 overlay export |
 | Audio output latency | < 10 ms | 12-audio.md instrumentation |
 | Determinism suite | 100 consecutive green runs per platform | 16-testing-ci.md |
@@ -540,6 +544,13 @@ Mistakes an implementor unfamiliar with pinball is most likely to make.
   p99.9 < 4 ms over ≥ 10,000 scripted press edges (R2.1, §9), and the sample
   count belongs in the same sentence as the percentile. A p99 figure over a
   short burst hides exactly the tail this gate exists to catch.
+- **Quoting the 4 ms gate as button-to-sim latency.** It is measured from the
+  OS-delivered key edge (R2.1); the encoder's debounce and USB polling —
+  ~1 ms on an iPac, up to ~8 ms on cheap encoders — happen before that clock
+  starts and cannot be tuned from inside the process. Never "budget" for them
+  by tightening the 4 ms, and never present the F3 export as what the player
+  feels: that number comes from the photodiode `--latency-test` run
+  (05-engine-core.md §14.4, §9).
 - **Recording the feel scenarios as replay files.** R7.1 is proven by
   FT-01…FT-08 on the 08-physics.md §5.6 rig — code, fixed seed,
   state-triggered predicates — not by a recorded-input tape. A tape pins
@@ -560,8 +571,10 @@ Mistakes an implementor unfamiliar with pinball is most likely to make.
       `perf_particles.two_thousand_live_at_60fps`, with no dependency on
       `tb_screenshot` or `tb_autoplay`.
 - [ ] R2.1 evidence is reported as p99.9 < 4 ms over ≥ 10,000 scripted press
-      edges — the same sentence in 04-milestones.md M4, 05-engine-core.md
-      Done-when, and the PR text; no p99-over-a-burst figure anywhere.
+      edges, measured from the OS-delivered key edge — the same sentence in
+      04-milestones.md M4, 05-engine-core.md Done-when, and the PR text; no
+      p99-over-a-burst figure anywhere, and no claim that this number is what
+      the player's finger feels (that is the §9 photodiode row).
 - [ ] Booting to Attract and idling through a full page cycle (§4.8) creates
       no `lua_State` and calls no script handler.
 - [ ] All §4 flows demonstrable end to end on Profile A (or under the §3

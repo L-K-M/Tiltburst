@@ -164,14 +164,28 @@ event.
 
 ### 2.4 Instruction watchdog
 
-- Shared budget of **100,000 Lua VM instructions per tick**, reset at the
+- Shared budget of **10,000 Lua VM instructions per tick**, reset at the
   start of phase 2 and drawn down by every handler and timer callback in
-  phases 2, 3 and 4 of that tick. (100 M instr/s ceiling — a full event
-  burst in the shipped tables measures under 3,000 instructions.)
+  phases 2, 3 and 4 of that tick.
+- The budget is a **time** budget expressed in instructions, and the two
+  numbers are tied: at the ~100 M instr/s ceiling of the sandboxed 5.4 VM
+  on reference hardware, 10,000 instructions ≈ **100 µs** — exactly
+  ADR-006's revisit criterion ("scripting still completes in < 100 µs") and
+  a tenth of the 1 ms tick. Changing the instruction count means restating
+  the microsecond equivalence here and in ADR-006; a budget whose time
+  equivalent does not fit inside the tick is a bug, not a tuning choice.
+  A full event burst in the shipped tables measures under 3,000
+  instructions (~30 µs), so 10,000 leaves ~3× headroom over real content
+  while still tripping long before a runaway script can push the tick into
+  the 05-engine-core.md §6.1 overrun clamp. A 40,000-iteration loop is
+  aborted in its first tick instead of quietly costing ~400 µs every tick
+  forever.
 - Enforced with `lua_sethook(L, hook, LUA_MASKCOUNT, 1000)`: the hook fires
-  every 1,000 instructions, decrements the tick budget, and at zero raises
-  the Lua error `"instruction budget exceeded"`. The hook must be installed
-  on the main state **and every coroutine** (§1.2).
+  every 1,000 instructions (unchanged — the budget is 10 hook fires, so the
+  worst-case overshoot past the cap is one interval, ~10 µs), decrements
+  the tick budget, and at zero raises the Lua error
+  `"instruction budget exceeded"`. The hook must be installed on the main
+  state **and every coroutine** (§1.2).
 - On overrun: the running handler/callback is aborted by that error,
   **permanently disabled for the rest of the game** (a disabled timer
   callback also cancels its timer), the error is logged with traceback,
@@ -1270,6 +1284,12 @@ warns on violations where statically checkable.
     scheduled from it never fires (all timers are canceled right after
     `ball_end`, §3.6) and posts made later are discarded by the frozen
     ledger (11-game-framework.md §4.5).
+16. **Treating the instruction budget as roomy.** 10,000 instructions is
+    ~100 µs of a 1 ms tick, shared by every handler and timer callback in
+    that tick (§2.4). Per-frame-shaped work — rescanning all elements,
+    rebuilding tables, string formatting in a hot handler — exhausts it and
+    permanently disables whichever handler happens to hit zero. Keep
+    handlers event-shaped and cache derived values in `tb.state`.
 
 ## Done when
 
@@ -1285,8 +1305,13 @@ warns on violations where statically checkable.
       id, and accepts the §9 reserved ids (`attract`, `main`, `mode`,
       `multiball`, `wizard`, `game_over`).
 - [ ] Watchdog: a handler with `while true do end` is aborted and disabled
-      within its first tick; subsequent sim ticks complete in < 1 ms wall
-      time; the same holds for the loop inside a coroutine.
+      within its first tick, after at most 10,000 + one hook interval of
+      instructions — measured script time for that tick ≤ ~110 µs, i.e.
+      inside ADR-006's < 100 µs criterion plus the hook granularity (§2.4);
+      a handler with a 40,000-iteration loop trips the same path rather
+      than running to completion; subsequent sim ticks carry no script cost
+      and complete in < 1 ms wall time; the same holds for the loop inside
+      a coroutine.
 - [ ] Error path: a handler calling `error("x")` logs once (rate-limited
       after), later handlers for the same event still run, and 10
       consecutive failures disable the handler with a distinct log line.

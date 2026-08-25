@@ -1,17 +1,36 @@
 #pragma once
 
+#include "sim/types.h"
+
 #include <atomic>
 #include <cstdint>
 
 // SimSnapshot and the triple buffer (05-engine-core.md §7).
 //
-// M1 carries only the tick; the struct grows in later milestones (balls,
-// flippers, element states, lights — 05 §7.1). POD, fixed size, no
-// pointers, safe to memcpy.
+// Grows milestone by milestone; at M2 it carries tick, sim time, and ball
+// positions (§7.1 subset). POD, fixed size, no pointers, safe to memcpy.
 namespace tb {
+
+using tb::sim::kMaxBalls;
+
+struct BallSnap {
+    float x = 0.0f;
+    float y = 0.0f;
+    float vx = 0.0f;
+    float vy = 0.0f;
+    float z = 0.0f;
+    float omega = 0.0f;
+    uint8_t layer = 0;
+    uint8_t flags = 0; // bit0 active
+    uint16_t _pad = 0;
+};
 
 struct SimSnapshot {
     uint64_t tick = 0;
+    double sim_time_s = 0.0; // tick * 0.001 exactly
+    uint32_t ball_count = 0;
+    uint32_t _pad = 0;
+    BallSnap balls[kMaxBalls]{};
 };
 
 // Triple buffer (§7.2, binding). Single writer (sim), single reader
@@ -63,7 +82,7 @@ public:
         buffer_.publish();
     }
 
-    SimSnapshot acquire_latest() const { // main thread ONLY (single reader, §7.2)
+    SimSnapshot acquire_latest() const { // main thread ONLY (single reader)
         return buffer_.read();
     }
 

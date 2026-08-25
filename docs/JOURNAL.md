@@ -58,3 +58,30 @@ corrections are new entries. Format: 03-process.md §3.1.
     --replay (M4+).
   - Branch protection retry: PUT still 404 (no admin) at M01 open; fallback
     continues per §3.2.
+
+## M02 — Headless simulation core & determinism (2026-08-25)
+
+- Shipped: Vec2/Ball/materials/colliders, analytic sweeps (§3.2–§3.4, §8)
+  with the five §2.1 worked examples pinned as unit tests, uniform-grid
+  broadphase (§3.7) with brute-force property test, shared-timeline CCD
+  loop + pull-back + push-out (§3.6/§3.8), impulse contacts with
+  velocity-dependent restitution and spin transfer (§4.1–§4.3), energy
+  property test, ball-ball collisions (§8), state_hash with the rolling
+  event-sequence accumulator (16 §2.4.1), .tbreplay writer/reader (05 §13),
+  JSON tape loader in test support, SimEvent ring skeleton, allocation-free
+  step proven by a global allocator hook, layout include guard,
+  perf_tick.gate_synthetic green (median-of-3 mean ≈ 1.8 µs, p99 ≈ 2.7 µs —
+  far inside the 100/200 µs CI limits).
+- Deviations:
+  - det_golden.m2_bounce records/compares per-OS goldens; only the linux
+    golden is committed (no Windows/macOS host available). Other OSes SKIP
+    until their goldens land via CI artifacts. ADR-013 same-OS rule intact.
+  - The m2_bounce tape's table_slug ("test-lab") is not yet validated —
+    table loading arrives at M5.
+  - sweep_circle_vs_point root-finding runs in double internally: the §2.1
+    worked-example tolerances (1e-6 on normalized normals near-tangent)
+    are unreachable in float without contradicting the spec's own decimals.
+  - Broadphase brute-force test asserts no-misses (+dedupe/sort), not set
+    equality: cell-level broadphase is conservative by design.
+  - Branch protection retry at M02 open: PUT still 404 (no admin);
+    fallback continues per §3.2.

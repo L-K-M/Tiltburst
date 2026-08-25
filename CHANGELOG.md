@@ -8,6 +8,12 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Added
 
+- M02: headless simulation core — analytic CCD (segment/point/arc/ball
+  pair), uniform-grid broadphase, shared-timeline TOI loop with push-out,
+  §4.1 impulse contacts with velocity-dependent restitution, ball-ball
+  collisions, state_hash with event-sequence accumulator, .tbreplay
+  recorder/player, JSON tape loader, allocation-free hot path, layout
+  guard, and `perf_tick.gate_synthetic`.
 - M01: application skeleton — 1000 Hz sim thread with triple-buffered
   snapshots, SDL3 GPU device (frames-in-flight 1, MAILBOX-else-VSYNC),
   quad-pipeline overlay from committed shader blobs, settings.json with

@@ -1,5 +1,6 @@
 #include "core/version.h"
 
+#include <cstdio>
 #include <cstring>
 #include <string>
 

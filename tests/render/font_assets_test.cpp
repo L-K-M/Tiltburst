@@ -1,16 +1,19 @@
+#include "support/data_path.h"
+
 #include <gtest/gtest.h>
 
 #include <picosha2.h>
 
 #define STB_TRUETYPE_IMPLEMENTATION
-#include "support/data_path.h"
-
 #include <stb_truetype.h>
 
+#include <algorithm>
 #include <array>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <sstream>
 #include <string>
 #include <vector>
 

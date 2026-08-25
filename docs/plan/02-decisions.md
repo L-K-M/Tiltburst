@@ -423,10 +423,12 @@ check can never pass.
 
 ### Decision
 
-The format job's `find` gains `-not -path 'tests/third_party/*'`: vendored
-code under any `third_party/` directory is excluded from clang-format
-enforcement everywhere, forever. First-party code under `/src` and `/tests`
-is unaffected and remains fully enforced.
+The format job's `find` becomes
+`find src tests \( -name '*.cpp' -o -name '*.h' \) -not -path '*/third_party/*'`
+(the parentheses are load-bearing — an ungrouped `-not` would bind only to
+the `'*.h'` branch): vendored code under any `third_party/` directory is
+excluded from clang-format enforcement everywhere, forever. First-party
+code under `/src` and `/tests` is unaffected and remains fully enforced.
 
 ### Consequences
 

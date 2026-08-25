@@ -35,7 +35,11 @@ runs:
       shell: bash
       run: |
         BASELINE="$(jq -r '."builtin-baseline"' vcpkg.json)"
-        git clone https://github.com/microsoft/vcpkg "${RUNNER_TEMP}/vcpkg"
+        if [ -z "${BASELINE}" ] || [ "${BASELINE}" = "null" ]; then
+          echo "::error::vcpkg.json is missing \"builtin-baseline\"; cannot pin vcpkg"
+          exit 1
+        fi
+        git clone --filter=blob:none https://github.com/microsoft/vcpkg "${RUNNER_TEMP}/vcpkg"
         git -C "${RUNNER_TEMP}/vcpkg" checkout "${BASELINE}"
         if [ "${RUNNER_OS}" = "Windows" ]; then
           "${RUNNER_TEMP}/vcpkg/bootstrap-vcpkg.bat" -disableMetrics

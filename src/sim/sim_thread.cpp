@@ -7,8 +7,8 @@
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
-#include <windows.h>
 #include <timeapi.h>
+#include <windows.h>
 #pragma comment(lib, "winmm.lib")
 #else
 #include <pthread.h>

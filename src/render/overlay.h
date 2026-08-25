@@ -2,6 +2,7 @@
 
 #include "render/renderer.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -22,9 +23,13 @@ struct OverlayStats {
 
 class Overlay {
 public:
-    // Rebuilds the text layout for the current stats into a quad list in
-    // UI pixel space (top-left origin). Cheap: called once per frame.
+    // Formats the current stats into the text lines.
     void update(const OverlayStats& stats);
+
+    // Formatted overlay text produced by update().
+    static constexpr size_t kLineCount = 4;
+
+    const std::string& line(size_t i) const { return lines_[i]; }
 
     // Appends one QuadInstance per glyph quad to `out` at (x, y) with the
     // given color; returns the next x baseline.
@@ -40,7 +45,7 @@ public:
 
 private:
     OverlayStats stats_;
-    std::string lines_[6];
+    std::string lines_[kLineCount];
 };
 
 } // namespace tb::render

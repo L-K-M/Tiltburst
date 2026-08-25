@@ -27,5 +27,8 @@ int main(int argc, char** argv) {
         // clean failure — no exception may propagate out of main.
         std::fprintf(stderr, "fatal: %s\n", e.what());
         return 1;
+    } catch (...) {
+        std::fprintf(stderr, "fatal: unknown exception\n");
+        return 1;
     }
 }

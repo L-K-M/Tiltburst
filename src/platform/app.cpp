@@ -42,7 +42,7 @@ constexpr uint64_t kHeadlessProbeTicks = 5000; // 5 s bounded probe
 constexpr size_t kFrameRing = 240;
 constexpr int kRenderSmokeW = 1080;
 constexpr int kRenderSmokeH = 1920;
-constexpr float kOverlayColor[4] = {0.00f, 0xE5f / 255.f, 1.0f, 1.0f};
+constexpr float kOverlayColor[4] = {0.00f, 0xE5 / 255.f, 1.0f, 1.0f};
 
 void request_quit(int) {
     g_quit.store(true);
@@ -70,10 +70,11 @@ struct FrameStats {
             accum_s_ = 0.0;
             frames_ = 0;
         }
+        // The "frame" readout is this frame's duration, not the ring max.
+        last_ms = float(dt_s * 1000.0);
         if (!ring.empty()) {
             std::deque<float> sorted = ring;
             std::sort(sorted.begin(), sorted.end());
-            last_ms = sorted.back();
             p50_ms = sorted[sorted.size() / 2];
             p99_ms = sorted[(sorted.size() * 99) / 100];
         }
@@ -336,9 +337,10 @@ int run(const CliOptions& cli) {
             s.tick = tick;
             snapshots.publish(s);
         });
-
         const uint64_t start = tb_now_ns();
-        while (sim.ticks_run() < kHeadlessProbeTicks && !g_quit.load(std::memory_order_relaxed)) {
+        // Wall-clock deadline keeps a wedged sim from hanging CI forever.
+        while (sim.ticks_run() < kHeadlessProbeTicks && tb_now_ns() - start < 60'000'000'000ull &&
+               !g_quit.load(std::memory_order_relaxed)) {
             sleep_until_ns(tb_now_ns() + 1'000'000); // poll at 1 kHz
         }
         sim.request_stop();
@@ -431,7 +433,7 @@ int run(const CliOptions& cli) {
                 os.frame_ms_last = stats.last_ms;
                 os.frame_ms_p50 = stats.p50_ms;
                 os.frame_ms_p99 = stats.p99_ms;
-                os.tick_rate_hz = 1000.0f; // pinned by canon §5.3
+                os.tick_rate_hz = 1000.0f; // pinned by canon 5.3
                 os.tick_us_p50 = 1000000.0f / std::max(os.tick_rate_hz, 1.f);
                 os.tick_us_p99 = os.tick_us_p50;
 
@@ -444,49 +446,20 @@ int run(const CliOptions& cli) {
                 (void)w;
 
                 float y = 12.f;
-                y += 18.f;
-                char line[96];
-                std::snprintf(line,
-                              sizeof(line),
-                              "fps %d   tick %d Hz",
-                              int(stats.fps),
-                              int(os.tick_rate_hz));
-                overlay.emit_quads(12.f,
-                                   y,
-                                   line,
-                                   kOverlayColor[0],
-                                   kOverlayColor[1],
-                                   kOverlayColor[2],
-                                   1.f,
-                                   &quads,
-                                   uint32_t(h));
-                y += 16.f;
-                std::snprintf(line,
-                              sizeof(line),
-                              "frame %.2f ms (p99 %.2f)",
-                              double(stats.last_ms),
-                              double(stats.p99_ms));
-                overlay.emit_quads(12.f,
-                                   y,
-                                   line,
-                                   kOverlayColor[0],
-                                   kOverlayColor[1],
-                                   kOverlayColor[2],
-                                   1.f,
-                                   &quads,
-                                   uint32_t(h));
-                y += 16.f;
-                std::snprintf(line, sizeof(line), "tick  %.2f us", double(os.tick_us_p50));
-                overlay.emit_quads(12.f,
-                                   y,
-                                   line,
-                                   kOverlayColor[0],
-                                   kOverlayColor[1],
-                                   kOverlayColor[2],
-                                   1.f,
-                                   &quads,
-                                   uint32_t(h));
+                for (size_t i = 0; i < tb::render::Overlay::kLineCount; ++i) {
+                    overlay.emit_quads(12.f,
+                                       y,
+                                       overlay.line(i),
+                                       kOverlayColor[0],
+                                       kOverlayColor[1],
+                                       kOverlayColor[2],
+                                       1.f,
+                                       &quads,
+                                       uint32_t(h));
+                    y += 16.f;
+                }
             }
+
             frame.quads = quads.data();
             frame.quad_count = uint32_t(quads.size());
 

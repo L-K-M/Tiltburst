@@ -41,7 +41,8 @@ public:
 
     // Uniform integer in [lo, hi] inclusive, lo <= hi.
     int32_t range_i32(int32_t lo, int32_t hi) {
-        return lo + (int32_t)next_below((uint32_t)(hi - lo) + 1u);
+        const uint32_t span = (uint32_t(hi) - uint32_t(lo)) + 1u;
+        return int32_t(int64_t(lo) + int64_t(next_below(span)));
     }
 
     // Uniform float in [lo, hi).

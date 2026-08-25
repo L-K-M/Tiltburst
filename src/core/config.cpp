@@ -240,6 +240,13 @@ bool Settings::save(const std::filesystem::path& path) const {
             }
         }
     }
+    // Wrong-typed sections would make operator[] throw type_error.305;
+    // reset any non-object section before writing leaves.
+    for (const char* section : {"video", "render", "audio", "input", "game", "accessibility"}) {
+        if (!doc.contains(section) || !doc[section].is_object()) {
+            doc[section] = json::object();
+        }
+    }
 
     auto& video = doc["video"];
     video["present_mode"] = present_mode;
@@ -287,8 +294,13 @@ bool Settings::save(const std::filesystem::path& path) const {
             return false;
         }
         const std::string text = doc.dump(2) + "\n";
-        std::fwrite(text.data(), 1, text.size(), f);
-        std::fflush(f);
+        if (std::fwrite(text.data(), 1, text.size(), f) != text.size() || std::fflush(f) != 0) {
+            TB_LOG_ERROR("main", "settings save: short write to {}", tmp.string());
+            std::fclose(f);
+            std::error_code rm_ec;
+            std::filesystem::remove(tmp, rm_ec);
+            return false;
+        }
 #if defined(_WIN32)
         _commit(_fileno(f));
 #else
@@ -306,7 +318,9 @@ bool Settings::save(const std::filesystem::path& path) const {
     }
 
 #if !defined(_WIN32)
-    if (int dirfd = ::open(path.parent_path().string().c_str(), O_RDONLY); dirfd >= 0) {
+    const std::string parent =
+        path.parent_path().empty() ? std::string(".") : path.parent_path().string();
+    if (int dirfd = ::open(parent.c_str(), O_RDONLY); dirfd >= 0) {
         ::fsync(dirfd);
         ::close(dirfd);
     }

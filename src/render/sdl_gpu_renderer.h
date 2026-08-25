@@ -5,9 +5,11 @@
 
 #include <SDL3/SDL_gpu.h>
 
-#include <array>
 #include <cstdint>
 #include <deque>
+#include <filesystem>
+#include <string>
+#include <vector>
 
 // SDL3 GPU implementation of IRenderer (the only backend in v1, ADR-005).
 // All GPU work happens on the main thread (canon §5.4).

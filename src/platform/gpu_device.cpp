@@ -54,9 +54,8 @@ SwapchainInit create_device_for_window(SDL_Window* window,
     const Uint32 formats = available_shader_formats();
     if (formats == 0) {
         TB_LOG_ERROR("main",
-                     "no shader blobs found under {}shaders; cannot "
-                     "create a GPU device",
-                     paths::base_dir().string());
+                     "no shader blobs found under {}; cannot create a GPU device",
+                     (paths::base_dir() / "shaders").string());
         return out;
     }
 

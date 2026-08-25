@@ -81,7 +81,7 @@ float Overlay::emit_quads(float x,
             QuadInstance{(minx + maxx) * 0.5f, (miny + maxy) * 0.5f, hx, hy, r, g, b, a});
     }
     (void)target_h;
-    return x;
+    return x + float(stb_easy_font_width(const_cast<char*>(text.c_str())));
 }
 
 } // namespace tb::render

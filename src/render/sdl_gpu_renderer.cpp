@@ -257,6 +257,10 @@ bool SdlGpuRenderer::write_png(const std::filesystem::path& out_png) {
     SDL_WaitForGPUIdle(device_);
 
     SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(device_);
+    if (!cmd) {
+        return false;
+    }
+
     SDL_GPUCopyPass* copy = SDL_BeginGPUCopyPass(cmd);
     SDL_GPUTextureRegion src{offscreen_, 0, 0, 0, offscreen_w_, offscreen_h_, 1};
     SDL_GPUTextureTransferInfo dst{readback_, 0, offscreen_w_, offscreen_h_};
@@ -268,6 +272,9 @@ bool SdlGpuRenderer::write_png(const std::filesystem::path& out_png) {
     SDL_ReleaseGPUFence(device_, fence);
 
     void* map = SDL_MapGPUTransferBuffer(device_, readback_, false);
+    if (!map) {
+        return false;
+    }
     const int ok = stbi_write_png(out_png.string().c_str(),
                                   int(offscreen_w_),
                                   int(offscreen_h_),

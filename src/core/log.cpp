@@ -99,6 +99,10 @@ void set_file(const std::filesystem::path& path) {
     }
     g_file_path = path;
     g_file = std::fopen(path.string().c_str(), "wb");
+    if (!g_file) {
+        std::fprintf(
+            stderr, "[WARN  ] [main ] failed to open log file %s\n", path.string().c_str());
+    }
 }
 
 void drain_to_file() {
@@ -108,9 +112,18 @@ void drain_to_file() {
     const uint64_t w = g_write_pos.load(std::memory_order_acquire);
     while (g_drained.load(std::memory_order_relaxed) < w) {
         const uint64_t r = g_drained.fetch_add(1, std::memory_order_relaxed);
-        // The producer may have lapped us only after 4096 entries in one
-        // frame; accept the loss rather than block any thread.
-        write_entry(g_ring[r % kRingEntries]);
+
+        // Snapshot the entry under the same spinlock the producer holds
+        // for its slot write: a lapping producer would otherwise tear the
+        // copy between our position fetch and the file write.
+        Entry local;
+        while (g_lock.test_and_set(std::memory_order_acquire)) {
+            cpu_pause();
+        }
+        local = g_ring[r % kRingEntries];
+        g_lock.clear(std::memory_order_release);
+
+        write_entry(local);
     }
     std::fflush(g_file);
 }

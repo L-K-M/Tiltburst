@@ -63,7 +63,7 @@ public:
         buffer_.publish();
     }
 
-    SimSnapshot acquire_latest() const { // any reader, never blocks writer
+    SimSnapshot acquire_latest() const { // main thread ONLY (single reader, §7.2)
         return buffer_.read();
     }
 

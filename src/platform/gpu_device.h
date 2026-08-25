@@ -31,8 +31,8 @@ struct SwapchainInit {
 // Creates the device from the on-disk format mask, claims the window, and
 // applies the canon swapchain parameters: SDR composition,
 // MAILBOX-else-VSYNC per `present_preference` ("auto"|"mailbox"|"vsync"),
-// frames-in-flight 1 device-wide. The chosen present mode is returned and
-// logged by the caller.
+// frames-in-flight 1 device-wide. The chosen present mode is logged by
+// this function; it is not part of the return value.
 SwapchainInit create_device_for_window(SDL_Window* window,
                                        bool debug_mode,
                                        const std::string& present_preference);

@@ -83,7 +83,8 @@ if(TB_COMPILE_SHADERS)
     add_custom_target(tb_shaders ALL DEPENDS ${TB_SHADER_BLOBS})
 else()
     # ADR-012 fallback: install the committed blobs verbatim.
-    file(GLOB tb_committed_blobs ${TB_SHADER_SOURCE_DIR}/compiled/*)
+    file(GLOB tb_committed_blobs CONFIGURE_DEPENDS
+         ${TB_SHADER_SOURCE_DIR}/compiled/*)
     foreach(blob ${tb_committed_blobs})
         get_filename_component(bname ${blob} NAME)
         add_custom_command(

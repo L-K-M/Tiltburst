@@ -21,7 +21,7 @@ bool init_pref() {
 
     std::error_code ec;
     std::filesystem::create_directories(g_pref / "logs", ec);
-    return true;
+    return !ec;
 }
 
 const std::filesystem::path& pref() {

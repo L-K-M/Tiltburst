@@ -2,6 +2,7 @@
 
 #include "sim/snapshot.h"
 
+#include <cstdint>
 #include <memory>
 
 struct SDL_Window;

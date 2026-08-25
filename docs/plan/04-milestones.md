@@ -374,8 +374,8 @@ overlay pass on the quad pipeline. 7) wire main loop.
 **Key interfaces.**
 
 ```cpp
-// src/core/time.h
-uint64_t ticks_now_ns();                      // monotonic; NEVER called from sim tick code
+// src/core/time.h (ADR-019: OS monotonic clock in tb_core, not SDL)
+uint64_t now_ns();  // tb::now_ns(); monotonic; NEVER called from sim tick code
 // src/core/rng.h  (full implementation verbatim in 05-engine-core.md §10)
 class Pcg32 { public: void seed(uint64_t initstate, uint64_t initseq);
               uint32_t next_u32(); float next_float();

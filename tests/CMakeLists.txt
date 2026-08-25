@@ -2,20 +2,29 @@ find_package(GTest CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 
 add_executable(tb_tests
+    core/config_test.cpp
+    core/rng_test.cpp
     core/scaffold_test.cpp
+    core/time_test.cpp
     render/font_assets_test.cpp
+    render/shader_build_test.cpp
+    sim/snapshot_test.cpp
+    sim/tick_loop_test.cpp
 )
 
 target_include_directories(tb_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party
     ${Stb_INCLUDE_DIR})
-target_link_libraries(tb_tests PRIVATE tb_core GTest::gtest GTest::gtest_main)
+target_link_libraries(tb_tests PRIVATE
+    tb_core tb_sim tb_render GTest::gtest GTest::gtest_main)
 
 include(GoogleTest)
 # Repo-relative test data: tests resolve paths through tb::test::data_path(),
 # never the process working directory (16-testing-ci.md §2).
-target_compile_definitions(tb_tests PRIVATE TB_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+target_compile_definitions(tb_tests PRIVATE
+    TB_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+    TB_SHADER_BUILD_DIR="${CMAKE_BINARY_DIR}/bin/shaders")
 
 # Three discovery passes give per-class timeouts. Fallback if multiple passes
 # on one target misbehave: a single pass with TIMEOUT 2400.

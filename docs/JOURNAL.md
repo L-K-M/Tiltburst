@@ -29,3 +29,32 @@ corrections are new entries. Format: 03-process.md §3.1.
   built but FontAssets failed on a CRLF checkout of SHA256SUMS — parser
   strips CR and .gitattributes pins vendored bytes / LF for the sums file.
 
+- Mid-milestone: branch protection PUT on main returned 404 (token lacks
+  admin; 2026-08-25). Fallback per 03-process.md §3.2: the §4 per-PR
+  CI-green checklist enforces merges; six contexts confirmed verbatim from
+  gh pr checks on PR #2. Retry once at M01.
+
+## M01 — App skeleton & fixed-timestep loop (2026-08-25)
+
+- Shipped: core (time/log/rng/config/assert), sim (SimSnapshot +
+  TripleBuffer, 1000 Hz SimThread with §6.1 clamp), platform (CLI §2,
+  SDL boot §1 subset, window, GPU device w/ FIF=1 + MAILBOX-else-VSYNC),
+  render (renderer.h per 06 §2, quad pipeline from committed blobs,
+  stb_easy_font overlay, --render-smoke offscreen path), 14 unit tests.
+- Deviations:
+  - Timebase unified as tb::now_ns() in tb_core over CLOCK_MONOTONIC/QPC
+    (05 §3 said SDL_GetTicksNS; 04 M1 said ticks_now_ns — neither fits the
+    layering) → ADR-019; both spec snippets amended same PR.
+  - SDL_shadercross has no release tags; FetchContent pins commit
+    e55cf5e31ced6f3d1be5cc6d0c50e99384f9f4ba instead (ADR-012's "fixed
+    release tag" applied as fixed commit).
+  - Blobs generated locally: dxc v1.8.2505 → SPIR-V, spirv-cross → MSL;
+    DXIL deferred (needs Windows DXC); CI shader compile stays OFF until a
+    runner-provisioned DXC exists → committed-blob path per ADR-012.
+    Windows/macOS render-smoke will log-skip until DXIL lands; Linux
+    exercises lavapipe.
+  - --headless runs a bounded 5000-tick probe then exits 0 so CI can
+    verify display-less boot; unbounded headless sessions arrive with
+    --replay (M4+).
+  - Branch protection retry: PUT still 404 (no admin) at M01 open; fallback
+    continues per §3.2.

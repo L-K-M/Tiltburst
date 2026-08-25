@@ -484,6 +484,38 @@ updated in the same PR.
 One apt line per Linux job (~10 s warm). No check-name or workflow-structure
 changes.
 
+## ADR-019 — The engine timebase is `tb::now_ns()` over the OS monotonic clock
+
+**Status:** Accepted (M1). Amends 05-engine-core.md §3's implementation
+note and 04-milestones.md M1's `ticks_now_ns` snippet.
+
+### Context
+
+05 §3 says `tb::now_ns()` "returns `SDL_GetTicksNS()`", and 04 M1 declares
+a different name, `ticks_now_ns()`. Both cannot hold, and neither fits the
+layering: `SDL_GetTicksNS` lives in SDL3, but `now_ns()` is consumed by
+`InputEdge` timestamps, the sim loop, and latency stages — including code
+that must link only `tb_core` (canon §5.1 forbids SDL in `tb_sim`'s
+dependency closure). Mixing an SDL-based timebase with a core-owned one
+would silently corrupt every input→latch delta.
+
+### Decision
+
+One function, one home: **`tb::now_ns()` is declared in `src/core/time.h`
+and implemented in `tb_core` over the OS monotonic clock**
+(`CLOCK_MONOTONIC` / `QueryPerformanceCounter`). All producers stamp edges
+at production time with `now_ns()`; SDL and evdev event timestamps are
+never used directly — they differ from our base by a per-source constant,
+the same conversion §3 already mandates for evdev. 04 M1's
+`ticks_now_ns()` snippet is corrected to `now_ns()`.
+
+### Consequences
+
+Latency math has a single consistent timebase on all platforms; `tb_sim`
+stays SDL-free. The delta between SDL's event timestamp and our stamp at
+pump time is bounded by pump latency and is itself visible in the F3 stage
+table.
+
 ## Amendments to ARCHITECTURE.md (authoritative table)
 
 Where ARCHITECTURE.md disagrees with a row below, the amendment wins (canon

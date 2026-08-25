@@ -1111,6 +1111,7 @@ runs:
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends \
           ninja-build pkg-config build-essential jq \
+          autoconf automake autoconf-archive libtool libltdl-dev \
           libasound2-dev libpulse-dev libaudio-dev libjack-dev libsndio-dev \
           libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
           libxi-dev libxss-dev libxtst-dev libxkbcommon-dev \
@@ -1595,7 +1596,7 @@ not a required check — it never runs on PRs.
     },
     {
       "name": "windows", "inherits": "base",
-      "generator": "Visual Studio 17 2022",
+      "generator": "Visual Studio 18 2026",
       "architecture": { "value": "x64", "strategy": "set" },
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
     }

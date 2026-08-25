@@ -374,6 +374,116 @@ applies to everything else (no LED protocols, no speculative interfaces).
 
 v2 scopes cabinet I/O; start from the `SimEvent` consumer model.
 
+## ADR-015 — Orbitron role filled by Chakra Petch Bold (font substitution)
+
+**Status:** Accepted (M0). Applies 13-art-direction.md §5.1's own fallback
+row and 03-process.md §3.2.
+
+### Context
+
+§5.1 pins `ofl/orbitron/Orbitron-Bold.ttf` (or a static instance under
+`ofl/orbitron/static/`) from github.com/google/fonts. At the pinned commit
+(`6a003b5eb672dc8bf5bff5937cf5863f8b175445`, fetched 2026-08-25) upstream
+ships only the variable font `Orbitron[wght].ttf`; both static paths 404.
+§5.1 simultaneously **forbids vendoring the variable font**: stb_truetype
+has no variation-instancing, so it would bake at weight 400 and the HUD
+would silently lose its Bold.
+
+### Decision
+
+The **Role/Rules columns of §5's font table stay binding; the family name
+does not** (that is exactly the substitution clause §5.1 ends with). The
+orbitron role — geometric square sans for HUD/score numerals — is filled by
+**Chakra Petch Bold** (`ofl/chakrapetch/ChakraPetch-Bold.ttf`, OFL 1.1,
+same pinned commit), vendored byte-exact as
+`assets/fonts/ChakraPetch-Bold.ttf` with its license and a SHA256SUMS line.
+The logical font name in code remains `orbitron`. Monoton and Righteous are
+unaffected.
+
+### Consequences
+
+M13 consumes a real static Bold; no engine change. Typography deltas vs
+true Orbitron (slightly narrower caps, humanist details) are acceptable for
+the role and noted for the M13 style checklist. If upstream ever restores
+static Orbitron, re-vendoring requires only SOURCES.md + SHA256SUMS updates
+plus a JOURNAL entry — no code change.
+
+## ADR-016 — Vendored third-party headers are exempt from the format check
+
+**Status:** Accepted (M0). Amends 16-testing-ci.md §3.2's `format` job.
+
+### Context
+
+The `format` job as specified runs `find src tests -name '*.cpp' -o -name
+'*.h'` over every header, which includes vendored third-party sources such
+as `tests/third_party/picosha2.h`. Reformatting a vendored file breaks its
+byte-exact provenance pin (SOURCES.md upstream commit), and excluding it by
+hand-editing it into compliance is unmaintainable. As written, M0's format
+check can never pass.
+
+### Decision
+
+The format job's `find` becomes
+`find src tests \( -name '*.cpp' -o -name '*.h' \) -not -path '*/third_party/*'`
+(the parentheses are load-bearing — an ungrouped `-not` would bind only to
+the `'*.h'` branch): vendored code under any `third_party/` directory is
+excluded from clang-format enforcement everywhere, forever. First-party
+code under `/src` and `/tests` is unaffected and remains fully enforced.
+
+### Consequences
+
+One-line workflow diff; no required-check name changes. Future vendored
+assets must live under a `third_party/` directory to inherit the exemption.
+
+## ADR-017 — Windows CI targets Visual Studio 18 2026
+
+**Status:** Accepted (M0). Amends 16-testing-ci.md §4.1's `windows` preset.
+
+### Context
+
+The `windows` configure preset pinned generator `"Visual Studio 17 2022"`.
+On 2026-06-08 GitHub migrated the `windows-latest` and `windows-2025` hosted
+images to Visual Studio 2026 (internal version 18); VS2022 is no longer
+installed there, so CMake fails with "could not find any instance of
+Visual Studio" — M0's first Windows run failed on exactly this.
+
+### Decision
+
+The `windows` preset uses generator `"Visual Studio 18 2026"` (and §4.1 is
+updated in the same PR). Local Windows machines still on VS2022 override via
+a `CMakeUserPresets.json` (gitignored) rather than pinning the repo to a
+dying toolchain.
+
+### Consequences
+
+Requires runner/toolchain CMake ≥ 4.1 for the VS18 generator — true on the
+hosted images (standalone cmake 4.2+) and in vcpkg's fetched tool (4.4+).
+No other preset changes; check names unchanged.
+
+## ADR-018 — tb-setup installs the autotools libxcrypt needs
+
+**Status:** Accepted (M0). Amends 16-testing-ci.md §3.1's Linux apt list.
+
+### Context
+
+The manifest's SDL3 → dbus[systemd] chain pulls `libxcrypt`, whose port
+runs `autoreconf` and hard-requires `autoconf`, `automake`,
+`autoconf-archive`, `libtool`, **and** `libltdl-dev` from the system. The
+§3.1 action as written installs none of them, so every Linux job failed at
+configure ("libxcrypt currently requires the following programs from the
+system package manager") before any Tiltburst code compiled.
+
+### Decision
+
+The Linux step of `.github/actions/tb-setup/action.yml` additionally
+installs `autoconf automake autoconf-archive libtool libltdl-dev`; §3.1 is
+updated in the same PR.
+
+### Consequences
+
+One apt line per Linux job (~10 s warm). No check-name or workflow-structure
+changes.
+
 ## Amendments to ARCHITECTURE.md (authoritative table)
 
 Where ARCHITECTURE.md disagrees with a row below, the amendment wins (canon

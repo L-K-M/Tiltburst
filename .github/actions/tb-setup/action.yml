@@ -1,0 +1,49 @@
+name: Tiltburst build setup
+description: Linux SDL3 deps, vcpkg GHA binary cache env, pinned vcpkg.
+runs:
+  using: composite
+  steps:
+    - name: Install Linux system dependencies (SDL3 build deps + lavapipe)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          ninja-build pkg-config build-essential jq \
+          autoconf automake autoconf-archive libtool libltdl-dev \
+          libasound2-dev libpulse-dev libaudio-dev libjack-dev libsndio-dev \
+          libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+          libxi-dev libxss-dev libxtst-dev libxkbcommon-dev \
+          libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
+          libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev \
+          libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev \
+          libvulkan-dev mesa-vulkan-drivers
+
+    - name: Install Ninja (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      run: brew install ninja
+
+    - name: Export GitHub Actions cache env for vcpkg
+      uses: actions/github-script@v7
+      with:
+        script: |
+          core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+          core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+    - name: Set up vcpkg pinned to the manifest baseline
+      shell: bash
+      run: |
+        BASELINE="$(jq -r '."builtin-baseline"' vcpkg.json)"
+        if [ -z "${BASELINE}" ] || [ "${BASELINE}" = "null" ]; then
+          echo "::error::vcpkg.json is missing \"builtin-baseline\"; cannot pin vcpkg"
+          exit 1
+        fi
+        git clone --filter=blob:none https://github.com/microsoft/vcpkg "${RUNNER_TEMP}/vcpkg"
+        git -C "${RUNNER_TEMP}/vcpkg" checkout "${BASELINE}"
+        if [ "${RUNNER_OS}" = "Windows" ]; then
+          "${RUNNER_TEMP}/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
+        else
+          "${RUNNER_TEMP}/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+        fi
+        echo "VCPKG_ROOT=${RUNNER_TEMP}/vcpkg" >> "${GITHUB_ENV}"

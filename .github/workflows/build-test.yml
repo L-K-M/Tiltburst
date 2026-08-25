@@ -1,0 +1,253 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 3 * * 1" # weekly deep run: ASan fuzz, Mondays 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      det_soak:
+        description: "Also run the 100-iteration determinism soak (§2.10d)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Distinct namespace from zai-code-review.yml (zai-review-<PR#>).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+jobs:
+  format:
+    name: format
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: clang-format check (version pinned to 18, 03-process.md §1.4)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang-format-18
+          find src tests \( -name '*.cpp' -o -name '*.h' \) \
+            -not -path '*/third_party/*' -print0 \
+            | xargs -0 -r clang-format-18 --dry-run --Werror
+
+  build-test:
+    # Explicit template: without it a matrix job's three check runs are all
+    # named "build-test" and cannot be required individually (§3).
+    name: build-test (${{ matrix.os }})
+    if: github.event_name != 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            configure_preset: release
+            build_preset: release
+            test_preset: release
+          - os: macos-latest
+            configure_preset: release
+            build_preset: release
+            test_preset: release
+          - os: windows-latest
+            configure_preset: windows
+            build_preset: windows-release
+            test_preset: windows-release
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/tb-setup
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.configure_preset }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.build_preset }}
+
+      - name: Test (flake-retried; excludes det/fuzz/perf/bounds)
+        shell: bash
+        run: |
+          ctest --preset ${{ matrix.test_preset }} \
+            -E '^(det_|fuzz_sim_|perf_|bounds_)' \
+            --repeat until-pass:2 --output-junit junit-main.xml
+
+      - name: Determinism tests (never retried)
+        shell: bash
+        run: |
+          ctest --preset ${{ matrix.test_preset }} -R '^det_' -E '^$' \
+            --no-tests=ignore --output-junit junit-det.xml
+
+      - name: Record determinism goldens (artifact for intentional sim changes)
+        if: always()
+        shell: bash
+        run: |
+          case "${RUNNER_OS}" in
+            Linux) OSDIR=linux ;; Windows) OSDIR=windows ;; macOS) OSDIR=macos ;;
+          esac
+          AUTOPLAY=$(find build -type f \( -name tb_autoplay -o -name tb_autoplay.exe \) | head -n1)
+          if [ -n "${AUTOPLAY}" ] && [ -d tables ]; then
+            mkdir -p "build/goldens/${OSDIR}"
+            for tj in tables/*/table.json; do
+              slug=$(basename "$(dirname "${tj}")")
+              tape="tests/fixtures/tapes/${slug}.replay.json"
+              [ -f "${tape}" ] && "${AUTOPLAY}" "tables/${slug}" \
+                --replay "${tape}" \
+                --record-golden "build/goldens/${OSDIR}/${slug}.hashes" || true
+            done
+          fi
+
+      - name: Renderer smoke (exit 2 = logged skip, see 16-testing-ci.md §5)
+        shell: bash
+        run: |
+          BIN=$(find build -type f \( -name tiltburst -o -name tiltburst.exe \) | head -n1)
+          if [ -z "${BIN}" ]; then echo "::warning::tiltburst not built yet"; exit 0; fi
+          set +e
+          "${BIN}" --render-smoke --frames 120 --screenshot-dir build/smoke
+          CODE=$?
+          set -e
+          if [ "${CODE}" = "0" ]; then echo "renderer smoke OK";
+          elif [ "${CODE}" = "2" ]; then echo "::warning::renderer smoke skipped: no usable GPU backend";
+          else echo "renderer smoke crashed (exit ${CODE})"; exit "${CODE}"; fi
+
+      - name: Upload test logs, goldens, screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-${{ matrix.os }}
+          if-no-files-found: ignore
+          path: |
+            junit-*.xml
+            build/**/junit-*.xml
+            build/*/Testing/Temporary/*.log
+            build/goldens/**
+            build/smoke/**
+            build/screens/**
+
+  asan:
+    name: asan
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/tb-setup
+      - name: Configure and build (ASan+UBSan)
+        run: |
+          cmake --preset asan
+          cmake --build --preset asan
+      - name: Test under ASan+UBSan (excludes det/fuzz/perf)
+        run: ctest --preset asan -E '^(det_|fuzz_sim_|perf_)' --repeat until-pass:2
+      - name: Determinism under ASan (never retried)
+        run: ctest --preset asan -R '^det_' -E '^$' --no-tests=ignore
+
+  perf-gates:
+    name: perf-gates
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/tb-setup
+      - name: Configure and build Release
+        run: |
+          cmake --preset release
+          cmake --build --preset release
+      # Every step below pairs -R with -E '^$': the release test preset
+      # excludes ^(fuzz_sim_|perf_|bounds_), a CLI -R replaces only the
+      # preset's include, and without the -E the selection is empty (§3.2
+      # filter rule).
+      - name: Fuzz invariants (1M ticks per table, fixed seed)
+        run: ctest --preset release -R '^fuzz_sim_' -E '^$' --no-tests=ignore
+      - name: Autoplay bounds (--balls 3 sweeps, §2.8b; none before M15)
+        run: ctest --preset release -R '^bounds_' -E '^$' --no-tests=ignore
+      - name: Perf gates (Release, serial; §2.9 + §2.10)
+        run: ctest --preset release -R '^perf_' -E '^$' -j1 --no-tests=ignore
+      - name: Upload perf report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-report
+          if-no-files-found: ignore
+          path: build/release/perf_report.json
+
+  weekly-deep:
+    name: weekly-deep
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TB_FUZZ_SEED: ${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/tb-setup
+      - name: Configure and build (ASan+UBSan)
+        run: |
+          cmake --preset asan
+          cmake --build --preset asan
+      - name: Randomized fuzz under ASan (seed = run id, logged by the test)
+        run: ctest --preset asan -R '^fuzz_sim_' -E '^$' --no-tests=ignore
+      - name: Quarantined tests (informational, may fail)
+        continue-on-error: true
+        shell: bash
+        env:
+          TB_RUN_QUARANTINED: "1" # un-disables them for this step only (§2, §6)
+        run: |
+          if [ -s tests/quarantine.txt ]; then
+            RE=$(paste -sd'|' tests/quarantine.txt)
+            ctest --preset asan -R "^(${RE})$" -E '^$' --no-tests=ignore
+          fi
+
+  # Determinism soak (§2.10d): the runnable form of 01-product.md §9's
+  # "100 consecutive green runs per platform". Manual only, never required.
+  det-soak:
+    name: det-soak (${{ matrix.os }})
+    if: github.event_name == 'workflow_dispatch' && inputs.det_soak
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            configure_preset: release
+            build_preset: release
+            test_preset: release
+          - os: macos-latest
+            configure_preset: release
+            build_preset: release
+            test_preset: release
+          - os: windows-latest
+            configure_preset: windows
+            build_preset: windows-release
+            test_preset: windows-release
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/tb-setup
+      - name: Configure and build Release
+        run: |
+          cmake --preset ${{ matrix.configure_preset }}
+          cmake --build --preset ${{ matrix.build_preset }}
+      - name: 100 consecutive determinism runs (stops at first failure)
+        shell: bash
+        run: |
+          ctest --preset ${{ matrix.test_preset }} -R '^det_' -E '^$' \
+            --repeat until-fail:100 --no-tests=ignore \
+            --output-junit junit-det-soak.xml
+      - name: Upload soak junit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: det-soak-${{ matrix.os }}
+          if-no-files-found: ignore
+          path: junit-det-soak.xml

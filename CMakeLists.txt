@@ -18,9 +18,10 @@ add_subdirectory(src/audio)     # links: tb_core, miniaudio
 add_subdirectory(src/table)     # links: tb_core, tb_sim, nlohmann_json
 add_subdirectory(src/game)      # links: tb_core, tb_sim, tb_table
 
-add_executable(tiltburst src/main.cpp)   # links all of the above
-target_link_libraries(tiltburst PRIVATE
-    tb_core tb_platform tb_sim tb_render tb_audio tb_table tb_game)
+add_executable(tiltburst src/main.cpp)   # links the graph transitively
+# Dependency order is computed from the PUBLIC link graph; do not restate
+# it manually (inter-library archive ordering must stay CMake's decision).
+target_link_libraries(tiltburst PRIVATE tb_render tb_audio tb_game)
 add_subdirectory(src/tools)     # tb_validate, tb_autoplay, tb_screenshot (canon §5.1)
 
 include(${CMAKE_SOURCE_DIR}/cmake/shaders.cmake)

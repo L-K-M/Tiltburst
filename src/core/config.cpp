@@ -5,11 +5,14 @@
 #include <nlohmann/json.hpp>
 
 #include <cstdio>
-#include <fcntl.h>
 #include <fstream>
 #include <iterator>
 #include <system_error>
+
+#if !defined(_WIN32)
+#include <fcntl.h>
 #include <unistd.h>
+#endif
 
 namespace tb {
 

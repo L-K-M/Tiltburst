@@ -2,6 +2,10 @@
 
 #include <cstdint>
 
+#if defined(_MSC_VER)
+#include <intrin.h>
+#endif
+
 // One timebase everywhere (05-engine-core.md §3, as amended by ADR-019):
 // monotonic nanoseconds over the OS steady clock. Callable from any thread.
 // The sim consumes time only as tick counts; pacing loops may call this.
@@ -15,7 +19,9 @@ inline uint64_t now_ns() {
 
 // Spin-wait hint for the sleep-then-spin pacing shape (05 §6.2).
 inline void cpu_pause() noexcept {
-#if defined(__x86_64__) || defined(_M_X64)
+#if defined(_MSC_VER)
+    _mm_pause();
+#elif defined(__x86_64__) || defined(_M_X64)
     __builtin_ia32_pause();
 #elif defined(__aarch64__) || defined(_M_ARM64)
     __builtin_arm_yield();

@@ -374,6 +374,65 @@ applies to everything else (no LED protocols, no speculative interfaces).
 
 v2 scopes cabinet I/O; start from the `SimEvent` consumer model.
 
+## ADR-015 — Orbitron role filled by Chakra Petch Bold (font substitution)
+
+**Status:** Accepted (M0). Applies 13-art-direction.md §5.1's own fallback
+row and 03-process.md §3.2.
+
+### Context
+
+§5.1 pins `ofl/orbitron/Orbitron-Bold.ttf` (or a static instance under
+`ofl/orbitron/static/`) from github.com/google/fonts. At the pinned commit
+(`6a003b5eb672dc8bf5bff5937cf5863f8b175445`, fetched 2026-08-25) upstream
+ships only the variable font `Orbitron[wght].ttf`; both static paths 404.
+§5.1 simultaneously **forbids vendoring the variable font**: stb_truetype
+has no variation-instancing, so it would bake at weight 400 and the HUD
+would silently lose its Bold.
+
+### Decision
+
+The **Role/Rules columns of §5's font table stay binding; the family name
+does not** (that is exactly the substitution clause §5.1 ends with). The
+orbitron role — geometric square sans for HUD/score numerals — is filled by
+**Chakra Petch Bold** (`ofl/chakrapetch/ChakraPetch-Bold.ttf`, OFL 1.1,
+same pinned commit), vendored byte-exact as
+`assets/fonts/ChakraPetch-Bold.ttf` with its license and a SHA256SUMS line.
+The logical font name in code remains `orbitron`. Monoton and Righteous are
+unaffected.
+
+### Consequences
+
+M13 consumes a real static Bold; no engine change. Typography deltas vs
+true Orbitron (slightly narrower caps, humanist details) are acceptable for
+the role and noted for the M13 style checklist. If upstream ever restores
+static Orbitron, re-vendoring requires only SOURCES.md + SHA256SUMS updates
+plus a JOURNAL entry — no code change.
+
+## ADR-016 — Vendored third-party headers are exempt from the format check
+
+**Status:** Accepted (M0). Amends 16-testing-ci.md §3.2's `format` job.
+
+### Context
+
+The `format` job as specified runs `find src tests -name '*.cpp' -o -name
+'*.h'` over every header, which includes vendored third-party sources such
+as `tests/third_party/picosha2.h`. Reformatting a vendored file breaks its
+byte-exact provenance pin (SOURCES.md upstream commit), and excluding it by
+hand-editing it into compliance is unmaintainable. As written, M0's format
+check can never pass.
+
+### Decision
+
+The format job's `find` gains `-not -path 'tests/third_party/*'`: vendored
+code under any `third_party/` directory is excluded from clang-format
+enforcement everywhere, forever. First-party code under `/src` and `/tests`
+is unaffected and remains fully enforced.
+
+### Consequences
+
+One-line workflow diff; no required-check name changes. Future vendored
+assets must live under a `third_party/` directory to inherit the exemption.
+
 ## Amendments to ARCHITECTURE.md (authoritative table)
 
 Where ARCHITECTURE.md disagrees with a row below, the amendment wins (canon

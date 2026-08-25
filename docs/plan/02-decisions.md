@@ -466,16 +466,16 @@ No other preset changes; check names unchanged.
 
 The manifest's SDL3 → dbus[systemd] chain pulls `libxcrypt`, whose port
 runs `autoreconf` and hard-requires `autoconf`, `automake`,
-`autoconf-archive`, and `libtool` from the system. The §3.1 action as
-written installs none of them, so every Linux job failed at configure
-("libxcrypt currently requires the following programs from the system
-package manager") before any Tiltburst code compiled.
+`autoconf-archive`, `libtool`, **and** `libltdl-dev` from the system. The
+§3.1 action as written installs none of them, so every Linux job failed at
+configure ("libxcrypt currently requires the following programs from the
+system package manager") before any Tiltburst code compiled.
 
 ### Decision
 
 The Linux step of `.github/actions/tb-setup/action.yml` additionally
-installs `autoconf automake autoconf-archive libtool`; §3.1 is updated in
-the same PR.
+installs `autoconf automake autoconf-archive libtool libltdl-dev`; §3.1 is
+updated in the same PR.
 
 ### Consequences
 

@@ -1111,7 +1111,7 @@ runs:
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends \
           ninja-build pkg-config build-essential jq \
-          autoconf automake autoconf-archive libtool \
+          autoconf automake autoconf-archive libtool libltdl-dev \
           libasound2-dev libpulse-dev libaudio-dev libjack-dev libsndio-dev \
           libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
           libxi-dev libxss-dev libxtst-dev libxkbcommon-dev \

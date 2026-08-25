@@ -1,0 +1,4 @@
+# Vendored bytes and integrity pins must survive any checkout config.
+*.ttf binary
+tests/third_party/* binary
+assets/fonts/SHA256SUMS text eol=lf

@@ -24,6 +24,8 @@ corrections are new entries. Format: 03-process.md §3.1.
   Windows/macOS until a machine with MSVC/Xcode is available.
 - Mid-milestone: first CI run red — windows-latest migrated to VS2026
   (generator fixed per ADR-017) and Linux jobs lacked the autotools the
-  libxcrypt port autoreconfs with (ADR-018). Both spec docs amended in this
-  PR per 03-process.md §3.3.
+  libxcrypt port autoreconfs with, plus its libltdl-dev (ADR-018). Both
+  spec docs amended in this PR per 03-process.md §3.3. Second run: Windows
+  built but FontAssets failed on a CRLF checkout of SHA256SUMS — parser
+  strips CR and .gitattributes pins vendored bytes / LF for the sums file.
 

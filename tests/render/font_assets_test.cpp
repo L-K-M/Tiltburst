@@ -56,6 +56,10 @@ std::vector<SumsLine> parse_sha256sums(const std::string& text) {
     std::istringstream stream(text);
     std::string line;
     while (std::getline(stream, line)) {
+        // Tolerate a CRLF checkout: strip any trailing carriage return.
+        while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) {
+            line.pop_back();
+        }
         if (line.size() < 66 || line[64] != ' ') {
             continue;
         }

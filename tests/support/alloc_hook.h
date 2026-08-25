@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <new>
 
 // Global allocation counter for the hot-path test (03-process.md §1.6:
 // Solver::step must not allocate). Overriding operator new/delete in the

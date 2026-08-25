@@ -9,7 +9,9 @@
 #include <iterator>
 #include <system_error>
 
-#if !defined(_WIN32)
+#if defined(_WIN32)
+#include <io.h>
+#else
 #include <fcntl.h>
 #include <unistd.h>
 #endif

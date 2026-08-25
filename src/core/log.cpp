@@ -4,7 +4,6 @@
 
 #include <atomic>
 #include <cstdio>
-#include <mutex>
 
 namespace tb::log {
 
@@ -94,8 +93,7 @@ void message(const char* thread, LogLevel level, fmt::string_view fmt, fmt::form
 }
 
 void set_file(const std::filesystem::path& path) {
-    std::lock_guard<std::mutex> nothing(std::mutex()); // single-threaded caller
-    (void)nothing;
+    // Called from main during boot, before the sim/audio threads exist.
     if (g_file) {
         std::fclose(g_file);
     }

@@ -18,9 +18,13 @@ add_subdirectory(src/audio)     # links: tb_core, miniaudio
 add_subdirectory(src/table)     # links: tb_core, tb_sim, nlohmann_json
 add_subdirectory(src/game)      # links: tb_core, tb_sim, tb_table
 
-add_executable(tiltburst src/main.cpp)   # links the graph transitively
-# Dependency order is computed from the PUBLIC link graph; do not restate
-# it manually (inter-library archive ordering must stay CMake's decision).
+# app.cpp orchestrates every subsystem, so it compiles as an executable
+# object: its undefined symbols exist before any static archive is scanned
+# (GNU ld single-pass archive semantics).
+add_executable(tiltburst
+    src/main.cpp
+    src/platform/app.cpp
+)
 target_link_libraries(tiltburst PRIVATE tb_render tb_audio tb_game)
 add_subdirectory(src/tools)     # tb_validate, tb_autoplay, tb_screenshot (canon §5.1)
 

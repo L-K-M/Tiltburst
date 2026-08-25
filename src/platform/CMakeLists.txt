@@ -1,8 +1,11 @@
 find_package(SDL3 CONFIG REQUIRED)
 
+# NOTE: app.cpp (the §1 boot/main-loop orchestration) belongs to the
+# tiltburst executable target, not this library — executable-object
+# symbols must be visible to the linker before static archives are
+# scanned.
 add_library(tb_platform STATIC
     platform.cpp
-    app.cpp
     gpu_device.cpp
     paths.cpp
     window.cpp

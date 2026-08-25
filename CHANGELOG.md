@@ -8,6 +8,11 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Added
 
+- M01: application skeleton — 1000 Hz sim thread with triple-buffered
+  snapshots, SDL3 GPU device (frames-in-flight 1, MAILBOX-else-VSYNC),
+  quad-pipeline overlay from committed shader blobs, settings.json with
+  crash-safe writes, PCG32, `--render-smoke` offscreen path, and the
+  §2.1 exit-code contract.
 - M00: CMake/vcpkg build scaffold with all canonical targets, CI workflow
   (3-OS matrix, format, ASan, perf gates), `tiltburst --version`, tool
   stubs, first tests, vendored OFL fonts with provenance and SHA-256 pins.

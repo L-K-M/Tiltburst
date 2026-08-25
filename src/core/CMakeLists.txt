@@ -1,7 +1,11 @@
 find_package(fmt CONFIG REQUIRED)
 
 add_library(tb_core STATIC
+    assert.cpp
+    config.cpp
     core.cpp
+    log.cpp
+    time.cpp
     version.cpp
 )
 

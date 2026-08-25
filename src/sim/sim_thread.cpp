@@ -5,10 +5,12 @@
 #include "core/time.h"
 
 #if defined(_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <timeapi.h>
-#include <windows.h>
+// Declared directly (not via <timeapi.h>) so WIN32_LEAN_AND_MEAN stays in
+// force; winmm.lib is picked up by the pragma below.
+extern "C" {
+__declspec(dllimport) unsigned long __stdcall timeBeginPeriod(unsigned long);
+__declspec(dllimport) unsigned long __stdcall timeEndPeriod(unsigned long);
+}
 #pragma comment(lib, "winmm.lib")
 #else
 #include <pthread.h>
@@ -26,9 +28,6 @@ void raise_priority_and_timer() {
     // Best-effort; failures are logged at debug and ignored (05 §6).
 #if defined(_WIN32)
     timeBeginPeriod(1);
-    if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL)) {
-        TB_LOG_DEBUG("sim", "SetThreadPriority(TIME_CRITICAL) failed");
-    }
 #else
     struct sched_param param {};
 

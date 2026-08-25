@@ -433,6 +433,55 @@ is unaffected and remains fully enforced.
 One-line workflow diff; no required-check name changes. Future vendored
 assets must live under a `third_party/` directory to inherit the exemption.
 
+## ADR-017 — Windows CI targets Visual Studio 18 2026
+
+**Status:** Accepted (M0). Amends 16-testing-ci.md §4.1's `windows` preset.
+
+### Context
+
+The `windows` configure preset pinned generator `"Visual Studio 17 2022"`.
+On 2026-06-08 GitHub migrated the `windows-latest` and `windows-2025` hosted
+images to Visual Studio 2026 (internal version 18); VS2022 is no longer
+installed there, so CMake fails with "could not find any instance of
+Visual Studio" — M0's first Windows run failed on exactly this.
+
+### Decision
+
+The `windows` preset uses generator `"Visual Studio 18 2026"` (and §4.1 is
+updated in the same PR). Local Windows machines still on VS2022 override via
+a `CMakeUserPresets.json` (gitignored) rather than pinning the repo to a
+dying toolchain.
+
+### Consequences
+
+Requires runner/toolchain CMake ≥ 4.1 for the VS18 generator — true on the
+hosted images (standalone cmake 4.2+) and in vcpkg's fetched tool (4.4+).
+No other preset changes; check names unchanged.
+
+## ADR-018 — tb-setup installs the autotools libxcrypt needs
+
+**Status:** Accepted (M0). Amends 16-testing-ci.md §3.1's Linux apt list.
+
+### Context
+
+The manifest's SDL3 → dbus[systemd] chain pulls `libxcrypt`, whose port
+runs `autoreconf` and hard-requires `autoconf`, `automake`,
+`autoconf-archive`, and `libtool` from the system. The §3.1 action as
+written installs none of them, so every Linux job failed at configure
+("libxcrypt currently requires the following programs from the system
+package manager") before any Tiltburst code compiled.
+
+### Decision
+
+The Linux step of `.github/actions/tb-setup/action.yml` additionally
+installs `autoconf automake autoconf-archive libtool`; §3.1 is updated in
+the same PR.
+
+### Consequences
+
+One apt line per Linux job (~10 s warm). No check-name or workflow-structure
+changes.
+
 ## Amendments to ARCHITECTURE.md (authoritative table)
 
 Where ARCHITECTURE.md disagrees with a row below, the amendment wins (canon

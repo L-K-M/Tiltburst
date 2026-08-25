@@ -19,7 +19,11 @@ corrections are new entries. Format: 03-process.md §3.1.
     Logical font name stays `orbitron`.
   - picosha2.h is MIT-licensed upstream (plan said "public-domain");
     license recorded verbatim in tests/third_party/SOURCES.md.
-- New ADRs: ADR-015, ADR-016.
+- New ADRs: ADR-015, ADR-016, ADR-017, ADR-018.
 - Worries: local dev box has no sudo; CI is the primary build gate for
   Windows/macOS until a machine with MSVC/Xcode is available.
+- Mid-milestone: first CI run red — windows-latest migrated to VS2026
+  (generator fixed per ADR-017) and Linux jobs lacked the autotools the
+  libxcrypt port autoreconfs with (ADR-018). Both spec docs amended in this
+  PR per 03-process.md §3.3.
 

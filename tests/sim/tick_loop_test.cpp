@@ -41,20 +41,19 @@ TEST(unit_tick_loop, produces_1000_ticks_per_sim_second) {
     sim.set_wait(&fake_wait);
 
     std::atomic<uint64_t> ticks{0};
-    sim.start([&ticks](uint64_t) { ticks.fetch_add(1); });
-
-    while (ticks.load(std::memory_order_relaxed) < 5000) {
-        tb::cpu_pause();
-    }
-    sim.request_stop();
+    sim.start([&sim, &ticks](uint64_t) {
+        if (ticks.fetch_add(1) == 4999) {
+            // Self-stop from inside the tick: no cross-thread stop latency
+            // to race against on a loaded runner (macOS CI found this).
+            sim.request_stop();
+        }
+    });
     sim.join();
 
+    // Exact only because the loop honors stop between every tick,
+    // including inside a catch-up burst.
     const uint64_t n = ticks.load();
-    EXPECT_GE(n, 5000u);
-    // The stop signal races the running loop; the overshoot is bounded by
-    // the clamp window plus scheduling slack.
-    EXPECT_LE(n, 5000u + 120u);
-
+    EXPECT_EQ(n, 5000u);
     // 5000 ticks = 5 simulated seconds; the clock may run a hair past.
     EXPECT_NEAR(double(g_fake_ns.load()) / 1e9, 5.0, 0.25);
 }
@@ -69,21 +68,27 @@ TEST(unit_tick_loop, overrun_clamps_at_50) {
     sim.set_wait(&fake_wait);
 
     std::atomic<uint64_t> ticks{0};
-    sim.start([&ticks](uint64_t) {
-        if (ticks.fetch_add(1) == 9) {
+    std::atomic<bool> stop_requested{false};
+    sim.start([&sim, &ticks, &stop_requested](uint64_t) {
+        const uint64_t n = ticks.fetch_add(1);
+        if (n == 9) {
             // Simulate a stall: jump the clock forward by 200 ms.
             fake_wait(fake_now() + 200'000'000ull);
         }
+        if (n >= 70 && !stop_requested.exchange(true)) {
+            // Self-stop well past the clamp burst (which ends around tick
+            // 60) so overrun/drop accounting is final before join.
+            sim.request_stop();
+        }
     });
 
-    // 10 pre-jump + 50 clamped + tail; bounded so a regression cannot hang
-    // CI.
+    // Bounded observation: if the overflow policy regresses and the loop
+    // stalls before tick 71, fail fast instead of hanging CI.
     int64_t guard = 0;
-    while (ticks.load(std::memory_order_relaxed) < 70) {
+    while (ticks.load(std::memory_order_relaxed) < 71 && !stop_requested.load()) {
         tb::cpu_pause();
         ASSERT_LT(++guard, 200'000'000ll) << "sim stalled; overflow policy regressed";
     }
-    sim.request_stop();
     sim.join();
 
     EXPECT_EQ(sim.overruns(), 1u);

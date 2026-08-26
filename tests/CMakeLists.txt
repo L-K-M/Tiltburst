@@ -9,6 +9,8 @@ add_executable(tb_tests
     core/scaffold_test.cpp
     core/time_test.cpp
     render/font_assets_test.cpp
+    render/projection_test.cpp
+    render/render_smoke_test.cpp
     render/shader_build_test.cpp
     sim/broadphase_test.cpp
     sim/ccd_test.cpp

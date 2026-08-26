@@ -1,5 +1,6 @@
 #pragma once
 
+#include "sim/collider.h"
 #include "sim/snapshot.h"
 
 #include <cstdint>
@@ -46,14 +47,19 @@ struct QuadInstance {
     float r, g, b, a;
 };
 
-// Per-frame description (06 §2). Grows at M3/M13: TBArt instances, text
-// runs, debug toggles, particles, flash overlay.
+// Per-frame description (06 §2). M3 adds the F2 debug-draw inputs; TBArt,
+// text runs, particles, and flash overlay arrive at M13.
 struct RenderFrame {
     const SimSnapshot* snapshot = nullptr;
     float wall_dt = 0.0f;
     const QuadInstance* quads = nullptr;
     uint32_t quad_count = 0;
     bool show_overlay = true;
+
+    // F2 debug draw (06 §16.1): colliders from the current table scene.
+    const sim::Collider* debug_colliders = nullptr;
+    uint32_t debug_collider_count = 0;
+    bool show_colliders = false;
 };
 
 class IRenderer {

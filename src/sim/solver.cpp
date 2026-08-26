@@ -10,6 +10,10 @@ namespace {
 constexpr double kPiF = 3.14159265358979;
 constexpr uint32_t kSlingArmVisualTicks = 60; // §6.2 kicked visual: 60 ms
 constexpr uint32_t kPopFlashTicks = 60;       // §6.3 skirt flash window
+// §6.6 plate friction as a per-tick factor: 0.55^(1/1000) — ln(0.55)/1000
+// = -5.97837e-4, exp of that. std::pow per spinner per tick is hot-path
+// waste for a compile-time constant.
+constexpr float kSpinnerDecayPerTick = 0.99940234f;
 
 float point_segment_distance(Vec2 p, Vec2 a, Vec2 b) {
     const Vec2 ab = b - a;
@@ -1003,7 +1007,7 @@ void Solver::step_elements(SimState& s) {
         if (std::abs(sp.plate_omega) >= 0.5f) {
             sp.plate_angle += sp.plate_omega * kTickDt;
             sp.rev_angle_acc += std::abs(sp.plate_omega) * kTickDt;
-            sp.plate_omega *= std::pow(0.55f, kTickDt); // friction^dt, 0.55/s (§6.6)
+            sp.plate_omega *= kSpinnerDecayPerTick; // 0.55/s (§6.6)
             if (sp.rev_angle_acc >= 2.0f * float(kPiF)) {
                 sp.rev_angle_acc -= 2.0f * float(kPiF);
                 for (Ball& b : s.balls) {

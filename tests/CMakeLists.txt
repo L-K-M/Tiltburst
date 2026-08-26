@@ -8,6 +8,8 @@ add_executable(tb_tests
     core/rng_test.cpp
     core/scaffold_test.cpp
     core/time_test.cpp
+    sim/det_replay_flipper_test.cpp
+    platform/input_test.cpp
     render/font_assets_test.cpp
     render/projection_test.cpp
     render/render_smoke_test.cpp
@@ -15,6 +17,7 @@ add_executable(tb_tests
     sim/broadphase_test.cpp
     sim/ccd_test.cpp
     sim/determinism_test.cpp
+    sim/feel_test.cpp
     sim/golden_test.cpp
     sim/perf_and_layout_test.cpp
     sim/snapshot_test.cpp
@@ -29,7 +32,7 @@ target_include_directories(tb_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party
     ${Stb_INCLUDE_DIR})
 target_link_libraries(tb_tests PRIVATE
-    tb_core tb_sim tb_render nlohmann_json::nlohmann_json
+    tb_core tb_sim tb_platform tb_render nlohmann_json::nlohmann_json
     GTest::gtest GTest::gtest_main)
 
 include(GoogleTest)

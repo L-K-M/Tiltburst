@@ -7,6 +7,11 @@ find_package(SDL3 CONFIG REQUIRED)
 add_library(tb_platform STATIC
     platform.cpp
     gpu_device.cpp
+    input.cpp
+    input_evdev.cpp
+    input_sdl.cpp
+    input_winraw.cpp
+    latency.cpp
     paths.cpp
     window.cpp
 )

@@ -42,6 +42,27 @@ void Overlay::update(const OverlayStats& stats) {
     lines_[3] = buf;
 }
 
+void Overlay::update_latency(const LatencyOverlayStats& stats) {
+    char buf[96];
+
+    std::snprintf(buf, sizeof(buf), "input source: %s", stats.input_source);
+    lines_[0] = buf;
+    std::snprintf(buf,
+                  sizeof(buf),
+                  "input>latch p50 %.2f p95 %.2f max %.2f ms",
+                  double(stats.input_latch_ms_p50),
+                  double(stats.input_latch_ms_p95),
+                  double(stats.input_latch_ms_max));
+    lines_[1] = buf;
+    std::snprintf(buf,
+                  sizeof(buf),
+                  "cumulative p99.9=%.2f ms (n=%llu)",
+                  stats.p999_ms,
+                  static_cast<unsigned long long>(stats.press_edges));
+    lines_[2] = buf;
+    lines_[3] = "F3 latency detail";
+}
+
 float Overlay::emit_quads(float x,
                           float y,
                           const std::string& text,

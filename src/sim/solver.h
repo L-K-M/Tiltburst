@@ -5,6 +5,8 @@
 #include "sim/broadphase.h"
 #include "sim/ccd.h"
 #include "sim/events.h"
+#include "sim/flipper.h"
+#include "sim/flipper_ccd.h"
 #include "sim/math.h"
 #include "sim/types.h"
 
@@ -38,6 +40,9 @@ struct SimState {
     // Balls.
     Ball balls[kMaxBalls]{};
 
+    // Flippers (M4): dynamic colliders bypassing the grid.
+    std::vector<Flipper> flippers;
+
     // RNG streams (05 §10.1): physics-side and script-side.
     Pcg32 rng_sim;
     Pcg32 rng_script;
@@ -54,12 +59,16 @@ struct SimState {
 
 class Solver {
 public:
-    // Runs one 1 ms tick: forces → push-out → CCD loop → events.
+    // Runs one 1 ms tick: flippers → forces → push-out → CCD → events.
     void step(SimState& state, const TickInput& input);
+    void step(SimState& state, const TickInput* input);
+
+private:
+    void step_body(SimState& s, const TickInput* input);
 
 private:
     struct Contact {
-        enum Kind : uint8_t { None = 0, Static = 1, Pair = 2 };
+        enum Kind : uint8_t { None = 0, Static = 1, Pair = 2, Flipper = 3 };
 
         float toi = 0.0f;
         uint8_t kind = None;
@@ -67,13 +76,17 @@ private:
         uint8_t ball2 = 0;
         Vec2 normal{};
         const Collider* collider = nullptr;
+        struct Flipper* flipper = nullptr;
     };
 
     Contact find_earliest(SimState& s, float t_cur);
-    float resolve_static(SimState& s,
-                         Ball& ball,
-                         Vec2 normal,
-                         const Material& mat); // returns approach speed
+    float resolve_surface(SimState& s,
+                          Ball& ball,
+                          Vec2 normal,
+                          const Material& mat,
+                          Vec2 surface_vel,
+                          float live_catch_scale); // returns approach speed
+    void resolve_flipper(SimState& s, Ball& ball, Flipper& f, const FlipperHit& hit);
     void resolve_pair(SimState& s, Ball& a, Ball& b, Vec2 normal);
     void pushout(SimState& s);
 

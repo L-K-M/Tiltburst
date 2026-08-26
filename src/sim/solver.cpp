@@ -7,8 +7,6 @@ namespace tb::sim {
 
 namespace {
 
-constexpr float kPi = 3.14159265358979f;
-
 inline Vec2 clamp_speed(Vec2 v) {
     const float speed_sq = length_sq(v);
     if (speed_sq > kMaxSpeed * kMaxSpeed) {
@@ -18,12 +16,20 @@ inline Vec2 clamp_speed(Vec2 v) {
     return v;
 }
 
-// §4.2: velocity-dependent restitution.
+// §4.2: velocity-dependent restitution. Two regimes:
+// - high speed: e falls off with approach speed (kFalloff past kSoft);
+// - low speed: viscoelastic cliff, e ramps linearly to zero at kRestSpeed
+//   (ADR-021: a flat e down to the cutoff sustains micro-bounce limit
+//   cycles — caught balls rattle instead of settling; real rubber is
+//   velocity-weakening at low impact speeds).
 inline float restitution_curve(const SimState& s, float e, float approach) {
     if (approach < kRestSpeed) {
         return 0.0f;
     }
-    return e / (1.0f + s.restitution_falloff * std::max(0.0f, approach - s.restitution_soft));
+    const float soft_scale =
+        std::min(1.0f, (approach - kRestSpeed) / (s.restitution_soft - kRestSpeed));
+    return e * soft_scale /
+           (1.0f + s.restitution_falloff * std::max(0.0f, approach - s.restitution_soft));
 }
 
 inline void absorb(SimState& s, uint64_t tick, SimEventType type, uint16_t element) {
@@ -51,29 +57,124 @@ inline void absorb(SimState& s, uint64_t tick, SimEventType type, uint16_t eleme
 
 } // namespace
 
-float Solver::resolve_static(SimState& s, Ball& ball, Vec2 n, const Material& mat) {
-    // §4.1 impulse equations; surface velocity zero for static colliders.
+namespace {
+
+// Persistent-contact probe (§3.6 pull-back contract). A ball resting on or
+// sliding along a surface within kSkin moves too slowly to cross it inside
+// one tick, so swept tests never fire and friction never acts — the ball
+// free-falls between rare crossings and rattles at the sweep threshold.
+// Probe the discrete separation instead: an approaching ball essentially
+// touching a surface is an immediate contact at TOI = t_cur.
+constexpr float kPersistMargin = kSkin + 1e-9f; // float-noise guard
+
+struct PersistHit {
+    bool hit = false;
+    Vec2 normal{};
+};
+
+PersistHit persist_point(Vec2 p, Vec2 v, Vec2 c, float radius) {
+    const Vec2 d = p - c;
+    const float dist = length(d);
+    if (dist - radius > kPersistMargin) {
+        return {};
+    }
+    const PersistHit hit{true, dist > 1e-9f ? d * (1.0f / dist) : Vec2{0.0f, 1.0f}};
+    return dot(v, hit.normal) < 0.0f ? hit : PersistHit{};
+}
+
+PersistHit persist_segment(Vec2 p, Vec2 v, Vec2 a, Vec2 b) {
+    const Vec2 d = b - a;
+    const float len_sq = length_sq(d);
+    if (len_sq <= 1e-12f) {
+        return {};
+    }
+    const float len = std::sqrt(len_sq);
+    const Vec2 dh = d * (1.0f / len);
+    const Vec2 n_line = perp(dh);
+
+    const Vec2 rel = p - a;
+    const float u = dot(rel, dh);
+    if (u < 0.0f || u > len) {
+        return {}; // outside the span: endpoint caps own these regions
+    }
+    const float sn = dot(rel, n_line);
+    if (std::fabs(sn) > kPersistMargin) {
+        return {};
+    }
+    const PersistHit hit{true, sn >= 0.0f ? n_line : n_line * -1.0f};
+    return dot(v, hit.normal) < 0.0f ? hit : PersistHit{};
+}
+
+PersistHit persist_arc(Vec2 p, Vec2 v, Vec2 c, float radius, float r, float a0, float a1) {
+    const Vec2 d = p - c;
+    const float dist = length(d);
+    if (dist <= 1e-9f) {
+        return {};
+    }
+
+    Vec2 n{};
+    if (dist > radius) {
+        // Outer surface.
+        if (dist - (radius + r) > kPersistMargin) {
+            return {};
+        }
+        n = d * (1.0f / dist);
+    } else if (radius > r && dist < radius - r) {
+        // Inner surface.
+        if (radius - r - dist > kPersistMargin) {
+            return {};
+        }
+        n = d * (-1.0f / dist);
+    } else {
+        return {}; // inside the wall band: push-out territory
+    }
+
+    // Angular window, same convention as sweep_circle_vs_arc.
+    const float phi = wrap_ccw(std::atan2(d.y, d.x) - a0);
+    if (phi > wrap_ccw(a1 - a0)) {
+        return {};
+    }
+    return dot(v, n) < 0.0f ? PersistHit{true, n} : PersistHit{};
+}
+
+} // namespace
+
+float Solver::resolve_surface(SimState& s,
+                              Ball& ball,
+                              Vec2 n,
+                              const Material& mat,
+                              Vec2 surface_vel,
+                              float live_catch_scale) {
+    // §4.1 impulse equations against an infinite-mass moving surface.
+    // V_s is zero for static colliders; §3.5 for flippers.
     const Vec2 t = perp(n);
 
-    // Ball surface-point velocity: v_p = v − r·omega_z·perp(n̂); u = v_p.
+    // Relative contact velocity: u = v_p − V_s.
     const Vec2 vp = ball.vel - kBallRadius * ball.omega_z * perp(n);
-    const float u_n = dot(vp, n);
+    const Vec2 u_vec = vp - surface_vel;
+    const float u_n = dot(u_vec, n);
     if (u_n >= 0.0f) {
         return 0.0f; // separating — never apply impulses
     }
-    const float u_t = dot(vp, t);
+    const float u_t = dot(u_vec, t);
 
     const float approach = -u_n;
-    const float e_eff = restitution_curve(s, mat.restitution, approach);
+    float e_eff = restitution_curve(s, mat.restitution, approach) * live_catch_scale;
+    float mu_s = mat.mu_s;
+    float mu_k = mat.mu_k;
+    if (live_catch_scale < 1.0f) {
+        mu_s = std::min(1.0f, 2.0f * mu_s); // tangential grip (§5.4)
+        mu_k = std::min(1.0f, 2.0f * mu_k);
+    }
     const float j_n = -(1.0f + e_eff) * u_n * kBallMass;
 
     // Tangential effective mass: 1/m_t = 7/(2m) → m_t = 2m/7.
     const float j_stick = -(2.0f * kBallMass / 7.0f) * u_t;
     float j_t;
-    if (std::fabs(j_stick) <= mat.mu_s * j_n) {
+    if (std::fabs(j_stick) <= mu_s * j_n) {
         j_t = j_stick;
     } else {
-        j_t = -std::copysign(mat.mu_k * j_n, u_t);
+        j_t = -std::copysign(mu_k * j_n, u_t);
     }
 
     ball.vel += (j_n * n + j_t * t) * (1.0f / kBallMass);
@@ -114,6 +215,18 @@ void Solver::resolve_pair(SimState& s, Ball& a, Ball& b, Vec2 n) {
     b.omega_z = std::clamp(b.omega_z, -kMaxSpin, kMaxSpin);
 }
 
+void Solver::resolve_flipper(SimState& s, Ball& ball, Flipper& f, const FlipperHit& hit) {
+    const Material mat = material_row(MaterialId::FlipperRubber);
+
+    // Live catch damping (§5.4): a just-raised HOLD absorbs the ball.
+    float scale = 1.0f;
+    if (f.state == FlipperState::Hold && f.ticks_since_eos <= kLiveCatchWindowTicks) {
+        scale = kLiveCatchFactor;
+    }
+
+    resolve_surface(s, ball, hit.normal, mat, hit.surface_vel, scale);
+}
+
 Solver::Contact Solver::find_earliest(SimState& s, float t_cur) {
     Contact best;
     best.kind = Contact::None;
@@ -150,6 +263,26 @@ Solver::Contact Solver::find_earliest(SimState& s, float t_cur) {
             const Collider& c = s.colliders[ci];
             SweepHit hit;
             bool hit_now = false;
+
+            // Persistent contact first: an approaching ball within kSkin of
+            // this surface resolves now, not at a future crossing.
+            PersistHit ph;
+            switch (c.kind) {
+            case Collider::Kind::Point:
+                ph = persist_point(ball.pos, ball.vel, c.a, c.radius);
+                break;
+            case Collider::Kind::Segment:
+                ph = persist_segment(ball.pos, ball.vel, c.a, c.b);
+                break;
+            case Collider::Kind::Arc:
+                ph = persist_arc(ball.pos, ball.vel, c.a, c.radius, kBallRadius, c.a0, c.a1);
+                break;
+            }
+            if (ph.hit) {
+                consider_static(t_cur, bi, ph.normal, &c);
+                continue;
+            }
+
             switch (c.kind) {
             case Collider::Kind::Segment:
                 hit_now =
@@ -166,6 +299,53 @@ Solver::Contact Solver::find_earliest(SimState& s, float t_cur) {
             }
             if (hit_now) {
                 consider_static(t_cur + hit.toi, bi, hit.normal, &c);
+            }
+        }
+
+        // Dynamic colliders bypass the grid (§3.7): flippers in id order.
+        for (uint8_t fi = 0; fi < s.flippers.size(); ++fi) {
+            Flipper& f = s.flippers[fi];
+            if (ball.layer != 0) {
+                continue; // flippers live on layer 0 in v1
+            }
+            // Persistent flipper contact at this tick's angle.
+            const FlipperSep sep =
+                flipper_separation(ball.pos, kBallRadius, f, f.theta_start + f.omega * t_cur);
+            if (sep.sep <= kPersistMargin && dot(ball.vel - sep.surface_vel, sep.normal) < 0.0f) {
+                float toi = t_cur;
+                bool better = best.kind == Contact::None || toi < best.toi - kToiEps;
+                if (!better && best.kind == Contact::Static && toi <= best.toi + kToiEps) {
+                    better = true;
+                }
+                if (better) {
+                    best.toi = toi;
+                    best.kind = Contact::Flipper;
+                    best.ball = bi;
+                    best.ball2 = bi;
+                    best.normal = sep.normal;
+                    best.collider = nullptr;
+                    best.flipper = &f;
+                }
+                continue;
+            }
+
+            FlipperHit fh;
+            if (sweep_circle_vs_flipper(ball.pos, ball.vel, kBallRadius, f, window, fh)) {
+                float toi = t_cur + fh.toi;
+                bool better = best.kind == Contact::None || toi < best.toi - kToiEps;
+                // FLIPPER ties: after STATIC, before PAIR.
+                if (!better && best.kind == Contact::Static && toi <= best.toi + kToiEps) {
+                    better = true; // deterministic: first flipper in id order
+                }
+                if (better) {
+                    best.toi = toi;
+                    best.kind = Contact::Flipper;
+                    best.ball = bi;
+                    best.ball2 = bi;
+                    best.normal = fh.normal;
+                    best.collider = nullptr;
+                    best.flipper = &f;
+                }
             }
         }
 
@@ -204,7 +384,23 @@ Solver::Contact Solver::find_earliest(SimState& s, float t_cur) {
     return best;
 }
 
-void Solver::step(SimState& s, const TickInput&) {
+void Solver::step(SimState& s, const TickInput& input_latched) {
+    const TickInput* input = &input_latched;
+    step_body(s, input);
+}
+
+void Solver::step(SimState& s, const TickInput* input) {
+    step_body(s, input);
+}
+
+void Solver::step_body(SimState& s, const TickInput* input) {
+    // Step 2 — flipper state update (§5.2), id order; (theta_start,
+    // omega) held constant for CCD this tick.
+    for (Flipper& f : s.flippers) {
+        bool pressed = f.enabled && ((input->buttons >> f.params.action) & 1u) != 0u;
+        FlipperSim::tick(f, pressed);
+    }
+
     // Step 3 — forces + velocity update (FREE balls, index order).
     const float slope_rad = s.slope_deg * (float(kPi) / 180.0f);
     const float g_slope = kGravity * std::sin(slope_rad);
@@ -266,7 +462,24 @@ void Solver::step(SimState& s, const TickInput&) {
         }
         t_cur = t_adv;
 
-        if (best.kind == Contact::Static) {
+        if (best.kind == Contact::Flipper) {
+            Ball& ball = s.balls[best.ball];
+            const float speed_before = length(ball.vel);
+            const float t_back = std::min(kSkin / std::max(speed_before, 1e-6f), t_cur);
+            ball.pos -= ball.vel * t_back;
+
+            resolve_flipper(
+                s,
+                ball,
+                *best.flipper,
+                FlipperHit{best.toi,
+                           best.normal,
+                           ball.pos - best.normal * kBallRadius,
+                           best.flipper->omega * perp(ball.pos - best.normal * kBallRadius -
+                                                      best.flipper->params.pivot)});
+
+            resolved_[best.ball]++;
+        } else if (best.kind == Contact::Static) {
             Ball& ball = s.balls[best.ball];
             const float speed = length(ball.vel);
             if (speed > 0.0f) {
@@ -274,8 +487,8 @@ void Solver::step(SimState& s, const TickInput&) {
                 ball.pos -= ball.vel * t_back; // keep kSkin separation
             }
 
-            const float approach =
-                resolve_static(s, ball, best.normal, material_row(best.collider->material));
+            const float approach = resolve_surface(
+                s, ball, best.normal, material_row(best.collider->material), {0.0f, 0.0f}, 1.0f);
 
             // Collision event for audio/particles (§4.1): emit at speed.
             // Absorb into the sequence hash first (dispatch order).

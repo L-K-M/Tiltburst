@@ -5,22 +5,6 @@
 
 namespace tb::sim {
 
-namespace {
-
-constexpr float kPi = 3.14159265358979f;
-
-float wrap_ccw(float a) {
-    // Map any angle to [0, 2π).
-    float two_pi = 2.0f * kPi;
-    float r = std::fmod(a, two_pi);
-    if (r < 0.0f) {
-        r += two_pi;
-    }
-    return r;
-}
-
-} // namespace
-
 bool sweep_circle_vs_segment(Vec2 p0, Vec2 v, float r, Vec2 a, Vec2 b, float max_t, SweepHit& out) {
     const Vec2 d = b - a;
     const float len = length(d);

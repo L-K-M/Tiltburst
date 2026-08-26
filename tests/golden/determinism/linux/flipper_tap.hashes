@@ -1,0 +1,8 @@
+# tiltburst determinism golden v1
+# table: test-lab(m4 synthetic) tape: flipper_tap.replay.json seed: 987654321
+500 ff3a552ac8492d27
+1000 d36395560e802867
+1500 760e664727e6aeb2
+2000 faf344daa373d66c
+2500 f8226a34dd9165bb
+3000 2acfe5977f81c77c

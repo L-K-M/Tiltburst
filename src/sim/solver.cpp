@@ -5,6 +5,18 @@
 
 namespace tb::sim {
 
+namespace {
+
+constexpr double kPiF = 3.14159265358979;
+
+float point_segment_distance(Vec2 p, Vec2 a, Vec2 b) {
+    const Vec2 ab = b - a;
+    const float t = std::clamp(dot(p - a, ab) / std::max(length_sq(ab), 1e-12f), 0.0f, 1.0f);
+    return length(p - (a + ab * t));
+}
+
+} // namespace
+
 SimState::SimState() {
     mats[uint8_t(MaterialId::Wood)] = material_row(MaterialId::Wood);
     mats[uint8_t(MaterialId::Steel)] = material_row(MaterialId::Steel);
@@ -143,6 +155,21 @@ PersistHit persist_arc(Vec2 p, Vec2 v, Vec2 c, float radius, float r, float a0, 
         return {};
     }
     return dot(v, n) < 0.0f ? PersistHit{true, n} : PersistHit{};
+}
+
+void emit_element_event(
+    SimState& s, SimEventType type, uint16_t element, const Ball& ball, float payload) {
+    absorb(s, s.tick, type, element);
+    SimEvent ev;
+    ev.tick = s.tick;
+    ev.type = uint16_t(type);
+    ev.element = element;
+    ev.x = ball.pos.x;
+    ev.y = ball.pos.y;
+    ev.a = payload;
+    ev.data = ball.index;
+    s.render_ring.push(s.tick, ev);
+    s.game_ring.push(s.tick, ev);
 }
 
 } // namespace
@@ -357,6 +384,82 @@ Solver::Contact Solver::find_earliest(SimState& s, float t_cur) {
             }
         }
 
+        // Blocking gates (§6.7): dynamic colliders, element order.
+        for (GateElem& g : s.gates) {
+            if (ball.layer != g.common.layer) {
+                continue;
+            }
+            const bool blocks_forward = g.state == GateState::Closed;
+            const bool blocks_reverse = g.state != GateState::Open;
+            const float vn = dot(ball.vel, g.face_normal);
+            const bool blocks = (vn > 0.0f && blocks_forward) || (vn <= 0.0f && blocks_reverse);
+            if (!blocks) {
+                continue;
+            }
+            SweepHit hit;
+            if (sweep_circle_vs_segment(ball.pos, ball.vel, kBallRadius, g.a, g.b, window, hit)) {
+                const float toi = t_cur + hit.toi;
+                bool better = best.kind == Contact::None || toi < best.toi - kToiEps;
+                if (!better && best.kind == Contact::Static && toi <= best.toi + kToiEps) {
+                    better = true;
+                }
+                if (better) {
+                    best.toi = toi;
+                    best.kind = Contact::Static;
+                    best.ball = bi;
+                    best.ball2 = bi;
+                    best.normal = hit.normal;
+                    // Blocking gates resolve through the static path but
+                    // need the gate's absorbent steel (e forced 0.3):
+                    // mark via a dedicated pseudo-collider.
+                    gate_pseudo_.kind = Collider::Kind::Segment;
+                    gate_pseudo_.a = g.a;
+                    gate_pseudo_.b = g.b;
+                    gate_pseudo_.element_id = g.common.table_id;
+                    gate_pseudo_.layer = g.common.layer;
+                    gate_pseudo_.material = MaterialId::Steel;
+                    best.collider = &gate_pseudo_;
+                }
+            }
+        }
+
+        // Spinner slow-wall (§6.6): below 0.15 m/s pass speed the plate is
+        // a steel wall (e 0.3).
+        for (SpinnerElem& sp : s.spinners) {
+            if (ball.layer != sp.common.layer) {
+                continue;
+            }
+            const float s_pass = std::abs(dot(ball.vel, sp.face_normal));
+            if (s_pass >= 0.15f) {
+                continue;
+            }
+            if (dot(ball.vel, sp.face_normal) == 0.0f && length_sq(ball.vel) > 0.0f) {
+                // Moving purely tangentially: the plate still deflects.
+            }
+            SweepHit hit;
+            if (sweep_circle_vs_segment(ball.pos, ball.vel, kBallRadius, sp.a, sp.b, window, hit)) {
+                const float toi = t_cur + hit.toi;
+                bool better = best.kind == Contact::None || toi < best.toi - kToiEps;
+                if (!better && best.kind == Contact::Static && toi <= best.toi + kToiEps) {
+                    better = true;
+                }
+                if (better) {
+                    best.toi = toi;
+                    best.kind = Contact::Static;
+                    best.ball = bi;
+                    best.ball2 = bi;
+                    best.normal = hit.normal;
+                    gate_pseudo_.kind = Collider::Kind::Segment;
+                    gate_pseudo_.a = sp.a;
+                    gate_pseudo_.b = sp.b;
+                    gate_pseudo_.element_id = sp.common.table_id;
+                    gate_pseudo_.layer = sp.common.layer;
+                    gate_pseudo_.material = MaterialId::Steel;
+                    best.collider = &gate_pseudo_;
+                }
+            }
+        }
+
         // Ball-ball pairs (§8): fixed i<j order, same layer only.
         for (uint8_t bj = uint8_t(bi + 1); bj < kMaxBalls; ++bj) {
             Ball& other = s.balls[bj];
@@ -402,6 +505,8 @@ void Solver::step(SimState& s, const TickInput* input) {
 }
 
 void Solver::step_body(SimState& s, const TickInput* input) {
+    contact_log_n_ = 0;
+
     // Step 2 — flipper state update (§5.2), id order; (theta_start,
     // omega) held constant for CCD this tick.
     for (Flipper& f : s.flippers) {
@@ -498,6 +603,10 @@ void Solver::step_body(SimState& s, const TickInput* input) {
             const float approach = resolve_surface(
                 s, ball, best.normal, s.mats[uint8_t(best.collider->material)], {0.0f, 0.0f}, 1.0f);
 
+            if (contact_log_n_ < kContactLogCap) {
+                contact_log_[contact_log_n_++] = {best.ball, best.collider->element_id, approach};
+            }
+
             // Collision event for audio/particles (§4.1): emit at speed.
             // Absorb into the sequence hash first (dispatch order).
             absorb(s, s.tick, SimEventType::Collision, best.collider->element_id);
@@ -527,8 +636,9 @@ void Solver::step_body(SimState& s, const TickInput* input) {
     }
 
     // Step 6 — triggers and regions (§2.1): plunger zone, outholes,
-    // trough serve. Positions are final for this tick.
+    // trough serve, reactive elements. Positions are final for this tick.
     step_regions(s, input);
+    step_elements(s);
 
     // Step 7c — last_safe_pos for balls that ended penetration-free.
     for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
@@ -682,6 +792,241 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
                 s.game_ring.push(s.tick, ev);
                 break;
             }
+        }
+    }
+}
+
+void Solver::step_elements(SimState& s) {
+    // --- Slingshots (§6.2): resolved face contact with −u_n >= 0.4 while
+    // off cooldown → post-resolution kick along the active face normal.
+    for (SlingshotElem& sl : s.slingshots) {
+        if (sl.kick_visual_ticks > 0) {
+            --sl.kick_visual_ticks;
+        }
+        if (sl.common.cooldown_left > 0) {
+            --sl.common.cooldown_left;
+            continue;
+        }
+        for (size_t ci = 0; ci < contact_log_n_; ++ci) {
+            const LoggedContact& c = contact_log_[ci];
+            if (c.element != sl.common.table_id || c.approach < 0.4f) {
+                continue;
+            }
+            Ball* ball = nullptr;
+            for (Ball& b : s.balls) {
+                if (b.live && b.index == c.ball) {
+                    ball = &b;
+                    break;
+                }
+            }
+            if (ball == nullptr) {
+                continue;
+            }
+            // Kick: keep tangential motion, force normal speed >= kick.
+            const Vec2 t = perp(sl.face_normal);
+            const float v_t = dot(ball->vel, t);
+            const float v_n = dot(ball->vel, sl.face_normal);
+            const float out_n = std::max(v_n, sl.kick_speed);
+            ball->vel = sl.face_normal * out_n + t * v_t;
+            ball->vel = clamp_speed(ball->vel);
+            sl.common.cooldown_left = sl.common.cooldown_ticks;
+            sl.kick_visual_ticks = 60; // arm animation window (§6.2)
+            emit_element_event(s, SimEventType::SwitchHit, sl.common.table_id, *ball, c.approach);
+            break;
+        }
+    }
+
+    // --- Pop bumpers (§6.3): any resolved contact off cooldown → radial
+    // kick with deterministic rng_sim jitter.
+    for (PopBumperElem& pop : s.pop_bumpers) {
+        if (pop.flash_ticks > 0) {
+            --pop.flash_ticks;
+        }
+        if (pop.common.cooldown_left > 0) {
+            --pop.common.cooldown_left;
+            continue;
+        }
+        for (size_t ci = 0; ci < contact_log_n_; ++ci) {
+            const LoggedContact& c = contact_log_[ci];
+            if (c.element != pop.common.table_id) {
+                continue;
+            }
+            Ball* ball = nullptr;
+            for (Ball& b : s.balls) {
+                if (b.live && b.index == c.ball) {
+                    ball = &b;
+                    break;
+                }
+            }
+            if (ball == nullptr) {
+                continue;
+            }
+            Vec2 d = ball->pos - pop.pos;
+            const float dist = length(d);
+            if (dist > pop.radius + kBallRadius + 0.002f) {
+                continue; // log hit a different surface of the same element
+            }
+            if (dist > 1e-6f) {
+                d = d * (1.0f / dist);
+            } else {
+                d = {0.0f, 1.0f};
+            }
+            const float delta = (s.rng_sim.next_float() * 2.0f - 1.0f) * 0.12f;
+            const float cs = std::cos(delta);
+            const float sn = std::sin(delta);
+            const Vec2 kicked{d.x * cs - d.y * sn, d.x * sn + d.y * cs};
+            ball->vel += kicked * pop.kick_speed;
+            ball->vel = clamp_speed(ball->vel);
+            pop.common.cooldown_left = pop.common.cooldown_ticks;
+            pop.flash_ticks = 60;
+            emit_element_event(
+                s, SimEventType::SwitchHit, pop.common.table_id, *ball, length(ball->vel));
+            break;
+        }
+    }
+
+    // --- Standup targets (§6.4): facing-side contact >= min_speed.
+    for (StandupTargetElem& st : s.standups) {
+        if (st.common.cooldown_left > 0) {
+            --st.common.cooldown_left;
+            continue;
+        }
+        for (size_t ci = 0; ci < contact_log_n_; ++ci) {
+            const LoggedContact& c = contact_log_[ci];
+            if (c.element != st.common.table_id || c.approach < st.min_speed) {
+                continue;
+            }
+            // Facing side only: the hit normal must oppose the facing.
+            Ball* ball = nullptr;
+            for (Ball& b : s.balls) {
+                if (b.live && b.index == c.ball) {
+                    ball = &b;
+                    break;
+                }
+            }
+            if (ball == nullptr) {
+                continue;
+            }
+            const Vec2 rel = ball->pos - (st.face_a + st.face_b) * 0.5f;
+            if (dot(rel, st.face_normal) < 0.0f) {
+                continue; // back-side contact never triggers (§6.4)
+            }
+            st.common.cooldown_left = st.common.cooldown_ticks;
+            emit_element_event(s, SimEventType::SwitchHit, st.common.table_id, *ball, c.approach);
+            break;
+        }
+    }
+
+    // --- Cooldown ticks for trigger-only elements.
+    for (RolloverElem& ro : s.rollovers) {
+        if (ro.common.cooldown_left > 0) {
+            --ro.common.cooldown_left;
+        }
+    }
+
+    // --- Rollovers (§6.8): capsule enter with hysteresis; no collider.
+    for (RolloverElem& ro : s.rollovers) {
+        for (Ball& b : s.balls) {
+            if (!b.live || b.mode != BallMode::Free || b.layer != ro.common.layer) {
+                continue;
+            }
+            const float d = point_segment_distance(b.pos, ro.a, ro.b);
+            if (ro.armed) {
+                if (d < 0.012f) {
+                    ro.armed = false;
+                    emit_element_event(
+                        s, SimEventType::SwitchHit, ro.common.table_id, b, length(b.vel));
+                    emit_element_event(s, SimEventType::RolloverEvent, ro.common.table_id, b, 0.0f);
+                }
+            } else if (d > 0.016f) {
+                ro.armed = true; // exit capsule re-arm
+            }
+        }
+    }
+
+    // --- Gates (§6.7): pass detection with hysteresis (blocking happens
+    // as a dynamic collider inside find_earliest).
+    for (GateElem& g : s.gates) {
+        for (Ball& b : s.balls) {
+            if (!b.live || b.mode != BallMode::Free || b.layer != g.common.layer) {
+                continue;
+            }
+            const Vec2 rel = b.pos - g.a;
+            const float along = dot(rel, g.face_normal); // signed side
+            const Vec2 seg = g.b - g.a;
+            const float u =
+                std::clamp(dot(rel, seg) / std::max(length_sq(seg), 1e-12f), 0.0f, 1.0f);
+            const bool within_span = u > 0.0f && u < 1.0f;
+            const float dist = point_segment_distance(b.pos, g.a, g.b);
+            if (g.switch_armed) {
+                if (within_span && std::abs(along) < kBallRadius && dist < kBallRadius + 0.002f) {
+                    // A pass (not a block): the crossing fired.
+                    if (g.state != GateState::Closed) {
+                        g.switch_armed = false;
+                        emit_element_event(
+                            s, SimEventType::SwitchHit, g.common.table_id, b, length(b.vel));
+                    }
+                }
+            } else if (dist > 0.03f) {
+                g.switch_armed = true; // §6.7 re-arm distance
+            }
+        }
+    }
+
+    // --- Spinners (§6.6): crossing with speed gate; plate model.
+    for (SpinnerElem& sp : s.spinners) {
+        for (Ball& b : s.balls) {
+            if (!b.live || b.mode != BallMode::Free || b.layer != sp.common.layer) {
+                continue;
+            }
+            const Vec2 rel = b.pos - sp.a;
+            const float along = dot(rel, sp.face_normal);
+            const Vec2 seg = sp.b - sp.a;
+            const float u =
+                std::clamp(dot(rel, seg) / std::max(length_sq(seg), 1e-12f), 0.0f, 1.0f);
+            if (u <= 0.0f || u >= 1.0f) {
+                continue; // outside the plate span
+            }
+            const float s_pass = dot(b.vel, sp.face_normal);
+            const bool on_plate = std::abs(along) < kBallRadius;
+            if (sp.crossing_armed && on_plate) {
+                sp.crossing_armed = false;
+                if (std::abs(s_pass) >= 0.15f) {
+                    // Spin-up + one-shot ball slowdown (plate inertia).
+                    const float side = s_pass > 0.0f ? 1.0f : -1.0f;
+                    sp.plate_omega = side * std::abs(s_pass) * 25.0f;
+                    if (std::abs(s_pass) > 0.12f) {
+                        b.vel -= sp.face_normal * (side * 0.12f);
+                    }
+                }
+                // Slow crossings are handled as a steel wall inside the
+                // CCD (conditional dynamic collider, find_earliest).
+            } else if (!sp.crossing_armed && std::abs(along) > kBallRadius + 0.005f) {
+                sp.crossing_armed = true; // clear of the plate: re-arm
+            }
+        }
+
+        // Plate model (every tick): friction decay + revolution events.
+        if (std::abs(sp.plate_omega) >= 0.5f) {
+            sp.plate_angle += sp.plate_omega * kTickDt;
+            sp.rev_angle_acc += std::abs(sp.plate_omega) * kTickDt;
+            sp.plate_omega *= 0.55f * kTickDt + (1.0f - kTickDt); // 0.55 per second
+            if (sp.rev_angle_acc >= 2.0f * float(kPiF)) {
+                sp.rev_angle_acc -= 2.0f * float(kPiF);
+                for (Ball& b : s.balls) {
+                    if (b.live) {
+                        emit_element_event(s, SimEventType::SwitchHit, sp.common.table_id, b, 0.0f);
+                        emit_element_event(s,
+                                           SimEventType::SpinnerSpin,
+                                           sp.common.table_id,
+                                           b,
+                                           std::abs(sp.plate_omega) * 60.0f / (2.0f * float(kPiF)));
+                        break;
+                    }
+                }
+            }
+        } else {
+            sp.plate_omega = 0.0f;
         }
     }
 }

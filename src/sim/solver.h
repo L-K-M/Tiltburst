@@ -4,6 +4,7 @@
 #include "core/rng.h"
 #include "sim/broadphase.h"
 #include "sim/ccd.h"
+#include "sim/elements.h"
 #include "sim/events.h"
 #include "sim/flipper.h"
 #include "sim/flipper_ccd.h"
@@ -50,6 +51,14 @@ struct SimState {
     int trough_balls = 0;
     std::vector<LightState> lights;
     uint32_t serve_delay_ticks = 0; // drain → serve countdown (basic M5 loop)
+
+    // Reactive/trigger elements (M6, 08-physics.md §6.2–§6.8).
+    std::vector<SlingshotElem> slingshots;
+    std::vector<PopBumperElem> pop_bumpers;
+    std::vector<StandupTargetElem> standups;
+    std::vector<RolloverElem> rollovers;
+    std::vector<GateElem> gates;
+    std::vector<SpinnerElem> spinners;
 
     // Balls.
     Ball balls[kMaxBalls]{};
@@ -98,6 +107,23 @@ private:
     };
 
     Contact find_earliest(SimState& s, float t_cur);
+
+    // Pseudo-collider backing blocking gates / spinner slow-walls in the
+    // static resolution path (see find_earliest).
+    Collider gate_pseudo_{};
+
+    // Static contacts resolved this tick, for reactive elements (§6.2–6.4):
+    // {ball, element (TableDef index), approach speed}.
+    static constexpr size_t kContactLogCap = 64;
+
+    struct LoggedContact {
+        uint8_t ball;
+        uint16_t element;
+        float approach;
+    };
+
+    LoggedContact contact_log_[kContactLogCap]{};
+    size_t contact_log_n_ = 0;
     float resolve_surface(SimState& s,
                           Ball& ball,
                           Vec2 normal,
@@ -107,6 +133,7 @@ private:
     void resolve_flipper(SimState& s, Ball& ball, Flipper& f, const FlipperHit& hit);
     void resolve_pair(SimState& s, Ball& a, Ball& b, Vec2 normal);
     void step_regions(SimState& s, const TickInput* input);
+    void step_elements(SimState& s);
     void pushout(SimState& s);
 
     // Per-tick scratch, reused across ticks (never allocated in step()).

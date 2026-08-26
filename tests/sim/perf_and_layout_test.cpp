@@ -188,11 +188,31 @@ TEST(perf_tick, gate_tables) {
         tb::table::build_sim(def, s);
 
         tb::sim::Solver solver;
-        tb::sim::TickInput input;
-        input.buttons = 1u; // one flipper held: exercises dynamic colliders
+
+        // Put a ball in play and keep it there: spawn on the plunger and
+        // plunge periodically; the M5 drain→serve loop respawns on drain.
+        tb::sim::Ball& b = s.balls[0];
+        b.index = 0;
+        b.live = true;
+        b.mode = tb::sim::BallMode::Free;
+        b.pos = s.plunger.pos + s.plunger.lane_dir * (tb::sim::kBallRadius + 0.002f);
+        b.vel = {0.0f, 0.0f};
+        b.last_safe_pos = b.pos;
+        s.trough_balls = 3;
+
+        auto input_for = [](int tick) {
+            tb::sim::TickInput in;
+            if ((tick % 7) < 3) {
+                in.buttons |= 1u; // left flipper mash
+            }
+            if ((tick % 3000) < 1600) {
+                in.buttons |= 1u << 4; // plunge cycle
+            }
+            return in;
+        };
 
         for (int i = 0; i < 5000; ++i) {
-            solver.step(s, input); // warmup
+            solver.step(s, input_for(i)); // warmup
         }
 
         constexpr int kTimed = 60000;
@@ -200,7 +220,7 @@ TEST(perf_tick, gate_tables) {
         samples.resize(size_t(kTimed));
         for (int i = 0; i < kTimed; ++i) {
             const auto t0 = Clock::now();
-            solver.step(s, input);
+            solver.step(s, input_for(i));
             samples[size_t(i)] =
                 double(std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - t0)
                            .count()) /

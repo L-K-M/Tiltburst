@@ -4,6 +4,7 @@
 #include "table/table_loader.h"
 
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 
 #include <cmath>
 #include <filesystem>
@@ -96,6 +97,7 @@ TEST(TableLoader, EveryM5ElementRoundTrips) {
         { "id": "fp", "prefab": "flipper_pair_standard", "pos": [0.24, 0.115],
           "tip_gap": 0.07 },
         { "id": "sh", "prefab": "plunger_lane" },
+        { "id": "il_left", "prefab": "inlane_outlane_pair", "side": "left" },
         { "id": "il", "prefab": "inlane_outlane_pair", "side": "right" },
         { "id": "ob", "prefab": "orbit" }
       ]
@@ -114,6 +116,10 @@ TEST(TableLoader, EveryM5ElementRoundTrips) {
 
     EXPECT_EQ(def.physics.rolling_resistance, 0.03f);
     bool rubber_found = false;
+    bool found_flip = false;
+    bool found_lamp = false;
+    bool found_il = false;
+    bool found_il_left = false;
     for (const auto& e : def.elements) {
         if (e.id() == "pin") {
             const auto& post = std::get<tb::table::PostDef>(e.def);
@@ -121,20 +127,30 @@ TEST(TableLoader, EveryM5ElementRoundTrips) {
             EXPECT_TRUE(post.material == tb::table::MaterialId::Rubber);
         }
         if (e.id() == "flip") {
+            found_flip = true;
             const auto& f = std::get<tb::table::FlipperDef>(e.def);
             EXPECT_FLOAT_EQ(f.rest_angle_deg, -31.0f);
             EXPECT_TRUE(f.left_side);
             EXPECT_EQ(f.input, "upper_left");
         }
         if (e.id() == "lamp") {
+            found_lamp = true;
             const auto& l = std::get<tb::table::LightDef>(e.def);
             EXPECT_EQ(l.shape, "arrow");
             EXPECT_FLOAT_EQ(l.direction_deg, 45.0f);
         }
         if (e.id() == "il_side_wall") {
+            found_il = true;
             // Right side mirrors x about 0.240: side wall x = 2*0.240 - 0.
             const auto& w = std::get<tb::table::WallDef>(e.def);
             EXPECT_FLOAT_EQ(w.path[0].point[0], 0.48f);
+        }
+        if (e.id() == "il_left_side_wall") {
+            // Left side is the identity: authored x passes through (09 §5.4).
+            found_il_left = true;
+            const auto& w = std::get<tb::table::WallDef>(e.def);
+            EXPECT_FLOAT_EQ(w.path[0].point[0], 0.0f);
+            EXPECT_FLOAT_EQ(w.path[0].point[1], 0.36f);
         }
     }
     // Materials override round-trips through build_sim.
@@ -146,6 +162,10 @@ TEST(TableLoader, EveryM5ElementRoundTrips) {
         }
     }
     EXPECT_TRUE(rubber_found);
+    EXPECT_TRUE(found_flip) << "flipper 'flip' missing";
+    EXPECT_TRUE(found_lamp) << "light 'lamp' missing";
+    EXPECT_TRUE(found_il) << "right inlane side wall missing";
+    EXPECT_TRUE(found_il_left) << "left inlane side wall missing";
     EXPECT_NEAR(sim.mats[uint8_t(tb::sim::MaterialId::Rubber)].restitution, 0.7f, 1e-6f);
     EXPECT_NEAR(sim.mu_rr, 0.03f, 1e-7f);
     EXPECT_TRUE(sim.has_plunger);
@@ -360,26 +380,220 @@ TEST(Prefab, FlipperPairExpansionGolden) {
     const std::vector<tb::table::Element> kids = tb::table::expand_prefab(partial, inst);
     ASSERT_EQ(kids.size(), 2u);
 
+    // The fixture is authoritative: parse it and compare field-by-field.
     std::ifstream in(tb::test::data_path("tests/fixtures/flipper_pair_golden.json"));
     ASSERT_TRUE(in.good());
-    std::stringstream buf;
-    buf << in.rdbuf();
-    const std::string golden = buf.str();
+    nlohmann::json golden;
+    try {
+        golden = nlohmann::json::parse(in, nullptr, true, true); // comments on
+    } catch (const std::exception&) {
+        FAIL() << "golden fixture is not valid JSON";
+    }
 
     const auto& left = std::get<tb::table::FlipperDef>(kids[0].def);
     const auto& right = std::get<tb::table::FlipperDef>(kids[1].def);
-    EXPECT_EQ(left.id, "flippers_left_flipper");
-    EXPECT_NEAR(left.pos[0], 0.140855f, 2e-6f);
-    EXPECT_NEAR(left.pos[1], 0.115f, 1e-7f);
-    EXPECT_FLOAT_EQ(left.rest_angle_deg, -31.0f);
+    const auto& g_left = golden.at("left");
+    const auto& g_right = golden.at("right");
+    EXPECT_EQ(left.id, g_left.at("id").get<std::string>());
+    EXPECT_NEAR(left.pos[0], g_left.at("pos")[0].get<float>(), 2e-6f);
+    EXPECT_NEAR(left.pos[1], g_left.at("pos")[1].get<float>(), 1e-7f);
+    EXPECT_FLOAT_EQ(left.rest_angle_deg, g_left.at("rest_angle_deg").get<float>());
     EXPECT_TRUE(left.left_side);
-    EXPECT_EQ(left.input, "left");
-    EXPECT_EQ(right.id, "flippers_right_flipper");
-    EXPECT_NEAR(right.pos[0], 0.339145f, 2e-6f);
-    EXPECT_FLOAT_EQ(right.rest_angle_deg, -149.0f);
+    EXPECT_EQ(left.input, g_left.at("input").get<std::string>());
+    EXPECT_FLOAT_EQ(left.length, g_left.at("length").get<float>());
+    EXPECT_EQ(right.id, g_right.at("id").get<std::string>());
+    EXPECT_NEAR(right.pos[0], g_right.at("pos")[0].get<float>(), 2e-6f);
+    EXPECT_NEAR(right.pos[1], g_right.at("pos")[1].get<float>(), 1e-7f);
+    EXPECT_FLOAT_EQ(right.rest_angle_deg, g_right.at("rest_angle_deg").get<float>());
     EXPECT_FALSE(right.left_side);
-    EXPECT_EQ(right.input, "right");
+    EXPECT_EQ(right.input, g_right.at("input").get<std::string>());
+}
 
-    EXPECT_NE(golden.find("0.140855"), std::string::npos);
-    EXPECT_NE(golden.find("0.339145"), std::string::npos);
+// Malformed-type inputs must surface as TableLoadError with a pointer —
+// never a raw nlohmann exception and never a crash (review cycle 1).
+TEST(TableLoader, MalformedTypesArePathQualified) {
+    const std::string base = R"JSON({
+      "format_version": 1,
+      "meta": { "slug": "m", "name": "M", "theme": "t", "author": "a",
+                "description": "d", "rules_card": "r" },
+      "elements": [
+        { "id": "outer", "type": "wall", "closed": true,
+          "path": [[0,0],[0,1],[0.5,1],[0.5,0]] },
+        { "id": "drain", "type": "outhole",
+          "region": { "a": [0.05, 0.01], "b": [0.4, 0.01] } },
+        { "id": "tr", "type": "trough", "capacity": 4 })JSON";
+
+    struct Case {
+        std::string body;
+        const char* needle;
+    };
+
+    const Case cases[] = {
+        {base + R"JSON(,
+        { "id": "sg", "type": "slingshot", "face": [1, 2] }]
+    })JSON",
+         "/elements/3/face"},
+        {base + R"JSON(,
+        { "id": "w", "type": "wall",
+          "path": [[0.1,0.5],{"arc":{"to":[0.2,0.6],"radius":"big","dir":"cw"}}] }]
+    })JSON",
+         "/path/1/arc"},
+        {R"JSON({
+      "format_version": 1,
+      "meta": { "slug": "m", "name": "M", "theme": "t", "author": "a",
+                "description": "d", "rules_card": "r" },
+      "playfield": { "size": ["0.52", 1.04] },
+      "elements": [
+        { "id": "outer", "type": "wall", "closed": true,
+          "path": [[0,0],[0,1],[0.5,1],[0.5,0]] },
+        { "id": "drain", "type": "outhole",
+          "region": { "a": [0.05, 0.01], "b": [0.4, 0.01] } },
+        { "id": "tr", "type": "trough", "capacity": 4 }]
+    })JSON",
+         "/playfield/size"},
+        {R"JSON({
+      "format_version": 1,
+      "meta": { "slug": "m", "name": "M", "theme": "t", "author": "a",
+                "description": "d", "rules_card": "r" },
+      "materials": [1, 2],
+      "elements": [
+        { "id": "outer", "type": "wall", "closed": true,
+          "path": [[0,0],[0,1],[0.5,1],[0.5,0]] },
+        { "id": "drain", "type": "outhole",
+          "region": { "a": [0.05, 0.01], "b": [0.4, 0.01] } },
+        { "id": "tr", "type": "trough", "capacity": 4 }]
+    })JSON",
+         "/materials"},
+        {base + R"JSON(,
+        { "id": "p", "type": "post", "pos": [0.1, 0.5], "layer": 1.9 }]
+    })JSON",
+         "/layer"},
+        {base + R"JSON(,
+        { "id": "t2", "type": "trough", "capacity": 0 }]
+    })JSON",
+         "/capacity"},
+        {base + R"JSON(]
+      ,
+      "prefabs": [{ "id": "x", "prefab": "nonesuch" }]
+    })JSON",
+         "/prefabs/0"},
+    };
+
+    for (const Case& c : cases) {
+        std::filesystem::path dir;
+        std::error_code ec;
+        dir = std::filesystem::temp_directory_path(ec) / ("tb_mt_" + std::to_string(::getpid()));
+        std::filesystem::create_directories(dir, ec);
+        { std::ofstream(dir / "table.json") << c.body; }
+        bool threw = false;
+        try {
+            tb::table::load_table(dir);
+        } catch (const tb::table::TableLoadError& e) {
+            threw = true;
+            // The pointer lives on the exception's json_pointer field (the
+            // what() text may predate index enrichment).
+            EXPECT_NE(e.json_pointer.find(c.needle), std::string::npos)
+                << "expected pointer " << c.needle << ", got " << e.json_pointer << " (" << e.what()
+                << ")";
+        } catch (const std::exception& e) {
+            ADD_FAILURE() << "case '" << c.needle << "' escaped as " << e.what();
+        }
+        std::filesystem::remove_all(dir, ec);
+        ASSERT_TRUE(threw) << "case '" << c.needle << "' did not throw";
+    }
+}
+
+// Degenerate arcs (|to − from| < 0.001) are V019 load errors (§3).
+TEST(TableLoader, DegenerateArcRejected) {
+    const std::string json = R"JSON({
+      "format_version": 1,
+      "meta": { "slug": "d", "name": "D", "theme": "t", "author": "a",
+                "description": "d", "rules_card": "r" },
+      "elements": [
+        { "id": "outer", "type": "wall", "closed": true,
+          "path": [[0,0],[0,1],[0.5,1],[0.5,0]] },
+        { "id": "w", "type": "wall",
+          "path": [[0.1, 0.5],
+                   {"arc": {"to": [0.1005, 0.5], "radius": 0.05, "dir": "cw"}}] }
+      ]
+    })JSON";
+    std::filesystem::path dir;
+    std::error_code ec;
+    dir = std::filesystem::temp_directory_path(ec) / ("tb_deg_" + std::to_string(::getpid()));
+    std::filesystem::create_directories(dir, ec);
+    std::ofstream(dir / "table.json") << json;
+    bool threw = false;
+    try {
+        tb::table::load_table(dir);
+    } catch (const tb::table::TableLoadError&) {
+        threw = true;
+    }
+    std::filesystem::remove_all(dir, ec);
+    EXPECT_TRUE(threw);
+}
+
+// sling_pair: the _left_ children sit at smaller x than _right_ (review
+// cycle 1 — the sides were swapped).
+TEST(Prefab, SlingPairSidesCorrect) {
+    tb::table::TableDef partial;
+    partial.width = 0.52f;
+    partial.height = 1.04f;
+    tb::table::PrefabInstance inst;
+    inst.id = "sl";
+    inst.prefab = "sling_pair";
+    inst.pos[0] = 0.240f;
+    inst.pos[1] = 0.210f;
+    inst.sling_spread = 0.150f;
+
+    const std::vector<tb::table::Element> kids = tb::table::expand_prefab(partial, inst);
+    ASSERT_EQ(kids.size(), 4u);
+    const auto& left_wall = std::get<tb::table::WallDef>(kids[0].def);
+    const auto& right_wall = std::get<tb::table::WallDef>(kids[1].def);
+    ASSERT_EQ(left_wall.id, "sl_left_wall");
+    ASSERT_EQ(right_wall.id, "sl_right_wall");
+    // Bottom corner B: left at pos.x − spread/2, right mirrored.
+    EXPECT_NEAR(left_wall.path[0].point[0], 0.240f - 0.075f, 1e-6f);
+    EXPECT_NEAR(right_wall.path[0].point[0], 0.240f + 0.075f, 1e-6f);
+    EXPECT_FLOAT_EQ(left_wall.path[0].point[1], right_wall.path[0].point[1]);
+}
+
+// The lane/orbit merge decision is order-independent: a plunger_lane
+// declared BEFORE the orbit still drops its top post (§5.2 measurement
+// rule; review cycle 1).
+TEST(Prefab, LaneOrbitMergeIsOrderIndependent) {
+    const std::string json = R"JSON({
+      "format_version": 1,
+      "meta": { "slug": "o", "name": "O", "theme": "t", "author": "a",
+                "description": "d", "rules_card": "r" },
+      "elements": [
+        { "id": "outer", "type": "wall", "closed": true,
+          "path": [[0,0],[0,1],[0.5,1],[0.5,0]] },
+        { "id": "drain", "type": "outhole",
+          "region": { "a": [0.05, 0.01], "b": [0.4, 0.01] } },
+        { "id": "tr", "type": "trough", "capacity": 4 }
+      ],
+      "prefabs": [
+        { "id": "sh", "prefab": "plunger_lane" },
+        { "id": "ob", "prefab": "orbit" }
+      ]
+    })JSON";
+    std::filesystem::path dir;
+    std::error_code ec;
+    dir = std::filesystem::temp_directory_path(ec) / ("tb_ord_" + std::to_string(::getpid()));
+    std::filesystem::create_directories(dir, ec);
+    std::ofstream(dir / "table.json") << json;
+    bool has_top_post = true;
+    try {
+        const tb::table::TableDef def = tb::table::load_table(dir);
+        has_top_post = false;
+        for (const auto& e : def.elements) {
+            if (e.id() == "sh_top_post") {
+                has_top_post = true;
+            }
+        }
+    } catch (const tb::table::TableLoadError& e) {
+        FAIL() << "load failed: " << e.what();
+    }
+    std::filesystem::remove_all(dir, ec);
+    EXPECT_FALSE(has_top_post) << "lane declared before orbit must still merge";
 }

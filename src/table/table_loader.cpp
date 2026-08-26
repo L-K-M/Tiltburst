@@ -64,6 +64,44 @@ void get_xy(const json& obj,
     out[1] = v[1].get<float>();
 }
 
+bool get_bool(const json& obj,
+              const char* key,
+              bool fallback,
+              const std::string& pointer,
+              const std::filesystem::path& file) {
+    if (!obj.contains(key)) {
+        return fallback;
+    }
+    if (!obj.at(key).is_boolean()) {
+        fail(std::string("field '") + key + "' must be a boolean", pointer + "/" + key, file);
+    }
+    return obj.at(key).get<bool>();
+}
+
+int get_int(const json& obj,
+            const char* key,
+            int fallback,
+            float lo,
+            float hi,
+            const std::string& pointer,
+            const std::filesystem::path& file) {
+    if (!obj.contains(key)) {
+        return fallback;
+    }
+    const json& v = obj.at(key);
+    if (!v.is_number()) {
+        fail(std::string("field '") + key + "' must be an integer", pointer + "/" + key, file);
+    }
+    const float f = v.get<float>();
+    if (f != std::floor(f) || f < lo || f > hi) {
+        fail(std::string("field '") + key + "' must be an integer in [" + std::to_string(int(lo)) +
+                 ", " + std::to_string(int(hi)) + "]",
+             pointer + "/" + key,
+             file);
+    }
+    return int(f);
+}
+
 std::vector<std::string> get_tags(const json& obj) {
     std::vector<std::string> tags;
     if (obj.contains("tags") && obj.at("tags").is_array()) {
@@ -108,22 +146,11 @@ parse_path(const json& obj, const std::string& pointer, const std::filesystem::p
         const json& n = arr[i];
         const std::string node_ptr = pointer + "/path/" + std::to_string(i);
         if (n.is_array() && n.size() == 2 && n[0].is_number() && n[1].is_number()) {
-            if (!nodes.empty() && nodes.back().is_arc == false && i == 0) {
-                // unreachable; kept for clarity
-            }
-            if (i == 0) {
-                PathNode node;
-                node.is_arc = false;
-                node.point[0] = n[0].get<float>();
-                node.point[1] = n[1].get<float>();
-                nodes.push_back(node);
-            } else {
-                PathNode node;
-                node.is_arc = false;
-                node.point[0] = n[0].get<float>();
-                node.point[1] = n[1].get<float>();
-                nodes.push_back(node);
-            }
+            PathNode node;
+            node.is_arc = false;
+            node.point[0] = n[0].get<float>();
+            node.point[1] = n[1].get<float>();
+            nodes.push_back(node);
             continue;
         }
         if (n.is_object() && n.contains("arc")) {
@@ -138,15 +165,32 @@ parse_path(const json& obj, const std::string& pointer, const std::filesystem::p
             PathNode node;
             node.is_arc = true;
             const json& to = arc.at("to");
-            if (!to.is_array() || to.size() != 2) {
+            if (!to.is_array() || to.size() != 2 || !to[0].is_number() || !to[1].is_number()) {
                 fail("arc 'to' must be [x, y]", node_ptr + "/arc/to", file);
             }
             node.arc.to[0] = to[0].get<float>();
             node.arc.to[1] = to[1].get<float>();
+            if (!arc.at("radius").is_number() || !arc.at("dir").is_string()) {
+                fail("arc 'radius' must be a number and 'dir' must be a string",
+                     node_ptr + "/arc",
+                     file);
+            }
             node.arc.radius = arc.at("radius").get<float>();
             const std::string dir = arc.at("dir").get<std::string>();
             if (dir != "cw" && dir != "ccw") {
                 fail("arc 'dir' must be \"cw\" or \"ccw\"", node_ptr + "/arc/dir", file);
+            }
+            // §3 feasibility: arcs are minor; |to - from| >= 0.001 and
+            // radius >= half-chord (V019).
+            const PathNode& prev = nodes.back();
+            const float dx = node.arc.to[0] - prev.point[0];
+            const float dy = node.arc.to[1] - prev.point[1];
+            const float chord = std::sqrt(dx * dx + dy * dy);
+            if (chord < 0.001f) {
+                fail("degenerate arc: |to - from| < 0.001 m (V019)", node_ptr, file);
+            }
+            if (node.arc.radius < chord * 0.5f) {
+                fail("arc radius < |to - from| / 2 (V019)", node_ptr + "/arc/radius", file);
             }
             node.arc.cw = dir == "cw";
             nodes.push_back(node);
@@ -167,7 +211,7 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
         fail("missing required field 'id'", pointer, file);
     }
     const std::string type = get_string(obj, "type", "", pointer, file);
-    const int layer = int(get_number(obj, "layer", 0.0f, pointer, file));
+    const int layer = get_int(obj, "layer", 0, 0, 1, pointer, file);
     const auto tags = get_tags(obj);
 
     if (type == "wall") {
@@ -176,7 +220,7 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
         w.layer = layer;
         w.tags = tags;
         w.path = parse_path(obj, pointer, file);
-        w.closed = obj.value("closed", false);
+        w.closed = get_bool(obj, "closed", false, pointer, file);
         w.material =
             parse_material(get_string(obj, "material", "wood", pointer, file), pointer, file);
         return Element{std::move(w)};
@@ -201,10 +245,10 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
         f.length = get_number(obj, "length", 0.076f, pointer, file);
         f.radius_base = get_number(obj, "radius_base", 0.011f, pointer, file);
         f.radius_tip = get_number(obj, "radius_tip", 0.007f, pointer, file);
-        f.rest_angle_deg = get_number(obj, "rest_angle_deg", 1000.0f, pointer, file);
-        if (f.rest_angle_deg > 999.0f) {
-            fail("missing required field 'rest_angle_deg'", pointer, file);
+        if (!obj.contains("rest_angle_deg")) {
+            fail("missing required field 'rest_angle_deg'", pointer + "/rest_angle_deg", file);
         }
+        f.rest_angle_deg = get_number(obj, "rest_angle_deg", 0.0f, pointer, file);
         f.swing_deg = get_number(obj, "swing_deg", 52.0f, pointer, file);
         const std::string side = get_string(obj, "side", "", pointer, file);
         if (side != "left" && side != "right") {
@@ -212,6 +256,12 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
         }
         f.left_side = side == "left";
         f.input = get_string(obj, "input", side, pointer, file);
+        if (f.input != "left" && f.input != "right" && f.input != "upper_left" &&
+            f.input != "upper_right") {
+            fail("flipper 'input' must be left/right/upper_left/upper_right",
+                 pointer + "/input",
+                 file);
+        }
         f.strength = get_number(obj, "strength", 1.0f, pointer, file);
         return Element{std::move(f)};
     }
@@ -222,7 +272,7 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
         p.launch_angle_deg = get_number(obj, "launch_angle_deg", 90.0f, pointer, file);
         p.max_speed = get_number(obj, "max_speed", 7.5f, pointer, file);
         p.charge_time_s = get_number(obj, "charge_time_s", 1.5f, pointer, file);
-        p.auto_launch = obj.value("auto", false);
+        p.auto_launch = get_bool(obj, "auto", false, pointer, file);
         p.auto_delay_ms = get_number(obj, "auto_delay_ms", 500.0f, pointer, file);
         return Element{std::move(p)};
     }
@@ -240,7 +290,7 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
     if (type == "trough") {
         TroughDef t;
         t.id = id;
-        t.capacity = int(get_number(obj, "capacity", 4.0f, pointer, file));
+        t.capacity = get_int(obj, "capacity", 4, 1, 6, pointer, file);
         return Element{std::move(t)};
     }
     if (type == "light") {
@@ -265,7 +315,7 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
         get_xy(obj, "pos", g.pos, pointer, file);
         g.width = get_number(obj, "width", 0.040f, pointer, file);
         g.facing_deg = get_number(obj, "facing_deg", 90.0f, pointer, file);
-        g.default_open = obj.value("default_state", "closed") == "open";
+        g.default_open = get_string(obj, "default_state", "closed", pointer, file) == "open";
         return Element{std::move(g)};
     }
     if (type == "rollover") {
@@ -285,6 +335,11 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
             fail("missing required field 'face' [[x,y],[x,y]]", pointer, file);
         }
         const json& face = obj.at("face");
+        if (!face[0].is_array() || face[0].size() != 2 || !face[1].is_array() ||
+            face[1].size() != 2 || !face[0][0].is_number() || !face[0][1].is_number() ||
+            !face[1][0].is_number() || !face[1][1].is_number()) {
+            fail("field 'face' must be [[x,y],[x,y]]", pointer + "/face", file);
+        }
         sl.face_a[0] = face[0][0].get<float>();
         sl.face_a[1] = face[0][1].get<float>();
         sl.face_b[0] = face[1][0].get<float>();
@@ -311,10 +366,10 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
         t.tags = tags;
         get_xy(obj, "pos", t.pos, pointer, file);
         t.width = get_number(obj, "width", 0.025f, pointer, file);
-        t.facing_deg = get_number(obj, "facing_deg", 361.0f, pointer, file);
-        if (t.facing_deg > 360.0f) {
-            fail("missing required field 'facing_deg'", pointer, file);
+        if (!obj.contains("facing_deg")) {
+            fail("missing required field 'facing_deg'", pointer + "/facing_deg", file);
         }
+        t.facing_deg = get_number(obj, "facing_deg", 0.0f, pointer, file);
         t.min_speed = get_number(obj, "min_speed", 0.3f, pointer, file);
         return Element{std::move(t)};
     }
@@ -348,6 +403,7 @@ struct PrefabParams {
     float top_radius = 0.130f;
     float entry_y_left = 0.550f;
     float entry_y_right = 0.900f;
+    bool merged_lane = false;
     float sling_spread = 0.150f;
     float sling_face_length = 0.070f;
     float sling_tilt_deg = 22.0f;
@@ -362,7 +418,7 @@ PrefabParams parse_prefab(const json& obj, size_t index, const std::filesystem::
         fail("missing required field 'id'", pointer, file);
     }
     p.prefab = get_string(obj, "prefab", "", pointer, file);
-    p.layer = int(get_number(obj, "layer", 0.0f, pointer, file));
+    p.layer = get_int(obj, "layer", 0, 0, 1, pointer, file);
     p.tags = get_tags(obj);
     if (obj.contains("pos")) {
         get_xy(obj, "pos", p.pos, pointer, file);
@@ -414,6 +470,7 @@ PrefabInstance to_instance(const PrefabParams& p) {
     inst.top_radius = p.top_radius;
     inst.entry_y_left = p.entry_y_left;
     inst.entry_y_right = p.entry_y_right;
+    inst.merged_with_orbit = p.merged_lane;
     inst.sling_spread = p.sling_spread;
     inst.sling_face_length = p.sling_face_length;
     inst.sling_tilt_deg = p.sling_tilt_deg;
@@ -511,6 +568,8 @@ std::vector<Element> expand_prefab(const TableDef& partial, const PrefabInstance
         left.pos[0] = inst.pos[0] - d / 2.0f;
         left.pos[1] = inst.pos[1];
         left.length = inst.length;
+        left.radius_base = 0.011f;
+        left.radius_tip = 0.007f;
         left.rest_angle_deg = -inst.rest_slope_deg;
         left.swing_deg = inst.swing_deg;
         left.left_side = true;
@@ -524,6 +583,8 @@ std::vector<Element> expand_prefab(const TableDef& partial, const PrefabInstance
         right.pos[0] = inst.pos[0] + d / 2.0f;
         right.pos[1] = inst.pos[1];
         right.length = inst.length;
+        right.radius_base = 0.011f;
+        right.radius_tip = 0.007f;
         right.rest_angle_deg = inst.rest_slope_deg - 180.0f;
         right.swing_deg = inst.swing_deg;
         right.left_side = false;
@@ -536,33 +597,14 @@ std::vector<Element> expand_prefab(const TableDef& partial, const PrefabInstance
     }
 
     if (inst.prefab == "plunger_lane") {
-        // §5.2: right-side shooter lane. Merged variant (no top post) when
-        // an orbit's right mouth lies within 0.045 m of the wall top node.
+        // §5.2: right-side shooter lane. The merged variant (no top post)
+        // is decided by the loader — order-independently, by measuring the
+        // orbit right mouth against this lane's wall top node — and passed
+        // in via merged_with_orbit (see load_table).
         const float w = partial.width;
         const float xw = w - inst.lane_width;
         const float y_gate = inst.top_y + 0.008f;
-
-        bool merged = false;
-        for (const Element& e : partial.elements) {
-            if (e.type_name() != std::string("wall")) {
-                continue;
-            }
-            const WallDef& wall = std::get<WallDef>(e.def);
-            const std::string suffix = "_guide_wall";
-            if (wall.id.size() > suffix.size() &&
-                wall.id.compare(wall.id.size() - suffix.size(), suffix.size(), suffix) == 0) {
-                // Orbit guide: right mouth is the last node of the path.
-                if (!wall.path.empty()) {
-                    const PathNode& last = wall.path.back();
-                    const float mx = last.is_arc ? last.arc.to[0] : last.point[0];
-                    const float my = last.is_arc ? last.arc.to[1] : last.point[1];
-                    if (std::sqrt((mx - xw) * (mx - xw) + (my - y_gate) * (my - y_gate)) <=
-                        0.045f) {
-                        merged = true;
-                    }
-                }
-            }
-        }
+        const bool merged = inst.merged_with_orbit;
 
         out.push_back(Element{make_wall(pid + "_wall",
                                         inst.layer,
@@ -603,46 +645,70 @@ std::vector<Element> expand_prefab(const TableDef& partial, const PrefabInstance
     }
 
     if (inst.prefab == "sling_pair") {
-        // §5.3: two rubber triangles + kicking faces. Defaults: spread
-        // 0.150, face_length 0.070, tilt 22 deg, kick 3.5.
+        // §5.3: two rubber triangles + kicking faces. Left-side geometry
+        // per the spec; the right side mirrors about pos.x. Defaults:
+        // spread 0.150, face_length 0.070, tilt 22 deg, kick 3.5.
         const float spread = inst.sling_spread;
         const float face_length = inst.sling_face_length;
         const float tilt = inst.sling_tilt_deg * kPi / 180.0f;
 
-        for (int side = 0; side < 2; ++side) {
-            const float sgn = side == 0 ? 1.0f : -1.0f;
-            const float bx = inst.pos[0] + sgn * spread / 2.0f;
-            const float by = inst.pos[1] - 0.035f;
-            const float tx = bx + sgn * face_length * -std::sin(tilt);
-            const float ty = by + face_length * std::cos(tilt);
-            const float kx = bx + sgn * -0.038f;
-            const float ky = by + 0.015f;
+        const float bx = inst.pos[0] - spread / 2.0f;
+        const float by = inst.pos[1] - 0.035f;
+        const float tx = bx + face_length * -std::sin(tilt);
+        const float ty = by + face_length * std::cos(tilt);
+        const float kx = bx + -0.038f;
+        const float ky = by + 0.015f;
+        const float mx = 2.0f * inst.pos[0];
+        auto mir = [mx](float x) { return mx - x; };
 
-            out.push_back(
-                Element{make_wall(pid + (side == 0 ? "_left_wall" : "_right_wall"),
-                                  inst.layer,
-                                  inst.tags,
-                                  {point(bx, by), point(tx, ty), point(kx, ky), point(bx, by)},
-                                  MaterialId::Rubber,
-                                  true)});
-            SlingshotDef sling;
-            sling.id = pid + (side == 0 ? "_left_sling" : "_right_sling");
-            sling.layer = inst.layer;
-            sling.tags = inst.tags;
-            sling.face_a[0] = tx;
-            sling.face_a[1] = ty;
-            sling.face_b[0] = bx;
-            sling.face_b[1] = by;
-            sling.kick_speed = inst.sling_kick_speed;
-            out.push_back(Element{std::move(sling)});
-        }
+        out.push_back(
+            Element{make_wall(pid + "_left_wall",
+                              inst.layer,
+                              inst.tags,
+                              {point(bx, by), point(tx, ty), point(kx, ky), point(bx, by)},
+                              MaterialId::Rubber,
+                              true)});
+        out.push_back(Element{make_wall(
+            pid + "_right_wall",
+            inst.layer,
+            inst.tags,
+            {point(mir(bx), by), point(mir(tx), ty), point(mir(kx), ky), point(mir(bx), by)},
+            MaterialId::Rubber,
+            true)});
+
+        SlingshotDef left_sling;
+        left_sling.id = pid + "_left_sling";
+        left_sling.layer = inst.layer;
+        left_sling.tags = inst.tags;
+        left_sling.face_a[0] = tx;
+        left_sling.face_a[1] = ty;
+        left_sling.face_b[0] = bx;
+        left_sling.face_b[1] = by;
+        left_sling.kick_speed = inst.sling_kick_speed;
+        left_sling.cooldown_ms = 80.0f;
+        out.push_back(Element{std::move(left_sling)});
+
+        SlingshotDef right_sling;
+        right_sling.id = pid + "_right_sling";
+        right_sling.layer = inst.layer;
+        right_sling.tags = inst.tags;
+        right_sling.face_a[0] = mir(tx);
+        right_sling.face_a[1] = ty;
+        right_sling.face_b[0] = mir(bx);
+        right_sling.face_b[1] = by;
+        right_sling.kick_speed = inst.sling_kick_speed;
+        right_sling.cooldown_ms = 80.0f;
+        out.push_back(Element{std::move(right_sling)});
         return out;
     }
 
     if (inst.prefab == "inlane_outlane_pair") {
         // §5.4: one side's inlane/outlane assembly (7 children).
-        const float mx = inst.right_side ? 2.0f * inst.mirror_axis_x : 0.0f;
-        auto mirror = [mx](float x) { return mx - x; };
+        // Authored coordinates are the left-side layout; the right side
+        // mirrors about x = mirror_axis_x (§5.4).
+        auto mirror = [&inst](float x) {
+            return inst.right_side ? 2.0f * inst.mirror_axis_x - x : x;
+        };
 
         std::vector<PathNode> side_path = {point(mirror(0.000f), 0.360f),
                                            point(mirror(0.096f), 0.058f)};
@@ -683,6 +749,7 @@ std::vector<Element> expand_prefab(const TableDef& partial, const PrefabInstance
         LightDef out_light;
         out_light.id = pid + "_outlane_light";
         out_light.layer = inst.layer;
+        out_light.tags = inst.tags;
         out_light.pos[0] = mirror(0.052f);
         out_light.pos[1] = 0.205f;
         out_light.color = "insert_primary";
@@ -691,6 +758,7 @@ std::vector<Element> expand_prefab(const TableDef& partial, const PrefabInstance
         LightDef in_light;
         in_light.id = pid + "_inlane_light";
         in_light.layer = inst.layer;
+        in_light.tags = inst.tags;
         in_light.pos[0] = mirror(0.115f);
         in_light.pos[1] = 0.155f;
         in_light.color = "insert_primary";
@@ -767,15 +835,24 @@ void validate(const TableDef& def, const std::filesystem::path& file) {
     int trough_capacity = 0;
 
     for (const Element& e : def.elements) {
-        if (e.type_name() == std::string("wall")) {
+        if (std::holds_alternative<WallDef>(e.def)) {
             const WallDef& w = std::get<WallDef>(e.def);
             has_closed_wall = has_closed_wall || w.closed;
-        } else if (e.type_name() == std::string("plunger")) {
+            for (const PathNode& n : w.path) {
+                const float x = n.is_arc ? n.arc.to[0] : n.point[0];
+                const float y = n.is_arc ? n.arc.to[1] : n.point[1];
+                if (x < 0.0f || x > def.width || y < 0.0f || y > def.height) {
+                    fail("wall '" + w.id + "' has a node outside the playfield",
+                         "/elements/" + e.id(),
+                         file);
+                }
+            }
+        } else if (std::holds_alternative<PlungerDef>(e.def)) {
             ++plunger_count;
-        } else if (e.type_name() == std::string("trough")) {
+        } else if (std::holds_alternative<TroughDef>(e.def)) {
             ++trough_count;
             trough_capacity = std::get<TroughDef>(e.def).capacity;
-        } else if (e.type_name() == std::string("outhole")) {
+        } else if (std::holds_alternative<OutholeDef>(e.def)) {
             ++outhole_count;
         }
     }
@@ -843,8 +920,9 @@ TableDef load_table(const std::filesystem::path& table_dir) {
         const json& pf = doc.at("playfield");
         if (pf.contains("size")) {
             const json& size = pf.at("size");
-            if (!size.is_array() || size.size() != 2) {
-                fail("playfield.size must be [w, h]", "/playfield/size", file);
+            if (!size.is_array() || size.size() != 2 || !size[0].is_number() ||
+                !size[1].is_number()) {
+                fail("playfield.size must be [w, h] numbers", "/playfield/size", file);
             }
             def.width = size[0].get<float>();
             def.height = size[1].get<float>();
@@ -872,6 +950,9 @@ TableDef load_table(const std::filesystem::path& table_dir) {
 
     if (doc.contains("materials")) {
         const json& mats = doc.at("materials");
+        if (!mats.is_object()) {
+            fail("materials must be an object", "/materials", file);
+        }
         for (auto it = mats.begin(); it != mats.end(); ++it) {
             int idx = -1;
             if (it.key() == "wood") {
@@ -902,13 +983,45 @@ TableDef load_table(const std::filesystem::path& table_dir) {
         def.elements.push_back(parse_element(doc.at("elements")[i], i, file));
     }
 
-    // Prefab expansion (§5): in array order, against the elements known so
-    // far (the plunger_lane merge check reads previously expanded orbits).
+    // Prefab expansion (§5): children append in array order. The §5.2
+    // lane/orbit merge decision is order-independent: every orbit's right
+    // mouth is measured against every lane's wall top before expansion.
     if (doc.contains("prefabs") && doc.at("prefabs").is_array()) {
         const json& prefabs = doc.at("prefabs");
+
+        std::vector<PrefabParams> params;
         for (size_t i = 0; i < prefabs.size(); ++i) {
-            const PrefabParams p = parse_prefab(prefabs[i], i, file);
-            std::vector<Element> children = expand_prefab(def, to_instance(p));
+            params.push_back(parse_prefab(prefabs[i], i, file));
+        }
+
+        for (PrefabParams& lane : params) {
+            if (lane.prefab != "plunger_lane") {
+                continue;
+            }
+            const float xw = def.width - lane.lane_width;
+            const float y_gate = lane.top_y + 0.008f;
+            for (const PrefabParams& orbit : params) {
+                if (orbit.prefab != "orbit") {
+                    continue;
+                }
+                const float mx = def.width - orbit.mouth_x;
+                const float my = orbit.entry_y_right;
+                if (std::sqrt((mx - xw) * (mx - xw) + (my - y_gate) * (my - y_gate)) <= 0.045f) {
+                    lane.merged_lane = true;
+                    break;
+                }
+            }
+        }
+
+        for (size_t i = 0; i < params.size(); ++i) {
+            std::vector<Element> children;
+            try {
+                children = expand_prefab(def, to_instance(params[i]));
+            } catch (TableLoadError& err) {
+                err.json_pointer = "/prefabs/" + std::to_string(i);
+                err.file = file;
+                throw;
+            }
             for (Element& child : children) {
                 def.elements.push_back(std::move(child));
             }

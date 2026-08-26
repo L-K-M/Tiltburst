@@ -185,6 +185,9 @@ struct PrefabInstance {
     float top_radius = 0.130f;
     float entry_y_left = 0.550f;
     float entry_y_right = 0.900f;
+    // Loader plumbing (not schema): this lane merges with an orbit (§5.2
+    // merged variant — no top post).
+    bool merged_with_orbit = false;
     // sling_pair (§5.3)
     float sling_spread = 0.150f;
     float sling_face_length = 0.070f;

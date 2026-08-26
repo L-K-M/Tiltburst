@@ -92,8 +92,15 @@ private:
     float fps_ = 0.0f;
 };
 
-// Loads a table pack for the windowed path: accepts "tables/<slug>" or a
-// bare slug; throws TableLoadError upward (caught at the call site).
+// Resolves a --table argument: an explicit directory, or "tables/<slug>".
+std::filesystem::path resolve_table_dir(const std::string& arg) {
+    std::filesystem::path dir = arg;
+    if (dir.is_relative() && !std::filesystem::is_directory(dir)) {
+        dir = std::filesystem::path("tables") / arg;
+    }
+    return dir;
+}
+
 struct LoadedTable {
     tb::table::TableDef def;
 };
@@ -396,10 +403,7 @@ int run(const CliOptions& cli) {
         tb::SnapshotBuffer snapshots;
         tb::sim::SimState sim_state;
         if (!cli.table.empty()) {
-            std::filesystem::path dir = cli.table;
-            if (dir.is_relative() && !std::filesystem::is_directory(dir)) {
-                dir = std::filesystem::path("tables") / cli.table;
-            }
+            const std::filesystem::path dir = resolve_table_dir(cli.table);
             try {
                 tb::table::build_sim(tb::table::load_table(dir), sim_state);
             } catch (const tb::table::TableLoadError& e) {
@@ -696,10 +700,7 @@ int run(const CliOptions& cli) {
         std::unique_ptr<LoadedTable> loaded_table;
         std::filesystem::path table_dir;
         if (!cli.table.empty()) {
-            table_dir = cli.table;
-            if (table_dir.is_relative() && !std::filesystem::is_directory(table_dir)) {
-                table_dir = std::filesystem::path("tables") / cli.table;
-            }
+            table_dir = resolve_table_dir(cli.table);
             try {
                 loaded_table = std::make_unique<LoadedTable>();
                 loaded_table->def = tb::table::load_table(table_dir);
@@ -948,7 +949,7 @@ int run(const CliOptions& cli) {
                                                              0.0f,
                                                              0.9f,
                                                              0.6f,
-                                                             light.on ? 1.f : 0.35f});
+                                                             0.5f});
                 }
             }
 

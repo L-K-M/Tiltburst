@@ -547,7 +547,8 @@ void Solver::step_body(SimState& s, const TickInput* input) {
 }
 
 void Solver::step_regions(SimState& s, const TickInput* input) {
-    constexpr uint32_t kPlungerActionBit = 4; // 05 §9.1 action index
+    constexpr uint32_t kPlungerActionBit = 4;  // 05 §9.1 action index
+    constexpr uint32_t kServeDelayTicks = 500; // drain → serve delay (M5 loop)
 
     // ---- Plunger (08 §6.16) ----
     if (s.has_plunger) {
@@ -564,7 +565,7 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
         const bool was_in_zone = s.plunger.ball_in_zone;
         s.plunger.ball_in_zone = in_zone;
 
-        const bool held = ((input->buttons >> kPlungerActionBit) & 1u) != 0u;
+        const bool held = input != nullptr && ((input->buttons >> kPlungerActionBit) & 1u) != 0u;
         if (held && in_zone) {
             s.plunger.held_ticks++; // q grows only while a ball is in the zone
         }
@@ -651,14 +652,14 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
         s.serve_delay_ticks = 0;
     } else {
         ++s.serve_delay_ticks;
-        if (s.serve_delay_ticks >= 500) {
-            --s.trough_balls;
+        if (s.serve_delay_ticks >= kServeDelayTicks) {
             s.serve_delay_ticks = 0;
             for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
                 Ball& b = s.balls[bi];
                 if (b.live) {
                     continue;
                 }
+                --s.trough_balls; // only once a free slot is confirmed
                 b.index = bi;
                 b.live = true;
                 b.mode = BallMode::Free;
@@ -675,6 +676,7 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
                 ev.element = 0xFFFD;
                 ev.x = b.pos.x;
                 ev.y = b.pos.y;
+                ev.a = 0.0f;
                 ev.data = b.index;
                 s.render_ring.push(s.tick, ev);
                 s.game_ring.push(s.tick, ev);

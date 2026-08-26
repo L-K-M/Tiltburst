@@ -27,7 +27,8 @@ float wrap_ccw_local(float a) {
 
 // Appends one wall path's colliders (08-physics.md §3.1): segments and
 // arcs, plus a point collider at every node (corner caps) and arc
-// endpoint, deduplicated within the path.
+// endpoint. Consecutive coincident points collapse (a closed path's last
+// node equal to the first adds one cap, not two).
 void bake_wall(const WallDef& w, uint16_t element_id, tb::sim::SimState& out, uint16_t& next_sub) {
     const tb::sim::MaterialId mat = to_sim_material(w.material);
     const size_t n_nodes = w.path.size() + (w.closed ? 1 : 0);
@@ -60,7 +61,7 @@ void bake_wall(const WallDef& w, uint16_t element_id, tb::sim::SimState& out, ui
         c.a = center;
         c.radius = radius;
         c.a0 = a0;
-        c.a1 = a1; // stored CCW span (a1 > a0)
+        c.a1 = a1; // CCW span from a0 to a1 (may wrap past 0; tests wrap)
         c.element_id = element_id;
         c.sub_index = next_sub++;
         c.layer = uint8_t(w.layer);
@@ -70,13 +71,18 @@ void bake_wall(const WallDef& w, uint16_t element_id, tb::sim::SimState& out, ui
 
     // Walk nodes; track the current position for arcs.
     tb::sim::Vec2 cur{w.path[0].point[0], w.path[0].point[1]};
+    tb::sim::Vec2 last_point_added = cur;
     add_point(cur);
     for (size_t i = 1; i < w.path.size(); ++i) {
         const PathNode& node = w.path[i];
         if (!node.is_arc) {
             const tb::sim::Vec2 next{node.point[0], node.point[1]};
             add_segment(cur, next);
-            add_point(next);
+            if (std::abs(next.x - last_point_added.x) > 1e-6f ||
+                std::abs(next.y - last_point_added.y) > 1e-6f) {
+                add_point(next);
+                last_point_added = next;
+            }
             cur = next;
             continue;
         }
@@ -94,20 +100,22 @@ void bake_wall(const WallDef& w, uint16_t element_id, tb::sim::SimState& out, ui
         const tb::sim::Vec2 center{m.x + sign * h * perp.x, m.y + sign * h * perp.y};
 
         // Start/end angles around the center; store CCW from start to end.
+        // The ±h center choice in §3.1 selects the minor arc by
+        // construction; no clamping needed.
         float a_start = std::atan2(cur.y - center.y, cur.x - center.x);
         float a_end = std::atan2(to.y - center.y, to.x - center.x);
-        float span = wrap_ccw_local(a_end - a_start);
-        if (span > kPi) {
-            // Minor arc only (§3): the other way around.
-            span -= 2.0f * kPi;
-        }
+        const float span = wrap_ccw_local(a_end - a_start);
         if (node.arc.cw) {
             // CW travel from cur to to: stored CCW span runs end→start.
             add_arc(center, node.arc.radius, a_end, wrap_ccw_local(a_end - span));
         } else {
             add_arc(center, node.arc.radius, a_start, wrap_ccw_local(a_start + span));
         }
-        add_point(to);
+        if (std::abs(to.x - last_point_added.x) > 1e-6f ||
+            std::abs(to.y - last_point_added.y) > 1e-6f) {
+            add_point(to);
+            last_point_added = to;
+        }
         cur = to;
     }
     if (w.closed) {
@@ -150,14 +158,14 @@ void build_sim(const TableDef& def, tb::sim::SimState& out) {
     out.mu_rr = def.physics.present ? def.physics.rolling_resistance : tb::sim::kRollMu;
     out.restitution_falloff = def.physics.present ? def.physics.restitution_falloff : 0.12f;
     out.restitution_soft = def.physics.present ? def.physics.restitution_soft : 0.5f;
-    if (def.physics.present) {
-        out.live_catch_window_ticks = def.physics.live_catch_window_ms; // ms → ticks (1 ms)
-        out.live_catch_factor = def.physics.live_catch_factor;
-    }
+    out.live_catch_window_ticks =
+        def.physics.present ? def.physics.live_catch_window_ms : tb::sim::kLiveCatchWindowTicks;
+    out.live_catch_factor =
+        def.physics.present ? def.physics.live_catch_factor : tb::sim::kLiveCatchFactor;
 
     // Material overrides (§2 materials) over the canonical rows.
     {
-        for (int i = 0; i < 4; ++i) {
+        for (size_t i = 0; i < std::size(def.materials); ++i) {
             const MaterialOverride& mo = def.materials[i];
             if (!mo.present) {
                 continue;
@@ -183,11 +191,10 @@ void build_sim(const TableDef& def, tb::sim::SimState& out) {
     for (size_t idx = 0; idx < def.elements.size(); ++idx) {
         const Element& e = def.elements[idx];
         const uint16_t element_id = uint16_t(idx);
-        const std::string& type = e.id(); // silence unused-warning pattern
 
-        if (e.type_name() == std::string("wall")) {
+        if (std::holds_alternative<WallDef>(e.def)) {
             bake_wall(std::get<WallDef>(e.def), element_id, out, next_sub);
-        } else if (e.type_name() == std::string("post")) {
+        } else if (std::holds_alternative<PostDef>(e.def)) {
             const PostDef& p = std::get<PostDef>(e.def);
             tb::sim::Collider c{};
             c.kind = tb::sim::Collider::Kind::Point;
@@ -209,10 +216,14 @@ void build_sim(const TableDef& def, tb::sim::SimState& out) {
             sim_flipper.params.swing_deg = f.swing_deg;
             sim_flipper.params.side_sign = f.left_side ? +1 : -1;
             sim_flipper.params.strength = f.strength;
-            if (f.input == "left" || f.input == "upper_left") {
-                sim_flipper.params.action = f.input == "left" ? 0 : 2;
+            if (f.input == "left") {
+                sim_flipper.params.action = 0;
+            } else if (f.input == "right") {
+                sim_flipper.params.action = 1;
+            } else if (f.input == "upper_left") {
+                sim_flipper.params.action = 2;
             } else {
-                sim_flipper.params.action = f.input == "right" ? 1 : 3;
+                sim_flipper.params.action = 3; // upper_right (validated at load)
             }
             sim_flipper.theta = sim_flipper.params.rest_rad();
             sim_flipper.theta_start = sim_flipper.theta;
@@ -254,7 +265,6 @@ void build_sim(const TableDef& def, tb::sim::SimState& out) {
         // M6+ types (gate, rollover, slingshot, pop_bumper,
         // standup_target): parsed and retained in the TableDef; their sims
         // arrive with their milestones (04-milestones.md §M5 scope-out).
-        (void)type;
     }
 
     out.grid.build(out.colliders, out.width, out.height);

@@ -43,6 +43,45 @@ TEST(unit_hot_path, no_allocations_in_step) {
     EXPECT_EQ(count.deletes_total(), 0u);
 }
 
+// HotPath.NoAllocationsWithFlippers: the M4 flipper path (stroke state
+// machine, moving-capsule CCD, persistent-contact probes) must hold the
+// same allocation-free contract under mashing input.
+TEST(unit_hot_path, no_allocations_with_flippers) {
+    tb::sim::SimState s;
+    tb::sim::make_synthetic_scene(s, 99);
+    s.slope_deg = 6.5f;
+
+    // Two flippers into the post lattice.
+    tb::sim::Flipper fl{};
+    fl.params.pivot = {0.170f, 0.120f};
+    fl.params.rest_angle_deg = -31.0f;
+    fl.params.side_sign = +1;
+    fl.params.action = 0;
+    fl.theta = fl.params.rest_rad();
+    fl.theta_start = fl.theta;
+    s.flippers.push_back(fl);
+
+    tb::sim::Solver solver;
+    uint32_t mash = 1; // deterministic button pattern
+    auto pressed = [](uint32_t pattern, int tick) {
+        return ((pattern >> uint32_t(tick % 7)) & 1u) != 0u;
+    };
+    for (int i = 0; i < 1000; ++i) {
+        tb::sim::TickInput in;
+        in.buttons = pressed(mash, i) ? 1u : 0u;
+        solver.step(s, in); // warm-up
+    }
+
+    tb::test::ScopedAllocCount count;
+    for (int i = 0; i < 1000; ++i) {
+        tb::sim::TickInput in;
+        in.buttons = pressed(mash, i) ? 1u : 0u;
+        solver.step(s, in);
+    }
+    EXPECT_EQ(count.news_total(), 0u);
+    EXPECT_EQ(count.deletes_total(), 0u);
+}
+
 // Layout.SimIncludesNothingForbidden: no src/sim include may reference
 // render/platform/audio/SDL (canon §5.1: tb_sim links only tb_core).
 TEST(unit_layout, sim_includes_nothing_forbidden) {

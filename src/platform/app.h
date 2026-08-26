@@ -12,6 +12,7 @@ inline constexpr char kUsage[] =
     "  tiltburst --version                 Print the version and exit.\n"
     "  tiltburst [--windowed WxH] [--table slug] [--dev] [--headless]\n"
     "  tiltburst --render-smoke --frames N --screenshot-dir DIR\n"
+    "  tiltburst --latency-test\n"
     "\n"
     "Unknown flags, malformed values, or contradictory combinations exit 2\n"
     "(05-engine-core.md §2.1).\n";
@@ -21,7 +22,8 @@ struct CliOptions {
     bool headless = false;
     bool dev = false;
     bool render_smoke = false;
-    int frames = 120; // --render-smoke frame count
+    bool latency_test = false; // §14.4 photodiode measurement mode
+    int frames = 120;          // --render-smoke frame count
     int window_w = 540;
     int window_h = 1080;
     std::string screenshot_dir;

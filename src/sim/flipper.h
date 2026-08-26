@@ -35,8 +35,8 @@ constexpr float kTauRise = 0.011f;      // s ramp-up
 constexpr float kAlphaDrop = 2400.0f;   // rad/s²
 constexpr float kOmegaDropMax = 24.0f;  // rad/s release cap
 constexpr float kMovingOmegaFastPath = 1.0f; // below: static swept path
-constexpr uint32_t kLiveCatchWindowTicks = 70; // 70 ms at dt = 1 ms
-constexpr float kLiveCatchFactor = 0.10f;
+constexpr uint32_t kLiveCatchWindowTicks = 70; // §1.3 default (50 ms)
+constexpr float kLiveCatchFactor = 0.15;      // §1.3 default
 
 // Per-tick kinematic state: ω held constant within the tick (step 2),
 // θ advances after CCD used it (§5.2).

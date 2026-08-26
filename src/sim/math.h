@@ -64,6 +64,19 @@ inline float length_sq(Vec2 v) {
     return dot(v, v);
 }
 
+inline float wrap_ccw(float a) {
+    // Map any angle to [0, 2π).
+    const float two_pi = 6.283185307179586f;
+    float r = a;
+    while (r < 0.0f) {
+        r += two_pi;
+    }
+    while (r >= two_pi) {
+        r -= two_pi;
+    }
+    return r;
+}
+
 float length(Vec2 v);
 Vec2 normalize(Vec2 v); // safe: returns (0,0) for zero vector
 

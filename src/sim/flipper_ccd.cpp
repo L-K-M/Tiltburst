@@ -23,7 +23,7 @@ LocalHit sd_flipper(Vec2 p, const Flipper& f) {
     const float ql = p.x;
     const float m = -k * qc + a * ql;
 
-    LocalHit hit {};
+    LocalHit hit{};
     if (m < 0.0f) {
         const float len = length(p);
         hit.d = len - rb;
@@ -53,12 +53,17 @@ Vec2 to_local(Vec2 world, const Flipper& f, float theta) {
 
 Vec2 to_world_dir(Vec2 local_dir, float theta) {
     const float c = std::cos(theta), sn = std::sin(theta);
-    return {local_dir.x * c - local_dir.y * sn,
-            local_dir.x * sn + local_dir.y * c}; // R(+θ)
+    return {local_dir.x * c - local_dir.y * sn, local_dir.x * sn + local_dir.y * c}; // R(+θ)
 }
 
-void finish_hit(Vec2 pc, float r, const Flipper& f, float theta, float omega,
-                float t, const LocalHit& lh, FlipperHit& out) {
+void finish_hit(Vec2 pc,
+                float r,
+                const Flipper& f,
+                float theta,
+                float omega,
+                float t,
+                const LocalHit& lh,
+                FlipperHit& out) {
     out.toi = t;
     out.normal = normalize(to_world_dir(lh.n_local, theta));
     out.contact = pc - out.normal * r;
@@ -67,8 +72,13 @@ void finish_hit(Vec2 pc, float r, const Flipper& f, float theta, float omega,
 
 // Static fast path at θ0: swept tests against the two caps and the two
 // tangent side segments (§3.5 relative-velocity path).
-bool sweep_static_capsule(Vec2 p0, Vec2 v, float r, const Flipper& f,
-                          float theta0, float omega, float max_t,
+bool sweep_static_capsule(Vec2 p0,
+                          Vec2 v,
+                          float r,
+                          const Flipper& f,
+                          float theta0,
+                          float omega,
+                          float max_t,
                           FlipperHit& out) {
     const float L = f.params.length;
     const Vec2 axis{std::cos(theta0), std::sin(theta0)};
@@ -125,8 +135,18 @@ bool sweep_static_capsule(Vec2 p0, Vec2 v, float r, const Flipper& f,
 
 } // namespace
 
-bool sweep_circle_vs_flipper(Vec2 p0, Vec2 v, float r, const Flipper& f,
-                             float max_t, FlipperHit& out) {
+FlipperSep flipper_separation(Vec2 p, float r, const Flipper& f, float theta) {
+    const LocalHit lh = sd_flipper(to_local(p, f, theta), f);
+    FlipperSep out;
+    out.sep = lh.d - r;
+    out.normal = normalize(to_world_dir(lh.n_local, theta));
+    const Vec2 contact = p - out.normal * r;
+    out.surface_vel = f.omega * perp(contact - f.params.pivot);
+    return out;
+}
+
+bool sweep_circle_vs_flipper(
+    Vec2 p0, Vec2 v, float r, const Flipper& f, float max_t, FlipperHit& out) {
     const float theta0 = f.theta_start;
     const float omega = f.omega;
 
@@ -136,15 +156,14 @@ bool sweep_circle_vs_flipper(Vec2 p0, Vec2 v, float r, const Flipper& f,
 
     // Conservative advancement (§3.5).
     const float bound =
-        length(v) + std::fabs(omega) *
-                        (f.params.length +
-                         std::max(f.params.radius_base, f.params.radius_tip));
+        length(v) +
+        std::fabs(omega) * (f.params.length + std::max(f.params.radius_base, f.params.radius_tip));
     if (!(bound > 0.0f)) {
         return false;
     }
 
     float t = 0.0f;
-    LocalHit lh {};
+    LocalHit lh{};
     for (int iter = 0; iter < 24; ++iter) {
         const Vec2 pc = p0 + v * t;
         lh = sd_flipper(to_local(pc, f, theta0 + omega * t), f);

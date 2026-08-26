@@ -20,12 +20,13 @@ constexpr float kRollMu = 0.025f;         // rolling resistance coefficient
 constexpr float kSpinDamp = 0.7f;         // 1/s free spin decay
 constexpr float kSkin = 1e-4f;            // m separation kept after TOI
 constexpr float kToiEps = 1e-9f;          // s TOI tie/validity epsilon
-constexpr float kRestSpeed = 0.05f;       // m/s restitution cutoff (ADR-020)
+constexpr float kRestSpeed = 0.15f;       // m/s restitution cutoff (ADR-021)
 constexpr float kMaxToiIter = 8.0f;       // contacts per ball per tick
 constexpr float kGridCell = 0.032f;       // broadphase cell size
 
 constexpr float kDefaultSlopeDeg = 6.5f;
 constexpr int kMaxBalls = 6;
+constexpr int kMaxFlippers = 8; // per-table flipper cap (bitmask width)
 
 enum class BallMode : uint8_t { Free = 0, Ramp = 1, Captured = 2 };
 

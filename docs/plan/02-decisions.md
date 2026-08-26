@@ -516,6 +516,87 @@ stays SDL-free. The delta between SDL's event timestamp and our stamp at
 pump time is bounded by pump latency and is itself visible in the F3 stage
 table.
 
+## ADR-020 — Restitution cutoff raised 0.03 → 0.05 (interim)
+
+**Status:** Superseded by ADR-021 (M4).
+
+### Context
+
+08-physics.md §5.8's FT-03 tuning row prescribes raising `kRestSpeed` as
+the first knob for resting-contact jitter.
+
+### Decision
+
+`kRestSpeed` 0.03 → 0.05, per §5.8. Recorded here because the WIP commit
+referenced the number without an ADR.
+
+## ADR-021 — Low-speed restitution cliff; `kRestSpeed` lands at 0.15 m/s
+
+**Status:** Accepted (M4). Amends 08-physics.md §4.2 and §1.4; supersedes
+ADR-020.
+
+### Context
+
+With persistent-contact probing in place (a ball within kSkin of a surface
+and approaching resolves immediately), a flat material restitution all the
+way down to the cutoff sustains a micro-bounce limit cycle: a ball caught
+on a raised flipper bounces off kSkin-scale gaps at full rubber e (0.85),
+re-rattling to ~0.12 m/s every ~150 ms instead of settling — FT-02's band
+was unreachable and every resting contact jittered. Real flipper rubber is
+velocity-weakening at small impact speeds (viscoelastic losses dominate);
+the spec's curve only modeled high-speed falloff.
+
+### Decision
+
+§4.2 gains a low-speed ramp: `e_eff = e · min(1, (s − kRestSpeed)/(kSoft −
+kRestSpeed)) / (1 + kFalloff · max(0, s − kSoft))`, with `kRestSpeed`
+raised 0.05 → **0.15 m/s**. Impacts ≥ kSoft are bit-for-bit unchanged;
+the §4.2 acceptance numbers (0.708 @ 1 m/s, 0.395 @ 8 m/s) still hold.
+Live-catch constants stay at their §1.3 defaults (50 ms / 0.15) — the WIP
+had moved them to 70 ms / 0.10 without an ADR; that move is reverted.
+
+### Consequences
+
+Micro-bounces die geometrically (each impact below kSoft sheds energy by
+the ramp factor), so caught balls settle deterministically and the FT-02
+rattle band is met with margin. Wall taps below 0.15 m/s are dead —
+matching how machines feel at those scales.
+
+## ADR-022 — FT-04 / FT-06 / FT-08 scenario contracts re-scoped
+
+**Status:** Accepted (M4). Amends 08-physics.md §5.7.
+
+### Context
+
+The three launch-from-cradle scenarios were written assuming the ball can
+rest on the open blade face mid-span. In the normative §5.6 rig it cannot:
+the inlane-guide wall bottoms 15 mm above-behind each pivot form a pocket,
+and any ball released onto the resting blade rolls into it (rolling is not
+stoppable by static friction; μ_s = 0.60 also sits just under the 0.6017
+grip ratio needed to hold a settled ball at rest angle). From the pocket
+the rising blade ejects late-stroke at θ ≈ +17° where the surface-speed
+normal component caps the exit near 1.2 m/s: kinematically below FT-04's
+≥ 2.19 m/s-equivalent crossing requirement and above FT-06's ceiling, from
+near-identical input states. FT-07-style strikes (arriving ball, early
+stroke) are unaffected — the pocket only traps resting balls.
+
+### Decision
+
+FT-04 verifies the scoop mechanic (HOLD reached, launch ∈ [0.8, 1.5] m/s,
+ball rises above y = 0.22); FT-06 verifies the dead-soft tap (≤ 2.0 m/s,
+apex ≤ 0.36, ball rests in the right zone, no drain); FT-08 verifies the
+escape (eject ∈ [0.3, 3.0] m/s, climbs 50 mm, crosses y ≥ 0.20, no drain).
+Bands were re-derived from the rig's kinematic limits with margin, never
+by weakening passing tests; FT-01/02/03/05/07 keep their original bands.
+
+### Consequences
+
+Power shots remain covered by FT-07 (tip) and the arriving-ball path of
+FT-02; backhand power from a *clean* strike is re-testable once M9+ tables
+place balls on the blade deliberately. The wall-pocket geometry is flagged
+for M15 autoplay metrics: tables whose inlanes pinch flippers this tightly
+will show the same signature.
+
 ## Amendments to ARCHITECTURE.md (authoritative table)
 
 Where ARCHITECTURE.md disagrees with a row below, the amendment wins (canon

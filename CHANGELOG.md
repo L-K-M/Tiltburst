@@ -8,6 +8,29 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Added
 
+- M04: flipper stroke state machine, moving-capsule CCD, surface-velocity
+  impulses and live catch; FT-01…FT-08 feel scenarios on the §5.6 code rig.
+- M04: raw input layer (05 §9) — SDL/WinRaw/evdev producers over per-source
+  edge rings with the late-latch contract (≤ 64 edges/tick, sub-tick tap
+  survival, atomic reconciliation), focus gating, and nudge plumbing.
+- M04: latency instrumentation (05 §14) — input→latch histogram backing the
+  R2.1 gate, per-stage record ring, F3 overlay page, `--latency-test` mode
+  with CSV export.
+
+### Changed
+
+- M04: restitution curve gains a low-speed cliff and the resting-contact
+  cutoff lands at 0.15 m/s (ADR-021); caught balls settle instead of
+  rattling at the sweep threshold.
+
+### Fixed
+
+- M04: resting/tangential contacts within kSkin now resolve as persistent
+  contacts — friction acts every tick on sliding balls instead of only at
+  normal crossings (ADR-021 context).
+
+### Added
+
 - M03: renderer v1 — SDF primitive pipeline (circle/ring/rbox/capsule/arc/
   ball with stroke and glow), RGBA16F scene target, rotated letterbox
   present pass with piecewise sRGB encode, F2 debug draw of colliders and

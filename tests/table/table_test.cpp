@@ -9,7 +9,12 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#if defined(_WIN32)
+#include <process.h>
+#define getpid _getpid
+#else
 #include <unistd.h>
+#endif
 
 // M5 table-format tests (04-milestones.md §M5): loader, prefab expansion,
 // plunger curve, and the greybox determinism replay.

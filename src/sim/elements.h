@@ -100,7 +100,7 @@ struct KickerElem {
     float eject_angle_deg = 90.0f;
     KickerStyle style = KickerStyle::Saucer;
     uint8_t held_ball = 0xFF; // captured ball index (0xFF = none)
-    uint32_t hold_ticks = 0;  // countdown to auto-eject; 0 = script-held
+    uint32_t hold_ticks = 0; // countdown to auto-eject; meaningful only while has_hold
     bool has_hold = false;
 };
 

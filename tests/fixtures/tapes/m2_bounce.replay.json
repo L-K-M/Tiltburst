@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "table_slug": "test-lab",
+  "seed": 424242,
+  // M2 demo tape: sparse entries; each mask holds until the next entry.
+  // Bit layout per 05-engine-core.md §13.1 (bit 5 aliases bit 4).
+  "inputs": [
+    [0, 0],
+    [1500, 16],       // plunger pull starts
+    [2100, 0],        // released
+    [5000, 1],        // left flipper down
+    [5180, 0],
+    [9000, 2],        // right flipper tap
+    [9180, 0],
+    [14000, 64],      // nudge left
+    [14200, 0],
+    [20000, 18],      // plunger + right flipper
+    [26000, 16],
+    [32000, 0],
+    [40000, 128],     // nudge right
+    [40300, 0],
+    [50000, 256],     // nudge up
+    [50500, 0],
+    [62000, 1],
+    [62500, 33],      // flipper + launch-alias bit pattern
+    [70000, 512],     // start
+    [70500, 0],
+    [82000, 97],      // mixed word
+    [90000, 0]
+  ]
+}

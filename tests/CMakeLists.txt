@@ -1,15 +1,25 @@
 find_package(GTest CONFIG REQUIRED)
 find_package(Stb REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 
 add_executable(tb_tests
     core/config_test.cpp
+    core/hash_test.cpp
     core/rng_test.cpp
     core/scaffold_test.cpp
     core/time_test.cpp
     render/font_assets_test.cpp
     render/shader_build_test.cpp
+    sim/broadphase_test.cpp
+    sim/ccd_test.cpp
+    sim/determinism_test.cpp
+    sim/golden_test.cpp
+    sim/perf_and_layout_test.cpp
     sim/snapshot_test.cpp
+    sim/solver_test.cpp
     sim/tick_loop_test.cpp
+    support/alloc_hook.cpp
+    support/tape.cpp
 )
 
 target_include_directories(tb_tests PRIVATE
@@ -17,7 +27,8 @@ target_include_directories(tb_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party
     ${Stb_INCLUDE_DIR})
 target_link_libraries(tb_tests PRIVATE
-    tb_core tb_sim tb_render GTest::gtest GTest::gtest_main)
+    tb_core tb_sim tb_render nlohmann_json::nlohmann_json
+    GTest::gtest GTest::gtest_main)
 
 include(GoogleTest)
 # Repo-relative test data: tests resolve paths through tb::test::data_path(),

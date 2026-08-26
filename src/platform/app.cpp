@@ -12,6 +12,7 @@
 #include "render/sdl_gpu_renderer.h"
 #include "sim/sim_thread.h"
 #include "sim/snapshot.h"
+#include "sim/solver.h"
 
 #include <SDL3/SDL.h>
 
@@ -331,11 +332,33 @@ int run(const CliOptions& cli) {
         // Bounded display-less probe (journal note): boot with no video/
         // GPU/audio, run the sim loop, report the tick rate, exit 0.
         tb::SnapshotBuffer snapshots;
+        tb::sim::SimState sim_state;
+        tb::sim::make_synthetic_scene(sim_state, 424242);
+        tb::sim::Solver solver;
         tb::SimThread sim;
-        sim.start([&snapshots](uint64_t tick) {
-            tb::SimSnapshot s;
-            s.tick = tick;
-            snapshots.publish(s);
+        sim.start([&snapshots, &solver, &sim_state](uint64_t tick) {
+            const tb::sim::TickInput input;
+            solver.step(sim_state, input);
+
+            tb::SimSnapshot snap;
+            snap.tick = tick;
+            snap.sim_time_s = double(tick) * 0.001;
+            uint32_t n = 0;
+            for (int i = 0; i < tb::sim::kMaxBalls; ++i) {
+                const auto& b = sim_state.balls[i];
+                if (!b.live || b.mode != tb::sim::BallMode::Free) {
+                    continue;
+                }
+                snap.balls[n].x = b.pos.x;
+                snap.balls[n].y = b.pos.y;
+                snap.balls[n].vx = b.vel.x;
+                snap.balls[n].vy = b.vel.y;
+                snap.balls[n].omega = b.omega_z;
+                snap.balls[n].flags = 1;
+                ++n;
+            }
+            snap.ball_count = n;
+            snapshots.publish(snap);
         });
         const uint64_t start = tb_now_ns();
         // Wall-clock deadline keeps a wedged sim from hanging CI forever.
@@ -380,11 +403,33 @@ int run(const CliOptions& cli) {
         }
 
         tb::SnapshotBuffer snapshots;
+        tb::sim::SimState sim_state;
+        tb::sim::make_synthetic_scene(sim_state, 424242);
+        tb::sim::Solver solver;
         tb::SimThread sim;
-        sim.start([&snapshots](uint64_t tick) {
-            tb::SimSnapshot s;
-            s.tick = tick;
-            snapshots.publish(s);
+        sim.start([&snapshots, &solver, &sim_state](uint64_t tick) {
+            const tb::sim::TickInput input;
+            solver.step(sim_state, input);
+
+            tb::SimSnapshot snap;
+            snap.tick = tick;
+            snap.sim_time_s = double(tick) * 0.001;
+            uint32_t n = 0;
+            for (int i = 0; i < tb::sim::kMaxBalls; ++i) {
+                const auto& b = sim_state.balls[i];
+                if (!b.live || b.mode != tb::sim::BallMode::Free) {
+                    continue;
+                }
+                snap.balls[n].x = b.pos.x;
+                snap.balls[n].y = b.pos.y;
+                snap.balls[n].vx = b.vel.x;
+                snap.balls[n].vy = b.vel.y;
+                snap.balls[n].omega = b.omega_z;
+                snap.balls[n].flags = 1;
+                ++n;
+            }
+            snap.ball_count = n;
+            snapshots.publish(snap);
         });
 
         FrameStats stats;

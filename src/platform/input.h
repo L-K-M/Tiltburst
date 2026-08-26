@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 // Raw input system (05-engine-core.md §9): fixed actions, edge queues,

@@ -3,10 +3,10 @@
 #include "core/hash.h"
 #include "core/rng.h"
 #include "sim/broadphase.h"
-#include "sim/flipper.h"
-#include "sim/flipper_ccd.h"
 #include "sim/ccd.h"
 #include "sim/events.h"
+#include "sim/flipper.h"
+#include "sim/flipper_ccd.h"
 #include "sim/math.h"
 #include "sim/types.h"
 
@@ -86,8 +86,7 @@ private:
                           const Material& mat,
                           Vec2 surface_vel,
                           float live_catch_scale); // returns approach speed
-    void resolve_flipper(SimState& s, Ball& ball, Flipper& f,
-                         const FlipperHit& hit);
+    void resolve_flipper(SimState& s, Ball& ball, Flipper& f, const FlipperHit& hit);
     void resolve_pair(SimState& s, Ball& a, Ball& b, Vec2 normal);
     void pushout(SimState& s);
 

@@ -2,6 +2,7 @@
 
 #include "sim/elements.h"
 #include "sim/flipper.h"
+#include "sim/ramp.h"
 
 #include <cmath>
 
@@ -127,6 +128,67 @@ void bake_wall(const WallDef& w, uint16_t element_id, tb::sim::SimState& out, ui
     }
 }
 
+// Flattens a path (segments + arcs) to a polyline at ~1 mm resolution.
+std::vector<tb::sim::Vec2> flatten_path(const std::vector<PathNode>& path) {
+    std::vector<tb::sim::Vec2> pts;
+    if (path.empty()) {
+        return pts;
+    }
+    tb::sim::Vec2 cur{path[0].point[0], path[0].point[1]};
+    pts.push_back(cur);
+    for (size_t i = 1; i < path.size(); ++i) {
+        const PathNode& node = path[i];
+        if (!node.is_arc) {
+            cur = {node.point[0], node.point[1]};
+            pts.push_back(cur);
+            continue;
+        }
+        // §3.1 center rule.
+        const tb::sim::Vec2 to{node.arc.to[0], node.arc.to[1]};
+        tb::sim::Vec2 d = to - cur;
+        const float len = std::sqrt(d.x * d.x + d.y * d.y);
+        if (len < 1e-9f) {
+            continue;
+        }
+        const float h =
+            std::sqrt(std::max(0.0f, node.arc.radius * node.arc.radius - len * len * 0.25f));
+        const tb::sim::Vec2 m{(cur.x + to.x) * 0.5f, (cur.y + to.y) * 0.5f};
+        const tb::sim::Vec2 dhat{d.x / len, d.y / len};
+        const tb::sim::Vec2 perp{-dhat.y, dhat.x};
+        const float sign = node.arc.cw ? -1.0f : 1.0f;
+        const tb::sim::Vec2 center{m.x + sign * h * perp.x, m.y + sign * h * perp.y};
+        const float a0 = std::atan2(cur.y - center.y, cur.x - center.x);
+        const float a1 = std::atan2(to.y - center.y, to.x - center.x);
+        float span = a1 - a0;
+        while (span <= -float(kPi)) {
+            span += 2.0f * float(kPi);
+        }
+        while (span > float(kPi)) {
+            span -= 2.0f * float(kPi);
+        }
+        // Minor arc, direction from the sign choice.
+        const int steps = std::max(2, int(std::fabs(span) / 0.02f));
+        for (int k2 = 1; k2 <= steps; ++k2) {
+            const float a = a0 + span * (float(k2) / float(steps));
+            pts.push_back({center.x + node.arc.radius * std::cos(a),
+                           center.y + node.arc.radius * std::sin(a)});
+        }
+        cur = to;
+    }
+    return pts;
+}
+
+// seam_layer(z) (§6.10.2): 0 near z≈0, 1 near layer1_z, else 0xFF.
+uint8_t derive_seam_layer(float z, float layer1_z) {
+    if (std::fabs(z) <= 0.005f) {
+        return 0;
+    }
+    if (std::fabs(z - layer1_z) <= 0.005f) {
+        return 1;
+    }
+    return 0xFF;
+}
+
 // Unit vector along facing_deg (0° = +x, 90° = +y).
 tb::sim::Vec2 facing_vec(float facing_deg) {
     const float phi = facing_deg * kPi / 180.0f;
@@ -152,6 +214,8 @@ void build_sim(const TableDef& def, tb::sim::SimState& out) {
     out.drop_banks.clear();
     out.captives.clear();
     out.ball_locks.clear();
+    out.ramps.clear();
+    out.magnets.clear();
     out.ball_count = def.ball_count;
     out.locked_balls = 0;
     out.ball_save = {};

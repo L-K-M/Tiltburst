@@ -597,6 +597,37 @@ place balls on the blade deliberately. The wall-pocket geometry is flagged
 for M15 autoplay metrics: tables whose inlanes pinch flippers this tightly
 will show the same signature.
 
+## ADR-023 — Magnet in-field eddy velocity damping 0.8 → 3.5 s⁻¹
+
+**Status:** Accepted (M8). Amends 08-physics.md §6.12.
+
+### Context
+
+FT-09 (magnet catch and throw) requires the §6.12 field to hold a ball
+that enters at 0.52 m/s. At the spec's original `v ← v·exp(−0.8·dt)`
+braking, energy accounting over one rim-to-rim transit is strictly
+positive: the ball's entry KE (~0.27 m²/s²) plus the effective-gravity
+gain across the 0.18 m diameter (~0.40 m²/s²) exceeds what the 0.8/s
+braking can remove during the ~0.2 s transit (~0.35 m²/s²), so the field
+work cancels symmetrically and every through ball exited the far rim with
+0.4–0.5 m/s regardless of entry speed. Empirically confirmed by probe:
+escape at t≈0.5 s with 0.64 m/s.
+
+### Decision
+
+`v ← v·exp(−3.5·dt)` while inside an enabled field. 3.5 s⁻¹ is the
+smallest round value that holds the FT-09 transit with margin (at 2.0
+the ball still escaped; at 3.0 the 3 s |v| ≤ 0.35 band missed by
+0.012 m/s). The field-force formula, the 60 m/s² cap, the rim fade, the
+spin braking (8 s⁻¹), and the release-impulse bound are unchanged.
+
+### Consequences
+
+Magnet capture is dissipative-dominated, matching real machines (eddy
+currents in the ball are aggressive). The §4.4 energy property is
+unaffected (magnets are active elements). FT-09 green with bands
+unmodified; the throw phase is unchanged (release still adds no impulse).
+
 ## Amendments to ARCHITECTURE.md (authoritative table)
 
 Where ARCHITECTURE.md disagrees with a row below, the amendment wins (canon

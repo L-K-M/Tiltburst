@@ -142,15 +142,26 @@ parse_path(const json& obj, const std::string& pointer, const std::filesystem::p
         fail("field 'path' must hold 2–256 nodes", pointer + "/path", file);
     }
     std::vector<PathNode> nodes;
+    float cur[2] = {0.0f, 0.0f}; // running position (points and arc ends)
     for (size_t i = 0; i < arr.size(); ++i) {
         const json& n = arr[i];
         const std::string node_ptr = pointer + "/path/" + std::to_string(i);
+        auto update_cur = [&cur](const PathNode& node) {
+            if (node.is_arc) {
+                cur[0] = node.arc.to[0];
+                cur[1] = node.arc.to[1];
+            } else {
+                cur[0] = node.point[0];
+                cur[1] = node.point[1];
+            }
+        };
         if (n.is_array() && n.size() == 2 && n[0].is_number() && n[1].is_number()) {
             PathNode node;
             node.is_arc = false;
             node.point[0] = n[0].get<float>();
             node.point[1] = n[1].get<float>();
             nodes.push_back(node);
+            update_cur(node);
             continue;
         }
         if (n.is_object() && n.contains("arc")) {
@@ -181,10 +192,10 @@ parse_path(const json& obj, const std::string& pointer, const std::filesystem::p
                 fail("arc 'dir' must be \"cw\" or \"ccw\"", node_ptr + "/arc/dir", file);
             }
             // §3 feasibility: arcs are minor; |to - from| >= 0.001 and
-            // radius >= half-chord (V019).
-            const PathNode& prev = nodes.back();
-            const float dx = node.arc.to[0] - prev.point[0];
-            const float dy = node.arc.to[1] - prev.point[1];
+            // radius >= half-chord (V019). `cur` is the running position
+            // (the previous node may itself be an arc).
+            const float dx = node.arc.to[0] - cur[0];
+            const float dy = node.arc.to[1] - cur[1];
             const float chord = std::sqrt(dx * dx + dy * dy);
             if (chord < 0.001f) {
                 fail("degenerate arc: |to - from| < 0.001 m (V019)", node_ptr, file);
@@ -194,6 +205,7 @@ parse_path(const json& obj, const std::string& pointer, const std::filesystem::p
             }
             node.arc.cw = dir == "cw";
             nodes.push_back(node);
+            update_cur(node);
             continue;
         }
         fail("path node must be [x, y] or {\"arc\": {...}}", node_ptr, file);
@@ -370,6 +382,70 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
         get_xy(obj, "pos", sp.pos, pointer, file);
         sp.facing_deg = get_number(obj, "facing_deg", 90.0f, pointer, file);
         return Element{std::move(sp)};
+    }
+    if (type == "ramp") {
+        RampDef r;
+        r.id = id;
+        r.path = parse_path(obj, pointer, file);
+        r.width = get_number(obj, "width", 0.044f, pointer, file);
+        if (!obj.contains("height_profile") || !obj.at("height_profile").is_array()) {
+            fail("missing required field 'height_profile'", pointer, file);
+        }
+        for (const auto& k : obj.at("height_profile")) {
+            if (!k.is_object() || !k.contains("s") || !k.contains("z") || !k.at("s").is_number() ||
+                !k.at("z").is_number()) {
+                fail("height_profile keyframes must be {s, z} numbers",
+                     pointer + "/height_profile",
+                     file);
+            }
+            r.height_profile.push_back(
+                {k.at("s").get<float>(), std::max(0.0f, k.at("z").get<float>())});
+        }
+        r.drop_exit = get_bool(obj, "drop_exit", false, pointer, file);
+
+        // V010: profile shape; V011: end z must land on a surface.
+        const auto& kp = r.height_profile;
+        if (kp.empty() || std::fabs(kp.front().s) > 1e-6f ||
+            std::fabs(kp.back().s - 1.0f) > 1e-6f) {
+            fail("height_profile must start at s:0 and end at s:1 (V010)",
+                 pointer + "/height_profile",
+                 file);
+        }
+        for (size_t i = 1; i < kp.size(); ++i) {
+            if (kp[i].s <= kp[i - 1].s) {
+                fail("height_profile s must strictly increase (V010)",
+                     pointer + "/height_profile",
+                     file);
+            }
+            if (kp[i].z > 0.15f || kp[i].z < 0.0f) {
+                fail("height_profile z must be in [0, 0.15] (V010)",
+                     pointer + "/height_profile",
+                     file);
+            }
+        }
+        if (!r.drop_exit) {
+            const float layer1_z = 0.055f; // playfield.layer1_z default
+            const float z_end = kp.back().z;
+            const bool surf0 = std::fabs(z_end) <= 0.005f;
+            const bool surf1 = std::fabs(z_end - layer1_z) <= 0.005f;
+            if (!surf0 && !surf1) {
+                fail("ramp end z must be 0 or layer1_z (±0.005) unless "
+                     "drop_exit (V011)",
+                     pointer + "/height_profile",
+                     file);
+            }
+        }
+        return Element{std::move(r)};
+    }
+    if (type == "magnet") {
+        MagnetDef m;
+        m.id = id;
+        m.layer = layer;
+        get_xy(obj, "pos", m.pos, pointer, file);
+        m.radius = get_number(obj, "radius", 0.09f, pointer, file);
+        m.strength = get_number(obj, "strength", 1.2f, pointer, file);
+        m.default_on = get_bool(obj, "default_on", false, pointer, file);
+        return Element{std::move(m)};
     }
     if (type == "kicker") {
         KickerDef k;

@@ -6,6 +6,7 @@ add_library(tb_sim STATIC
     ccd.cpp
     flipper.cpp
     flipper_ccd.cpp
+    ramp.cpp
     broadphase.cpp
     replay.cpp
     sim.cpp

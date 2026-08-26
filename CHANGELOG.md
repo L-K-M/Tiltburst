@@ -8,6 +8,11 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Added
 
+- M08: ramps as constrained 1-D paths with derived seam layers and
+  bidirectional layer transfer, layer masks, and magnets with the §6.12
+  field — completing the R7 element set (ramp, magnet, toy parse; FT-09
+  and FT-10 green).
+
 - M07: kickers, drop target banks, captive balls, and ball locks per
   08-physics.md §6.5/§6.9/§6.13/§6.14, plus the ball-save mechanism and
   the active+trough+locked ball-accounting invariant.

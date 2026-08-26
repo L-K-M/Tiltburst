@@ -278,3 +278,49 @@ corrections are new entries. Format: 03-process.md §3.1.
     geometry at M15.
 - Mid-milestone: branch protection retry at M07 open: PUT still 404
   (no admin); fallback continues per §3.2.
+- Review cycles (GLM 5.3, 5 cycles to steady state): the significant
+  catch was the inverted captive reaction-impulse sign — my tests had
+  passed through end-clamp bounce chaos; confirmed with an isolated
+  sign probe before the fix. Also: kicker capture payload speed,
+  captive full-travel attribution, BallLockCapture rename (one broken
+  intermediate commit where the rename missed events.h — CI caught it;
+  lesson re-verified: never trust grep -c over build logs), eject-speed
+  validation, cycle-3/4 nits. One declined with citation (release-timer
+  reset: §6.14's 500 ms cadence scopes per release command).
+
+## M08 — Ramps, layers & magnets (2026-08-26)
+
+- Shipped: RampPath (§6.10.1 arc-length parametrized samples from the
+  flattened path, per-end derived seam layers per §6.10.2 with the
+  drop_exit internal-end rule); ramp dynamics (§6.10.4 gravity +
+  profile-climb + linear damping + rolling resistance with the
+  never-reverse rule; the 2-D arc length used as-is per spec); seam
+  binding (alignment ≤ 50°, speed ≥ 0.1 m/s, strict pre/post crossing so
+  an exiting ball never rebinds, 5% side-guide loss, correct far-end
+  s_dot sign); exits (forward with ramp_made + switch_hit pairing and 5%
+  loss, rollback out the entry, fall-back-off stall guard with the
+  0.05 m/0.006 m window); magnets (§6.12 field with core clamp, rim fade,
+  60 m/s² cap, pulse envelope, eddy damping); layer masks throughout
+  (colliders, elements, seams); V010/V011 ramp profile validation at
+  load; parse_path tracks the running position across chained arcs (V019
+  half-chord check was reading garbage after an arc node); Neon Drift
+  greybox gains drift_magnet + both ramps per 15 §1.3. Tests:
+  Ramp.ClimbConservesPlausibleEnergy, Ramp.SlowBallRollsBack,
+  Ramp.RidesDownFromLayer1, Layer.MasksIsolateColliders,
+  Magnet.CaptureEnvelope, FT-09, FT-10 (make + rollback, bands
+  unmodified), Determinism.FullElementSetReplay — 83/83 green;
+  gate_tables holds (1.0/1.7 µs mean).
+- Deviations / new ADRs:
+  - ADR-023: §6.12 in-field eddy velocity damping 0.8 → 3.5 s⁻¹. At 0.8
+    the braking cannot dissipate the rim-to-rim gravity gain (energy
+    accounting + probe: every through ball escaped regardless of entry
+    speed), so FT-09's catch band was unreachable. 3.5 is the smallest
+    round value that holds with margin (2.0 escapes; 3.0 missed the 3 s
+    |v| ≤ 0.35 band by 0.012 m/s). Spec text amended in this PR.
+  - VUK kicker ramp-binding eject stays the M7 saucer-style eject: v1
+    wire-up deferred with the ramp element's own edge cases; noted for
+    M9 scripting integration.
+- Mid-milestone: branch protection retry at M08 open: PUT still 404
+  (no admin); fallback continues per §3.2.
+- (Carried from M07 merge aftermath:) the M07 review-cycle history is
+  recorded under the M07 entry above; this entry adds nothing further.

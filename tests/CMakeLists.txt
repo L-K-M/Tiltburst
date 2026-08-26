@@ -12,6 +12,7 @@ add_executable(tb_tests
     platform/input_test.cpp
     sim/elements_test.cpp
     sim/lifecycle_test.cpp
+    sim/ramp_test.cpp
     table/table_test.cpp
     render/font_assets_test.cpp
     render/projection_test.cpp

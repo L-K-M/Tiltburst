@@ -58,6 +58,10 @@ private:
     int cell_y(float y) const { return int((y - origin_y_) / kGridCell); }
 
     std::vector<Cell> cells_;
+    // Global (element_id, sub_index) rank per collider index, baked at
+    // build so queries can emit the §3.7-sorted candidate buffer without
+    // touching the collider array.
+    std::vector<uint32_t> rank_;
     int grid_w_ = 0;
     int grid_h_ = 0;
     float origin_x_ = -0.05f;

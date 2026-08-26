@@ -81,6 +81,7 @@ TEST(det_golden, m2_bounce) {
     }
 
     std::ifstream in(golden);
+    ASSERT_TRUE(in.good()) << "cannot open golden file: " << golden;
     std::vector<uint64_t> want;
     std::string line;
     while (std::getline(in, line)) {
@@ -89,7 +90,7 @@ TEST(det_golden, m2_bounce) {
         }
         const unsigned long long tick = std::strtoul(line.c_str(), nullptr, 10);
         const unsigned long long hash =
-            std::strtoul(line.c_str() + line.find(' ') + 1, nullptr, 16);
+            std::strtoull(line.c_str() + line.find(' ') + 1, nullptr, 16);
         EXPECT_EQ(tick % 1000, 0ull);
         want.push_back(hash);
     }

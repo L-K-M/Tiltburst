@@ -74,27 +74,35 @@ bool ReplayWriter::finish(const char* out_path, uint64_t total_ticks) {
 }
 
 bool ReplayReader::open(const char* path, ReplayReader& out) {
+    out = ReplayReader{}; // never return a half-filled reader
     std::FILE* f = std::fopen(path, "rb");
     if (!f) {
         return false;
     }
     FileHeader h{};
-    if (std::fread(&h, sizeof(h), 1, f) != 1 || std::memcmp(h.magic, kMagic, sizeof(kMagic)) != 0) {
+    if (std::fread(&h, sizeof(h), 1, f) != 1 || std::memcmp(h.magic, kMagic, sizeof(kMagic)) != 0 ||
+        h.version != 1) {
         std::fclose(f);
         return false;
     }
     out.header_.version = h.version;
     out.header_.seed = h.seed;
     std::memcpy(out.header_.table, h.table, sizeof(out.header_.table));
+    out.header_.table[sizeof(out.header_.table) - 1] = '\0';
     out.header_.tick_count = h.tick_count;
     out.header_.nudge_level = h.nudge_level;
 
     FileRecord r;
     while (std::fread(&r, sizeof(r), 1, f) == 1) {
+        if (!out.edges_.empty() && r.tick < out.edges_.back().tick) {
+            std::fclose(f);
+            return false; // ticks must be non-decreasing (05 §13)
+        }
         out.edges_.push_back({r.tick, r.action, r.pressed, r.source});
     }
+    const bool bad = std::ferror(f) != 0 || std::fgetc(f) != EOF;
     std::fclose(f);
-    return true;
+    return !bad;
 }
 
 } // namespace tb::sim

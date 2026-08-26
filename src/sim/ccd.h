@@ -11,6 +11,9 @@
 // surface toward the ball center.
 namespace tb::sim {
 
+// Earliest sweep hit. Sweep functions fill toi and normal only;
+// collider_id stays at its sentinel and callers assign it when
+// picking the winning contact.
 struct SweepHit {
     float toi = 0.0f;
     Vec2 normal{};
@@ -37,10 +40,10 @@ bool sweep_circle_vs_arc(Vec2 p0,
                          float max_t,
                          SweepHit& out);
 
-// Moving circle vs moving circle (ball-ball, §8): relative motion with
-// combined radius. Normal points from circle 1 toward circle 2's center…
-// convention here: normal points toward body 1 (the caller passes its own
-// ordering consistently).
+// Moving circle vs moving circle (ball-ball, §8). Relative motion with
+// combined radius. Raw convention: the normal points from body 1's
+// center toward body 2's center at TOI; §8 resolution wants it toward
+// ball i, so the solver flips it at the call site.
 bool sweep_circle_vs_circle(
     Vec2 p0, Vec2 v0, float r0, Vec2 p1, Vec2 v1, float r1, float max_t, SweepHit& out);
 

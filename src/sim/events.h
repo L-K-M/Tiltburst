@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 
 // Sim events and the SPSC overwrite ring (05-engine-core.md §8).
@@ -32,6 +33,9 @@ template <typename T, uint32_t N>
 class EventRing {
     static_assert((N & (N - 1)) == 0, "N must be a power of two");
     static constexpr uint32_t kMargin = 64;
+    static_assert(N > kMargin,
+                  "N must exceed kMargin so resync arithmetic "
+                  "cannot underflow");
 
 public:
     void push(uint64_t tick, const T& ev) {

@@ -72,6 +72,8 @@ TEST(unit_broadphase, matches_brute_force) {
             EXPECT_TRUE(got_set.count(idx)) << "config " << config << " missed collider " << idx;
         }
         // Dedupe + sorted output contract.
+        EXPECT_TRUE(std::is_sorted(got.begin(), got.end()))
+            << "config " << config << " output not sorted";
         EXPECT_EQ(std::adjacent_find(got.begin(), got.end()), got.end())
             << "config " << config << " produced duplicates";
     }

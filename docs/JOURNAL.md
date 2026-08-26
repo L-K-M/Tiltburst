@@ -85,3 +85,7 @@ corrections are new entries. Format: 03-process.md §3.1.
     equality: cell-level broadphase is conservative by design.
   - Branch protection retry at M02 open: PUT still 404 (no admin);
     fallback continues per §3.2.
+- Golden regeneration (M02 review cycle): the tape loader's bit→action map
+  was fixed to shift bits 6–9 down one (05 §13.1), changing the m2_bounce
+  button stream; tests/golden/determinism/linux/m2_bounce.hashes
+  regenerated per §2.4.4.

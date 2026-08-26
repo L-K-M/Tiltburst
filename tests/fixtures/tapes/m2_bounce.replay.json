@@ -14,7 +14,7 @@
     [9180, 0],
     [14000, 64],      // nudge left
     [14200, 0],
-    [20000, 18],      // plunger + left flipper
+    [20000, 18],      // plunger + right flipper
     [26000, 16],
     [32000, 0],
     [40000, 128],     // nudge right

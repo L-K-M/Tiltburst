@@ -38,15 +38,16 @@ bool load_tape(const std::filesystem::path& path, Tape& out) {
 
     uint64_t last_tick = 0;
     for (const auto& entry : doc["inputs"]) {
-        if (!entry.is_array() || entry.size() != 2 || !entry[0].is_number() ||
-            !entry[1].is_number()) {
+        if (!entry.is_array() || entry.size() != 2 || !entry[0].is_number_unsigned() ||
+            !entry[1].is_number_unsigned()) {
             return false;
         }
         const uint64_t tick = entry[0].get<uint64_t>();
-        const uint32_t mask = entry[1].get<uint32_t>();
-        if (tick < last_tick) {
-            return false; // strictly increasing ticks
+        constexpr uint64_t kMaxTapeTick = 100000000; // sanity cap
+        if (tick < last_tick || tick >= kMaxTapeTick) {
+            return false; // strictly increasing, bounded length
         }
+        const uint32_t mask = entry[1].get<uint32_t>();
         last_tick = tick;
         out.buttons_by_tick.resize(size_t(tick) + 1,
                                    out.buttons_by_tick.empty() ? 0u : out.buttons_by_tick.back());

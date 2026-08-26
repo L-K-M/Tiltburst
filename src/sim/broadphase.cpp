@@ -43,8 +43,8 @@ bool order_less(const std::vector<Collider>& cs, uint32_t l, uint32_t r) {
 } // namespace
 
 void Broadphase::build(const std::vector<Collider>& colliders, float width, float height) {
-    grid_w_ = int((width - origin_x_) / kGridCell) + 1;
-    grid_h_ = int((height - origin_y_) / kGridCell) + 1;
+    grid_w_ = std::max(1, int((width - origin_x_) / kGridCell) + 1);
+    grid_h_ = std::max(1, int((height - origin_y_) / kGridCell) + 1);
     cells_.assign(size_t(grid_w_) * size_t(grid_h_), Cell{});
 
     const float pad = kBallRadius + kSkin;
@@ -63,11 +63,23 @@ void Broadphase::build(const std::vector<Collider>& colliders, float width, floa
             }
         }
     }
-
     for (Cell& cell : cells_) {
         std::sort(cell.colliders.begin(), cell.colliders.end(), [&](uint32_t l, uint32_t r) {
             return order_less(colliders, l, r);
         });
+    }
+
+    // Global (element_id, sub_index) ranking for query output ordering.
+    rank_.assign(colliders.size(), 0);
+    std::vector<uint32_t> order(colliders.size());
+    for (uint32_t i = 0; i < order.size(); ++i) {
+        order[i] = i;
+    }
+    std::sort(order.begin(), order.end(), [&](uint32_t l, uint32_t r) {
+        return order_less(colliders, l, r);
+    });
+    for (uint32_t pos = 0; pos < order.size(); ++pos) {
+        rank_[order[pos]] = pos;
     }
 }
 
@@ -89,8 +101,8 @@ void Broadphase::query(
     const int y0 = std::clamp(cell_y(min_y), 0, grid_h_ - 1);
     const int y1 = std::clamp(cell_y(max_y), 0, grid_h_ - 1);
 
-    // Merge sorted cell lists; dedupe via linear scan of the small output
-    // (candidate counts are tiny — ≤ 96 per the spec's buffer bound).
+    // Collect per-cell sorted lists, dedupe, then re-sort by the global
+    // (element_id, sub_index) ranking — §3.7's output contract.
     for (int y = y0; y <= y1; ++y) {
         for (int x = x0; x <= x1; ++x) {
             for (uint32_t idx : cells_[size_t(y) * size_t(grid_w_) + size_t(x)].colliders) {
@@ -100,6 +112,10 @@ void Broadphase::query(
             }
         }
     }
+
+    const auto& rank = rank_;
+    std::sort(
+        out.begin(), out.end(), [&rank](uint32_t l, uint32_t r) { return rank[l] < rank[r]; });
 }
 
 } // namespace tb::sim

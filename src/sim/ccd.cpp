@@ -1,5 +1,6 @@
 #include "sim/ccd.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace tb::sim {
@@ -44,17 +45,24 @@ bool sweep_circle_vs_segment(Vec2 p0, Vec2 v, float r, Vec2 a, Vec2 b, float max
                 const Vec2 q = p0 + v * t_hit;
                 const float u = dot(q - a, dhat);
                 if (u >= 0.0f && u <= len) {
-                    best.toi = t_hit;
+                    best.toi = std::fmax(t_hit, 0.0f);
                     best.normal = n * sigma;
                     found = true;
                 }
             }
         }
     } else if (vn * sigma < 0.0f) {
-        // Inside the slab and approaching: immediate contact.
-        best.toi = 0.0f;
-        best.normal = n * sigma;
-        found = true;
+        // Inside the slab and approaching: immediate contact, but only if
+        // the circle actually overlaps the segment span right now (the
+        // caps own everything past the ends).
+        const Vec2 q0 = p0 - a;
+        const float u0 = std::clamp(dot(q0, dhat), 0.0f, len);
+        const Vec2 closest = a + dhat * u0;
+        if (length_sq(p0 - closest) <= r * r) {
+            best.toi = 0.0f;
+            best.normal = n * sigma;
+            found = true;
+        }
     }
 
     // Endpoint caps (§3.2 fall-through): swept point tests on A and B.
@@ -112,10 +120,11 @@ bool sweep_circle_vs_point(
     if (disc < 0.0) {
         return false;
     }
-    const double t_hit = (-b - std::sqrt(disc)) / (2.0 * a);
-    if (t_hit < 0.0 - double(kToiEps) || t_hit > double(max_t)) {
+    const double t_hit_raw = (-b - std::sqrt(disc)) / (2.0 * a);
+    if (t_hit_raw < 0.0 - double(kToiEps) || t_hit_raw > double(max_t)) {
         return false;
     }
+    const double t_hit = std::fmax(t_hit_raw, 0.0);
 
     const double qx = double(p0.x) + vx * t_hit - double(c.x);
     const double qy = double(p0.y) + vy * t_hit - double(c.y);
@@ -168,9 +177,11 @@ bool sweep_circle_vs_arc(Vec2 p0,
         }
         disc = std::sqrt(disc);
 
-        if (!(b < 0.0f)) {
-            continue; // not approaching
+        if (!s.inner && !(b < 0.0f)) {
+            continue; // outer surface must be closing
         }
+        // Inner hits take the positive root unconditionally: a ball moving
+        // outward from deep inside crosses rho_in with b > 0.
 
         float t_hit;
         if (s.inner) {
@@ -181,6 +192,7 @@ bool sweep_circle_vs_arc(Vec2 p0,
         if (t_hit < 0.0f - kToiEps || t_hit > max_t) {
             continue;
         }
+        t_hit = std::fmax(t_hit, 0.0f);
 
         const Vec2 q = p0 + v * t_hit;
         const float phi = wrap_ccw(std::atan2((q - center).y, (q - center).x) - a0);

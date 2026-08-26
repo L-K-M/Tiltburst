@@ -243,3 +243,38 @@ corrections are new entries. Format: 03-process.md §3.1.
   slings and gates arrive via its prefabs).
 - Mid-milestone: branch protection retry at M06 open: PUT still 404
   (no admin); fallback continues per §3.2.
+
+## M07 — Standard elements II (2026-08-26)
+
+- Shipped: kickers (§6.9 capture zone scan with saucer speed gate, CAPTURED
+  dwell with the capture_ms auto-eject failsafe, eject vector, kicker_enter
+  pairing); drop target banks (§6.5 facing-side contact triggers via the
+  M6 contact log, collider disable on drop in BOTH find_earliest and
+  pushout, per-target 120 ms drop / 250 ms raise animations, edge-guarded
+  bank_complete, auto-reset timer, request_bank_reset for script control);
+  captive balls (§6.13 1-D slot dynamics with end bounces, swept
+  free-vs-captive contact with the admissible-motion impulse, strike
+  switch_hit with 100 ms debounce, far-end full-travel event with 0.3 m/s
+  arrival gate and 4 mm hysteresis); ball locks (§6.14 unconditional
+  capture, switch_hit + ball_lock pairing with count payload, 3000 ms
+  unclaimed auto-release failsafe, one-per-500 ms eject cadence); ball
+  save mechanism (drain inside the window re-serves on the plunger, one
+  save per window); ball accounting (ball_count/locked_balls on SimState,
+  active+trough+locked == ball_count property-tested). Loader + builder
+  for kicker/drop_target_bank/captive_ball/ball_lock. Tests:
+  Kicker.CaptureDwellEject, DropBank.CompletesAndResets,
+  CaptiveBall.StaysInLane, CaptiveBall.FullTravelEmitsOnceAfterSwitchHit,
+  Trough.CountsNeverGoNegative, BallSave.TimerServesWithinWindow,
+  MultiBall.ThreeActiveDeterministic — 75/75 green; table perf gate holds
+  (0.97 / 1.73 µs mean).
+- Deviations:
+  - Kicker VUK style parses and stores but ejects like saucer/scoop in
+    v1: ramp binding arrives at M8 with the ramp element itself.
+  - Ball-lock claim plumbing (handler-consumed ball_lock events) arrives
+    with Lua at M9; until then the 3000 ms unclaimed failsafe governs
+    every capture, which is the conservative branch.
+  - Drop-bank reset deferral (never raise into a ball) is checked at the
+    animation level; the swept-overlap pre-check joins with tb_validate
+    geometry at M15.
+- Mid-milestone: branch protection retry at M07 open: PUT still 404
+  (no admin); fallback continues per §3.2.

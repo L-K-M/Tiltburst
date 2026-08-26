@@ -19,6 +19,28 @@ static_assert(kTickDt > 0.0009f && kTickDt < 0.0011f,
 static_assert(kSpinnerDecayPerTick > 0.999402f && kSpinnerDecayPerTick < 0.999403f,
               "kSpinnerDecayPerTick must stay exp(ln(0.55) * 0.001)");
 
+void emit_bank_event(SimState& s, SimEventType type, uint16_t element);
+void emit_lock_event(SimState& s, const BallLockElem& lock);
+void request_bank_reset(SimState& s, DropBankElem& bank);
+void emit_element_event(
+    SimState& s, SimEventType type, uint16_t element, const Ball& ball, float payload);
+
+// Drop-bank faces stop colliding the tick their target leaves UP (§6.5).
+bool collider_enabled(const SimState& s, uint32_t collider_idx) {
+    for (const DropBankElem& bank : s.drop_banks) {
+        for (const DropBankElem::Target& t : bank.targets) {
+            if (t.collider_idx == collider_idx && t.state != DropTargetState::Up) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+Vec2 captive_pos(const CaptiveBallElem& cap) {
+    return cap.a + cap.axis * cap.s_c;
+}
+
 float point_segment_distance(Vec2 p, Vec2 a, Vec2 b) {
     const Vec2 ab = b - a;
     const float t = std::clamp(dot(p - a, ab) / std::max(length_sq(ab), 1e-12f), 0.0f, 1.0f);
@@ -182,6 +204,39 @@ void emit_element_event(
     s.game_ring.push(s.tick, ev);
 }
 
+void emit_bank_event(SimState& s, SimEventType type, uint16_t element) {
+    absorb(s, s.tick, type, element);
+    SimEvent ev;
+    ev.tick = s.tick;
+    ev.type = uint16_t(type);
+    ev.element = element;
+    s.render_ring.push(s.tick, ev);
+    s.game_ring.push(s.tick, ev);
+}
+
+void emit_lock_event(SimState& s, const BallLockElem& lock) {
+    absorb(s, s.tick, SimEventType::BallLockCapture, lock.common.table_id);
+    SimEvent ev;
+    ev.tick = s.tick;
+    ev.type = uint16_t(SimEventType::BallLockCapture);
+    ev.element = lock.common.table_id;
+    ev.a = float(lock.held); // payload {lock_id, count}: count = held
+    s.render_ring.push(s.tick, ev);
+    s.game_ring.push(s.tick, ev);
+}
+
+void request_bank_reset(SimState& s, DropBankElem& bank) {
+    (void)s;
+    for (DropBankElem::Target& t : bank.targets) {
+        if (t.state != DropTargetState::Down) {
+            continue;
+        }
+        t.state = DropTargetState::Raising;
+        t.anim_ticks = 250;
+    }
+    bank.last_not_complete = true; // the bank can complete again
+}
+
 } // namespace
 
 float Solver::resolve_surface(SimState& s,
@@ -291,7 +346,14 @@ Solver::Contact Solver::find_earliest(SimState& s, float t_cur) {
         if (!better) {
             return;
         }
-        best = Contact{toi, Contact::Static, ball_idx, ball_idx, normal, col};
+        best.kind = Contact::Static;
+        best.toi = toi;
+        best.ball = ball_idx;
+        best.ball2 = ball_idx;
+        best.captive_idx = 0;
+        best.normal = normal;
+        best.collider = col;
+        best.flipper = nullptr;
     };
 
     for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
@@ -306,6 +368,9 @@ Solver::Contact Solver::find_earliest(SimState& s, float t_cur) {
 
         for (uint32_t ci : candidates_) {
             const Collider& c = s.colliders[ci];
+            if (!collider_enabled(s, ci)) {
+                continue; // dropped target (§6.5)
+            }
             SweepHit hit;
             bool hit_now = false;
 
@@ -467,6 +532,33 @@ Solver::Contact Solver::find_earliest(SimState& s, float t_cur) {
             }
         }
 
+        // Captive balls (§6.13): swept vs the captive's current position;
+        // resolved with the admissible-motion impulse.
+        for (uint8_t cap_i = 0; cap_i < s.captives.size(); ++cap_i) {
+            CaptiveBallElem& cap = s.captives[cap_i];
+            if (ball.layer != cap.common.layer) {
+                continue;
+            }
+            const Vec2 cpos = captive_pos(cap);
+            SweepHit hit;
+            if (sweep_circle_vs_point(
+                    ball.pos, ball.vel, kBallRadius, cpos, kBallRadius, window, hit)) {
+                const float toi = t_cur + hit.toi;
+                const bool better = best.kind == Contact::None || toi < best.toi - kToiEps;
+                if (better) {
+                    best.toi = toi;
+                    best.kind = Contact::Captive;
+                    best.ball = bi;
+                    best.ball2 = bi;
+                    best.captive_idx = cap_i;
+                    best.normal = hit.normal;
+                    best.collider = nullptr;
+                    best.flipper = nullptr;
+                }
+                (void)0;
+            }
+        }
+
         // Ball-ball pairs (§8): fixed i<j order, same layer only.
         for (uint8_t bj = uint8_t(bi + 1); bj < kMaxBalls; ++bj) {
             Ball& other = s.balls[bj];
@@ -494,7 +586,14 @@ Solver::Contact Solver::find_earliest(SimState& s, float t_cur) {
                 }
                 if (better) {
                     // Normal points toward pair-member "a" (= ball bi).
-                    best = Contact{toi, Contact::Pair, bi, bj, hit.normal * -1.0f, nullptr};
+                    best.kind = Contact::Pair;
+                    best.toi = toi;
+                    best.ball = bi;
+                    best.ball2 = bj;
+                    best.captive_idx = 0;
+                    best.normal = hit.normal * -1.0f;
+                    best.collider = nullptr;
+                    best.flipper = nullptr;
                 }
             }
         }
@@ -628,6 +727,9 @@ void Solver::step_body(SimState& s, const TickInput* input) {
             s.game_ring.push(s.tick, ev);
 
             resolved_[best.ball]++;
+        } else if (best.kind == Contact::Captive) {
+            resolve_captive(s, s.balls[best.ball], s.captives[best.captive_idx], best.normal);
+            resolved_[best.ball]++;
         } else {
             resolve_pair(s, s.balls[best.ball], s.balls[best.ball2], best.normal);
             resolved_[best.ball]++;
@@ -646,6 +748,7 @@ void Solver::step_body(SimState& s, const TickInput* input) {
     // trough serve, reactive elements. Positions are final for this tick.
     step_regions(s, input);
     step_elements(s);
+    step_lifecycle(s, input);
 
     // Step 7c — last_safe_pos for balls that ended penetration-free.
     for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
@@ -725,6 +828,45 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
         }
     }
 
+    // ---- Kickers (08 §6.9): capture zone scan. ----
+    for (KickerElem& k : s.kickers) {
+        if (k.held_ball != 0xFF) {
+            continue; // one ball per kicker in v1 (§4.12 style)
+        }
+        for (Ball& b : s.balls) {
+            if (!b.live || b.mode != BallMode::Free || b.layer != k.common.layer) {
+                continue;
+            }
+            if (length(b.pos - k.pos) >= k.radius) {
+                continue;
+            }
+            if (k.style == KickerStyle::Saucer && length(b.vel) >= 3.0f) {
+                continue; // fast balls fly over a saucer (§6.9)
+            }
+            b.mode = BallMode::Captured;
+            b.holder_elem = k.common.table_id;
+            b.hold_ticks = k.capture_ticks;
+            b.pos = k.pos;
+            b.vel = {0.0f, 0.0f};
+            b.omega_z = 0.0f;
+            k.held_ball = b.index;
+            k.has_hold = true;
+            k.hold_ticks = k.capture_ticks;
+            emit_element_event(s, SimEventType::SwitchHit, k.common.table_id, b, length(b.vel));
+            absorb(s, s.tick, SimEventType::KickerEnter, k.common.table_id);
+            SimEvent ev;
+            ev.tick = s.tick;
+            ev.type = uint16_t(SimEventType::KickerEnter);
+            ev.element = k.common.table_id;
+            ev.x = b.pos.x;
+            ev.y = b.pos.y;
+            ev.data = b.index;
+            s.render_ring.push(s.tick, ev);
+            s.game_ring.push(s.tick, ev);
+            break;
+        }
+    }
+
     // ---- Outholes (08 §6.15): capsule radius 0.02 around a→b. ----
     for (const OutholeRegion& hole : s.outholes) {
         for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
@@ -740,8 +882,18 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
             if (length(b.pos - closest) >= kOutholeRadius) {
                 continue;
             }
-            b.live = false; // drained: slot freed, trough count grows
-            ++s.trough_balls;
+            // Ball save (M7): a drain inside the window re-serves
+            // instead of consuming the ball.
+            if (s.ball_save.active) {
+                s.ball_save.active = false; // one save per window
+                b.pos = s.plunger.pos + s.plunger.lane_dir * (kBallRadius + 0.002f);
+                b.vel = {0.0f, 0.0f};
+                b.omega_z = 0.0f;
+                b.last_safe_pos = b.pos;
+            } else {
+                b.live = false; // drained: slot freed, trough count grows
+                ++s.trough_balls;
+            }
 
             absorb(s, s.tick, SimEventType::Drain, 0xFFFE);
             SimEvent ev;
@@ -924,6 +1076,60 @@ void Solver::step_elements(SimState& s) {
         }
     }
 
+    // --- Drop banks (§6.5): facing-side contact >= 0.3 m/s while UP.
+    for (DropBankElem& bank : s.drop_banks) {
+        for (size_t ci = 0; ci < contact_log_n_; ++ci) {
+            const LoggedContact& c = contact_log_[ci];
+            if (c.element != bank.common.table_id || c.approach < 0.3f) {
+                continue;
+            }
+            Ball* ball = nullptr;
+            for (Ball& b : s.balls) {
+                if (b.live && b.index == c.ball) {
+                    ball = &b;
+                    break;
+                }
+            }
+            if (ball == nullptr) {
+                continue;
+            }
+            // Which UP target did this contact hit? The nearest face.
+            size_t hit_idx = SIZE_MAX;
+            float best_d = 1e9f;
+            for (size_t ti = 0; ti < bank.targets.size(); ++ti) {
+                const DropBankElem::Target& t = bank.targets[ti];
+                if (t.state != DropTargetState::Up) {
+                    continue;
+                }
+                const float d = point_segment_distance(ball->pos, t.face_a, t.face_b);
+                if (d < best_d) {
+                    const Vec2 rel = ball->pos - (t.face_a + t.face_b) * 0.5f;
+                    if (dot(rel, t.face_normal) < 0.0f) {
+                        continue; // back side never triggers
+                    }
+                    best_d = d;
+                    hit_idx = ti;
+                }
+            }
+            if (hit_idx == SIZE_MAX || best_d > kBallRadius + 0.004f) {
+                continue;
+            }
+            DropBankElem::Target& t = bank.targets[hit_idx];
+            t.state = DropTargetState::Dropping;
+            t.anim_ticks = 120;
+            emit_element_event(s, SimEventType::SwitchHit, bank.common.table_id, *ball, c.approach);
+            absorb(s, s.tick, SimEventType::TargetDown, bank.common.table_id);
+            SimEvent ev;
+            ev.tick = s.tick;
+            ev.type = uint16_t(SimEventType::TargetDown);
+            ev.element = bank.common.table_id;
+            ev.b = float(hit_idx + 1); // 1-based target_index (§6.5)
+            ev.data = ball->index;
+            s.render_ring.push(s.tick, ev);
+            s.game_ring.push(s.tick, ev);
+        }
+    }
+
     // --- Rollovers (§6.8): capsule enter with hysteresis; no collider.
     for (RolloverElem& ro : s.rollovers) {
         for (Ball& b : s.balls) {
@@ -1032,6 +1238,253 @@ void Solver::step_elements(SimState& s) {
     }
 }
 
+void Solver::step_lifecycle(SimState& s, const TickInput* input) {
+    (void)input;
+
+    // --- Kicker dwell/eject (§6.9). ---
+    for (KickerElem& k : s.kickers) {
+        if (k.held_ball == 0xFF || !k.has_hold) {
+            continue;
+        }
+        if (k.hold_ticks > 0) {
+            --k.hold_ticks; // the capture_ms auto-eject failsafe
+        }
+        if (k.hold_ticks == 0) {
+            Ball* ball = nullptr;
+            for (Ball& b : s.balls) {
+                if (b.live && b.index == k.held_ball) {
+                    ball = &b;
+                    break;
+                }
+            }
+            if (ball == nullptr) {
+                k.held_ball = 0xFF;
+                k.has_hold = false;
+                continue;
+            }
+            const float phi = k.eject_angle_deg * float(3.14159265358979 / 180.0);
+            ball->pos = k.pos;
+            ball->vel = {k.eject_speed * float(std::cos(phi)),
+                         k.eject_speed * float(std::sin(phi))};
+            ball->omega_z = 0.0f;
+            ball->mode = BallMode::Free;
+            ball->last_safe_pos = ball->pos;
+            k.held_ball = 0xFF;
+            k.has_hold = false;
+            pushout(s); // immediately after eject (§6.9)
+        }
+    }
+
+    // --- Drop banks (§6.5): drop/raise animations + bank complete +
+    // auto reset. ---
+    for (DropBankElem& bank : s.drop_banks) {
+        for (DropBankElem::Target& t : bank.targets) {
+            switch (t.state) {
+            case DropTargetState::Up:
+            case DropTargetState::Down:
+                break;
+            case DropTargetState::Dropping:
+                if (t.anim_ticks > 0) {
+                    --t.anim_ticks;
+                }
+                if (t.anim_ticks == 0) {
+                    t.state = DropTargetState::Down;
+                }
+                break;
+            case DropTargetState::Raising:
+                if (t.anim_ticks > 0) {
+                    --t.anim_ticks;
+                }
+                if (t.anim_ticks == 0) {
+                    t.state = DropTargetState::Up;
+                }
+                break;
+            }
+        }
+        // Bank completes when the last target settles DOWN (no target is
+        // Up/Dropping/Raising) — checked once per tick, not per transition.
+        if (bank.last_not_complete) {
+            bool all_down = !bank.targets.empty();
+            for (const DropBankElem::Target& t : bank.targets) {
+                if (t.state != DropTargetState::Down) {
+                    all_down = false;
+                    break;
+                }
+            }
+            if (all_down) {
+                emit_bank_event(s, SimEventType::BankComplete, bank.common.table_id);
+                bank.last_not_complete = false;
+                if (bank.auto_reset) {
+                    bank.reset_timer = bank.auto_reset_ticks;
+                }
+            }
+        }
+        if (bank.auto_reset && bank.reset_timer > 0) {
+            --bank.reset_timer;
+            if (bank.reset_timer == 0) {
+                request_bank_reset(s, bank);
+            }
+        }
+    }
+
+    // --- Captive balls (§6.13): 1-D motion + end bounces + full travel. ---
+    const float slope_rad = s.slope_deg * float(3.14159265358979 / 180.0);
+    const float g_slope = kGravity * std::sin(slope_rad);
+    const float rr = s.mu_rr * kGravity * std::cos(slope_rad);
+    for (CaptiveBallElem& cap : s.captives) {
+        // Gravity along the slot + rolling resistance.
+        const float g_along = -g_slope * cap.axis.y;
+        cap.s_dot += g_along * kTickDt;
+        if (std::abs(cap.s_dot) > 0.0f) {
+            const float drop = rr * kTickDt;
+            if (drop >= std::abs(cap.s_dot)) {
+                cap.s_dot = 0.0f;
+            } else {
+                cap.s_dot -= std::copysign(drop, cap.s_dot);
+            }
+        }
+        cap.s_c += cap.s_dot * kTickDt;
+
+        const float s_max = cap.slot_len - kBallRadius;
+        if (cap.s_c >= s_max && cap.s_dot > 0.0f) {
+            if (cap.s_dot >= 0.3f && cap.far_armed) {
+                cap.far_armed = false; // hysteresis: re-arm 4 mm back
+                for (Ball& b : s.balls) {
+                    if (b.live) {
+                        emit_element_event(s,
+                                           SimEventType::CaptiveFullTravel,
+                                           cap.common.table_id,
+                                           b,
+                                           std::abs(cap.s_dot));
+                        break;
+                    }
+                }
+            }
+            cap.s_c = s_max;
+            cap.s_dot = -0.4f * cap.s_dot; // far end bounce
+        }
+        const float s_min = kBallRadius;
+        if (cap.s_c <= s_min && cap.s_dot < 0.0f) {
+            cap.s_c = s_min;
+            cap.s_dot = -0.4f * cap.s_dot; // near end bounce
+        }
+        if (!cap.far_armed && cap.s_c <= s_max - 0.004f) {
+            cap.far_armed = true;
+        }
+    }
+
+    // --- Ball locks (§6.14): capture region + failsafe + 500 ms eject. ---
+    for (BallLockElem& lock : s.ball_locks) {
+        if (lock.held < lock.capacity) {
+            for (Ball& b : s.balls) {
+                if (!b.live || b.mode != BallMode::Free || b.layer != lock.common.layer) {
+                    continue;
+                }
+                if (length(b.pos - lock.pos) >= 0.02f) {
+                    continue;
+                }
+                // Capture is unconditional (§6.14).
+                b.mode = BallMode::Captured;
+                b.holder_elem = lock.common.table_id;
+                b.hold_ticks = lock.claim_ticks;
+                ++lock.held;
+                ++s.locked_balls;
+                emit_element_event(
+                    s, SimEventType::SwitchHit, lock.common.table_id, b, length(b.vel));
+                emit_lock_event(s, lock);
+                break;
+            }
+        }
+
+        // Unclaimed auto-release (§6.14): runs when the event was not
+        // claimed by any handler; claim plumbing arrives with Lua (M9),
+        // so until then locks never claim — the failsafe always applies.
+        if (lock.claim_ticks > 0 && lock.held > 0 && lock.release_pending == 0) {
+            // Oldest held ball's countdown lives on the CAPTURED ball.
+            for (Ball& b : s.balls) {
+                if (b.live && b.mode == BallMode::Captured &&
+                    b.holder_elem == lock.common.table_id && b.hold_ticks > 0) {
+                    --b.hold_ticks;
+                    if (b.hold_ticks == 0) {
+                        lock.release_pending = 1; // failsafe releases one
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (lock.release_pending > 0) {
+            if (lock.release_timer > 0) {
+                --lock.release_timer;
+            }
+            if (lock.release_timer == 0) {
+                // Eject exactly one ball (oldest first = lowest index).
+                for (Ball& b : s.balls) {
+                    if (b.live && b.mode == BallMode::Captured &&
+                        b.holder_elem == lock.common.table_id) {
+                        const float phi = lock.eject_angle_deg * float(3.14159265358979 / 180.0);
+                        b.mode = BallMode::Free;
+                        b.pos = lock.pos;
+                        b.vel = {lock.eject_speed * float(std::cos(phi)),
+                                 lock.eject_speed * float(std::sin(phi))};
+                        b.omega_z = 0.0f;
+                        b.last_safe_pos = b.pos;
+                        --lock.held;
+                        --s.locked_balls;
+                        --lock.release_pending;
+                        lock.release_timer = 500; // one per 500 ms (§6.14)
+                        break;
+                    }
+                }
+                if (lock.release_pending == 0) {
+                    lock.release_timer = 0;
+                }
+            }
+        }
+    }
+
+    // --- Ball save countdown. ---
+    if (s.ball_save.active && s.ball_save.ticks_left > 0) {
+        --s.ball_save.ticks_left;
+        if (s.ball_save.ticks_left == 0) {
+            s.ball_save.active = false;
+        }
+    }
+}
+
+void Solver::resolve_captive(SimState& s, Ball& ball, CaptiveBallElem& cap, Vec2 n) {
+    // §6.13: the captive moves only along â. n̂ points captive → free ball
+    // here (flip from the sweep convention, surface → ball center).
+    const Vec2 n_hat = n; // sweep normal points from captive surface toward ball
+    const Vec2 v_rel = ball.vel - cap.axis * cap.s_dot;
+    const float u_n = dot(v_rel, n_hat);
+    if (u_n >= 0.0f) {
+        return; // separating
+    }
+    const float ca = dot(n_hat, cap.axis);
+    if (std::abs(ca) < 1e-6f) {
+        // Kinetic wall: resolve the free ball off an immovable captive.
+        const float e = 0.9f;
+        ball.vel -= n_hat * ((1.0f + e) * u_n);
+        ball.vel = clamp_speed(ball.vel);
+    } else {
+        const float e = 0.9f;
+        const float denom = 1.0f / kBallMass + (ca * ca) / kBallMass;
+        const float j = -(1.0f + e) * u_n / denom;
+        ball.vel += n_hat * (j / kBallMass);
+        // Newton's third law on the captive: reaction −j·n̂, projected on
+        // the slot axis â (n̂ points captive → ball in this convention).
+        cap.s_dot -= (j * ca / kBallMass);
+        ball.vel = clamp_speed(ball.vel);
+    }
+
+    // The strike's switch_hit (100 ms debounce per element, §6.13).
+    if (cap.common.cooldown_left == 0) {
+        cap.common.cooldown_left = cap.common.cooldown_ticks;
+        emit_element_event(s, SimEventType::SwitchHit, cap.common.table_id, ball, length(ball.vel));
+    }
+}
+
 void Solver::pushout(SimState& s) {
     // §3.8 fallback depenetration: deepest-overlap position correction,
     // never touching velocity or spin.
@@ -1046,6 +1499,9 @@ void Solver::pushout(SimState& s) {
             Vec2 push_n{};
             for (uint32_t ci : candidates_) {
                 const Collider& c = s.colliders[ci];
+                if (!collider_enabled(s, ci)) {
+                    continue; // dropped target (§6.5) — no depenetration
+                }
                 Vec2 n{};
                 float sep = 0.0f;
                 switch (c.kind) {

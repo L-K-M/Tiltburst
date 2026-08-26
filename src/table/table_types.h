@@ -105,6 +105,48 @@ struct GateDef {
     bool state_closed = false;
 };
 
+struct KickerDef {
+    std::string id;
+    int layer = 0;
+    float pos[2]{};
+    float radius = 0.014f;
+    std::string style = "saucer"; // saucer | scoop | vuk
+    float capture_ms = 800.0f;
+    float eject_speed = 3.0f;
+    float eject_angle_deg = 90.0f;
+};
+
+struct DropTargetBankDef {
+    std::string id;
+    int layer = 0;
+
+    struct TargetDef {
+        float pos[2]{};
+        float width = 0.025f;
+        float facing_deg = 0.0f;
+    };
+
+    std::vector<TargetDef> targets;
+    bool auto_reset = false;
+    float auto_reset_ms = 1500.0f;
+};
+
+struct CaptiveBallDef {
+    std::string id;
+    int layer = 0;
+    float a[2]{};
+    float b[2]{};
+};
+
+struct BallLockDef {
+    std::string id;
+    int layer = 0;
+    float pos[2]{};
+    int capacity = 2;
+    float eject_speed = 2.5f;
+    float eject_angle_deg = -90.0f;
+};
+
 struct SpinnerDef {
     std::string id;
     int layer = 0;
@@ -160,6 +202,10 @@ struct Element {
                  GateDef,
                  RolloverDef,
                  SpinnerDef,
+                 KickerDef,
+                 DropTargetBankDef,
+                 CaptiveBallDef,
+                 BallLockDef,
                  SlingshotDef,
                  PopBumperDef,
                  StandupTargetDef>

@@ -11,6 +11,7 @@ add_executable(tb_tests
     sim/det_replay_flipper_test.cpp
     platform/input_test.cpp
     sim/elements_test.cpp
+    sim/lifecycle_test.cpp
     table/table_test.cpp
     render/font_assets_test.cpp
     render/projection_test.cpp

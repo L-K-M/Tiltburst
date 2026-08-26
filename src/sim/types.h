@@ -99,4 +99,11 @@ struct LightState {
 constexpr uint16_t kInvalidElement = 0xFFFF;
 constexpr float kOutholeRadius = 0.02f; // 08 §6.15 capsule radius
 
+// Ball-save mechanism (M7; policy scripted at M9): when active, a drain
+// inside the window re-serves instead of scoring a lost ball.
+struct BallSaveState {
+    bool active = false;
+    uint32_t ticks_left = 0;
+};
+
 } // namespace tb::sim

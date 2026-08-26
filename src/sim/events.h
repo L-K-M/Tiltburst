@@ -20,7 +20,7 @@ enum class SimEventType : uint16_t {
     KickerEnter = 8,        // kicker captured a ball (08 §6.9)
     TargetDown = 9,         // drop target dropped (08 §6.5)
     BankComplete = 10,      // last target of a bank down (08 §6.5)
-    BallLockCapture = 11, // lock captured a ball (08 §6.14)
+    BallLockCapture = 11,   // lock captured a ball (08 §6.14)
     CaptiveFullTravel = 12, // captive hit the far end (08 §6.13)
     None = 0xFFFF,
 };

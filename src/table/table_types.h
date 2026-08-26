@@ -105,6 +105,29 @@ struct GateDef {
     bool state_closed = false;
 };
 
+struct HeightKey {
+    float s = 0.0f; // normalized arc length 0..1
+    float z = 0.0f; // meters above layer 0
+};
+
+struct RampDef {
+    std::string id;
+    int layer = 0;
+    std::vector<PathNode> path;
+    float width = 0.044f;
+    std::vector<HeightKey> height_profile;
+    bool drop_exit = false;
+};
+
+struct MagnetDef {
+    std::string id;
+    int layer = 0;
+    float pos[2]{};
+    float radius = 0.09f;
+    float strength = 1.2f;
+    bool default_on = false;
+};
+
 struct KickerDef {
     std::string id;
     int layer = 0;
@@ -202,6 +225,8 @@ struct Element {
                  GateDef,
                  RolloverDef,
                  SpinnerDef,
+                 RampDef,
+                 MagnetDef,
                  KickerDef,
                  DropTargetBankDef,
                  CaptiveBallDef,

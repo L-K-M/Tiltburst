@@ -1,5 +1,7 @@
 #include "sim/solver.h"
 
+#include "sim/ramp.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -559,6 +561,8 @@ Solver::Contact Solver::find_earliest(SimState& s, float t_cur) {
             }
         }
 
+        // RAMP balls were projected above; the 2-D loop skips them.
+
         // Ball-ball pairs (§8): fixed i<j order, same layer only.
         for (uint8_t bj = uint8_t(bi + 1); bj < kMaxBalls; ++bj) {
             Ball& other = s.balls[bj];
@@ -627,11 +631,59 @@ void Solver::step_body(SimState& s, const TickInput* input) {
 
     for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
         Ball& ball = s.balls[bi];
-        if (!ball.live || ball.mode != BallMode::Free) {
+        if (!ball.live) {
+            continue;
+        }
+
+        if (ball.mode == BallMode::Ramp) {
+            // §6.10.4 1-D dynamics (step 3); position integrates in
+            // step 4/5 below via the ramp projection.
+            const RampPath* ramp = nullptr;
+            for (const RampPath& r : s.ramps) {
+                if (r.element_id == ball.ramp_elem) {
+                    ramp = &r;
+                    break;
+                }
+            }
+            if (ramp != nullptr) {
+                // §6.10.4 dynamics. The 2-D arc length is used as-is (the
+                // sqrt(1+(dz/ds)²) correction is deliberately ignored).
+                const Vec2 t_hat = ramp->tangent_at(ball.s);
+                const float s_hi = std::min(ball.s + 0.001f, ramp->total_s);
+                const float s_lo = std::max(ball.s - 0.001f, 0.0f);
+                const float dz_ds =
+                    (ramp->z_at(s_hi) - ramp->z_at(s_lo)) / std::max(s_hi - s_lo, 1e-6f);
+                const float a_gravity = -kGravity * std::sin(slope_rad) * t_hat.y -
+                                        kGravity * std::cos(slope_rad) * dz_ds;
+                const float damping = -0.10f * ball.s_dot;
+                const float fr = 0.015f * kGravity; // rolling resistance
+                ball.s_dot += (a_gravity + damping) * kTickDt;
+                // Friction never reverses the sign within the tick: use the
+                // post-gravity sign so a within-tick reversal isn't helped.
+                const float fr_dv = fr * kTickDt;
+                if (std::abs(ball.s_dot) <= fr_dv) {
+                    ball.s_dot = 0.0f;
+                } else {
+                    ball.s_dot -= std::copysign(fr_dv, ball.s_dot);
+                }
+                ball.s_dot = std::clamp(ball.s_dot, -kMaxSpeed, kMaxSpeed);
+                ball.omega_z *= std::exp(-kSpinDamp * kTickDt);
+            }
+            continue;
+        }
+        if (ball.mode != BallMode::Free) {
             continue;
         }
 
         Vec2 acc{0.0f, -g_slope}; // slope gravity
+
+        // Magnet forces (§6.12), step 3 item 2.
+        for (const MagnetSim& mag : s.magnets) {
+            if (mag.layer == ball.layer) {
+                acc += mag.accel(ball);
+                mag.damp(ball);
+            }
+        }
 
         const float speed = length(ball.vel);
         if (speed > 0.0f) {
@@ -649,6 +701,132 @@ void Solver::step_body(SimState& s, const TickInput* input) {
         ball.vel = clamp_speed(ball.vel);
         ball.omega_z *= std::exp(-kSpinDamp * kTickDt);
         ball.omega_z = std::clamp(ball.omega_z, -kMaxSpin, kMaxSpin);
+    }
+
+    // Step 4/5 for RAMP balls: integrate s, project position, resolve
+    // exits and fall-back (§6.10.6). RAMP balls never enter the 2-D CCD.
+    for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
+        Ball& ball = s.balls[bi];
+        if (!ball.live || ball.mode != BallMode::Ramp) {
+            continue;
+        }
+        RampPath* ramp = nullptr;
+        for (RampPath& r : s.ramps) {
+            if (r.element_id == ball.ramp_elem) {
+                ramp = &r;
+                break;
+            }
+        }
+        if (ramp == nullptr) {
+            ball.mode = BallMode::Free; // orphaned bind: recover
+            continue;
+        }
+        ball.s += ball.s_dot * kTickDt;
+
+        // Fall-back-off (§6.10.6): only for a stalled ball (s_dot crossed
+        // or hit zero) within 0.05 m of the end it is still essentially at
+        // the height of. A climbing ball near the entry never qualifies.
+        const float z_here = ramp->z_at(std::clamp(ball.s, 0.0f, ramp->total_s));
+        const bool stalled = std::abs(ball.s_dot) <= 0.05f;
+        const bool near_zero =
+            ball.s < 0.05f && stalled && std::abs(z_here - ramp->end_z[0]) <= 0.006f;
+        const bool near_far = ball.s > ramp->total_s - 0.05f && stalled &&
+                              std::abs(z_here - ramp->end_z[1]) <= 0.006f;
+        if (near_zero || near_far) {
+            const int end = near_zero ? 0 : 1;
+            ball.mode = BallMode::Free;
+            ball.layer = ramp->seam_layer[end] == 0xFF ? 0 : ramp->seam_layer[end];
+            ball.pos = ramp->point_at(std::clamp(ball.s, 0.0f, ramp->total_s));
+            const Vec2 t_hat = ramp->tangent_at(ball.s);
+            ball.vel = t_hat * ball.s_dot;
+            continue;
+        }
+
+        if (ball.s > ramp->total_s) {
+            // Forward exit (§6.10.6).
+            const Vec2 t_exit = ramp->tangent_at(ramp->total_s);
+            ball.mode = BallMode::Free;
+            ball.pos = ramp->point_at(ramp->total_s);
+            ball.vel = t_exit * (ball.s_dot * 0.95f); // 5% exit loss
+            ball.layer =
+                ramp->drop_exit ? 0 : (ramp->seam_layer[1] == 0xFF ? 0 : ramp->seam_layer[1]);
+            emit_element_event(
+                s, SimEventType::SwitchHit, ramp->element_id, ball, std::abs(ball.s_dot));
+            absorb(s, s.tick, SimEventType::RampMade, ramp->element_id);
+            SimEvent ev;
+            ev.tick = s.tick;
+            ev.type = uint16_t(SimEventType::RampMade);
+            ev.element = ramp->element_id;
+            ev.x = ball.pos.x;
+            ev.y = ball.pos.y;
+            ev.data = ball.index;
+            s.render_ring.push(s.tick, ev);
+            s.game_ring.push(s.tick, ev);
+            continue;
+        }
+        if (ball.s < 0.0f) {
+            // Rolled back out the s = 0 end (§6.10.6).
+            const Vec2 t_entry = ramp->tangent_at(0.0f);
+            ball.mode = BallMode::Free;
+            ball.pos = ramp->point_at(0.0f);
+            ball.vel = t_entry * ball.s_dot; // s_dot < 0: exits backward
+            ball.layer = ramp->seam_layer[0] == 0xFF ? 0 : ramp->seam_layer[0];
+            continue;
+        }
+
+        // Constrained projection (step 5).
+        ball.pos = ramp->point_at(ball.s);
+    }
+
+    // Step 6a — seam binding for FREE balls (§6.10.2), before triggers.
+    for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
+        Ball& ball = s.balls[bi];
+        if (!ball.live || ball.mode != BallMode::Free) {
+            continue;
+        }
+        for (RampPath& ramp : s.ramps) {
+            for (int end = 0; end < 2; ++end) {
+                const uint8_t seam = ramp.seam_layer[end];
+                if (seam == 0xFF || seam != ball.layer) {
+                    continue;
+                }
+                // Crossing the seam segment (perpendicular, width long)?
+                const Vec2 rel = ball.pos - ramp.seam_center[end];
+                const Vec2 into = ramp.seam_into[end];
+                const float along_into = dot(rel, into);
+                const float lateral = std::abs(dot(rel, Vec2{-into.y, into.x}));
+                if (lateral > ramp.width * 0.5f + kBallRadius) {
+                    continue;
+                }
+                // Crossing: the pre-tick center was on the outside, the
+                // post-tick center is on the inside (strict sign change —
+                // a ball leaving must never rebind).
+                const Vec2 pre_rel = ball.pos - ball.vel * kTickDt - ramp.seam_center[end];
+                const float pre_along = dot(pre_rel, into);
+                if (!(pre_along <= 0.0f && along_into > 0.0f)) {
+                    continue;
+                }
+                const float v_along = dot(ball.vel, into);
+                if (v_along < 0.1f) {
+                    continue; // speed gate (§6.10.2)
+                }
+                const float cos_a = v_along / std::max(length(ball.vel), 1e-9f);
+                if (cos_a < std::cos(50.0f * float(3.14159265358979 / 180.0))) {
+                    continue; // alignment gate
+                }
+                ball.mode = BallMode::Ramp;
+                ball.ramp_elem = ramp.element_id;
+                ball.s = end == 0 ? 0.0f : ramp.total_s;
+                // §6.10.2 sign: s_dot > 0 toward the far end from s=0;
+                // entering at S rides with negative s_dot.
+                ball.s_dot = (end == 0 ? v_along : -v_along) * 0.95f;
+                ball.pos = ramp.seam_center[end];
+                break;
+            }
+            if (ball.mode == BallMode::Ramp) {
+                break;
+            }
+        }
     }
 
     // Step 4 pre-pass — fallback push-out (§3.8), position-only.

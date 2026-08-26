@@ -9,6 +9,7 @@
 #include "sim/flipper.h"
 #include "sim/flipper_ccd.h"
 #include "sim/math.h"
+#include "sim/ramp.h"
 #include "sim/types.h"
 
 #include <vector>
@@ -63,6 +64,8 @@ struct SimState {
     std::vector<DropBankElem> drop_banks;
     std::vector<CaptiveBallElem> captives;
     std::vector<BallLockElem> ball_locks;
+    std::vector<RampPath> ramps;
+    std::vector<MagnetSim> magnets;
 
     // Ball accounting: active (FREE) + trough + locked == ball_count.
     int ball_count = 4;

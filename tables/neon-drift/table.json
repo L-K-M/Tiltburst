@@ -34,6 +34,28 @@
       ]
     },
 
+    // Drift corner magnet on the left orbit lane center (15 §1.3).
+    { "id": "drift_magnet", "type": "magnet", "pos": [0.0375, 0.880],
+      "radius": 0.110, "strength": 1.8 },
+
+    // Left ramp "climb": exits onto the right inlane (15 §1.3).
+    { "id": "left_ramp", "type": "ramp", "width": 0.044, "drop_exit": true,
+      "path": [[0.155, 0.700], [0.155, 0.760],
+               { "arc": { "to": [0.095, 0.820], "radius": 0.060, "dir": "ccw" } },
+               [0.080, 0.560], [0.408, 0.300]],
+      "height_profile": [ { "s": 0.0, "z": 0.0 }, { "s": 0.35, "z": 0.055 },
+                          { "s": 0.85, "z": 0.045 }, { "s": 1.0, "z": 0.025 } ] },
+
+    // Right ramp "drop": crosses left_ramp on layer 1, drops into the
+    // left orbit lane above drift_lock (15 §1.3).
+    { "id": "right_ramp", "type": "ramp", "width": 0.044, "drop_exit": true,
+      "path": [[0.370, 0.560], [0.370, 0.620],
+               { "arc": { "to": [0.240, 0.800], "radius": 0.160, "dir": "cw" } },
+               { "arc": { "to": [0.120, 0.870], "radius": 0.160, "dir": "cw" } },
+               [0.0375, 0.895]],
+      "height_profile": [ { "s": 0.0, "z": 0.0 }, { "s": 0.45, "z": 0.052 },
+                          { "s": 0.80, "z": 0.052 }, { "s": 1.0, "z": 0.030 } ] },
+
     // Upper-right flipper: the third flipper (15 §1.3 roster row 1).
     { "id": "upper_flipper", "type": "flipper", "pos": [0.448, 0.615],
       "length": 0.062, "rest_angle_deg": -100, "swing_deg": 46,

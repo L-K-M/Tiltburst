@@ -219,7 +219,7 @@ TEST(TableLoader, UnknownElementTypeIsPathQualified) {
       "elements": [
         { "id": "outer", "type": "wall", "closed": true,
           "path": [[0,0],[0,1],[0.5,1],[0.5,0]] },
-        { "id": "m", "type": "magnet", "pos": [0.2, 0.5] }
+        { "id": "w", "type": "wormhole", "pos": [0.2, 0.5] }
       ]
     })JSON";
     std::filesystem::path dir;

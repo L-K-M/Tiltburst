@@ -1337,8 +1337,11 @@ pair do not interact (accepted 2.5D fiction).
   Added in step 3. The fade removes the on/off discontinuity at the rim.
 - Eddy damping while in the field (enabled, `d_true ≤ radius`):
   `omega_z ← omega_z · exp(−8·dt)` (magnets kill spin) and
-  `v ← v · exp(−0.8·dt)` (models induced-current braking; also what lets a
-  magnet actually capture and hold a ball above `pos`).
+  `v ← v · exp(−3.5·dt)` (models induced-current braking; also what lets a
+  magnet actually capture and hold a ball above `pos` — ADR-023 raised the
+  0.8/s original: at that value the braking cannot dissipate the
+  rim-to-rim gravity gain, so every through ball escaped and FT-09's catch
+  band was unreachable).
 - Control: `default_on` (false); `tb.magnet_on/off`; `tb.magnet_pulse(id,
   ms)` runs an envelope over duration T: full strength for `0.6·T`, then
   linear decay to 0 over `0.4·T`.

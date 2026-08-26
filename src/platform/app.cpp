@@ -567,6 +567,30 @@ int run(const CliOptions& cli) {
             int h = 0;
             SDL_GetWindowSizeInPixels(window.get(), &w, &h);
             (void)w;
+
+            // §14.4: the F3 overlay works in this mode.
+            if (show_overlay) {
+                static tb::render::Overlay overlay;
+                tb::render::LatencyOverlayStats los;
+                los.input_source = input.raw_active ? input.sources.front()->name() : "sdl";
+                los.p999_ms = input.histogram.percentile(0.999) / 1e6;
+                los.press_edges = input.histogram.total();
+                overlay.update_latency(los);
+                float y = 144.f; // below the flash square's corner
+                for (size_t i = 0; i < tb::render::Overlay::kLineCount; ++i) {
+                    overlay.emit_quads(12.f,
+                                       y,
+                                       overlay.line(i),
+                                       kOverlayColor[0],
+                                       kOverlayColor[1],
+                                       kOverlayColor[2],
+                                       1.f,
+                                       &quads,
+                                       uint32_t(h));
+                    y += 16.f;
+                }
+            }
+
             frame.quads = quads.data();
             frame.quad_count = uint32_t(quads.size());
 

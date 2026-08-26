@@ -150,13 +150,6 @@ void cradle_setup(Rig& rig) {
     ASSERT_TRUE(cradled(rig, 0)) << "CRADLE_SETUP failed";
 }
 
-// Distance from the LEFT pivot to the ball's nearest capsule surface.
-float rho_left(const Rig& rig) {
-    const Ball& b = rig.state.balls[0];
-    const Flipper& f = rig.state.flippers[0];
-    return length(b.pos - f.params.pivot);
-}
-
 } // namespace ft
 
 namespace {
@@ -171,19 +164,6 @@ using std::fabs;
 using std::sin;
 using tb::sim::Flipper;
 using tb::sim::Vec2;
-
-constexpr float kPiF = 3.14159265358979f / 180.0f;
-
-// Distance from the LEFT flipper surface to the ball center.
-float surface_dist(const ft::Rig& rig) {
-    const tb::sim::Ball& b = rig.state.balls[0];
-    const tb::sim::Flipper& f = rig.state.flippers[0];
-    const tb::sim::Vec2 axis{std::cos(f.theta), std::sin(f.theta)};
-    const float along =
-        std::clamp(tb::sim::dot(b.pos - f.params.pivot, axis), 0.0f, f.params.length);
-    const tb::sim::Vec2 closest = f.params.pivot + axis * along;
-    return length(b.pos - closest) - (tb::sim::kBallRadius + 0.009f); // avg rubber radius
-}
 
 // First contact event with anything while `left` is held, detected by a
 // velocity discontinuity well above slope gravity's per-tick increment.
@@ -208,27 +188,6 @@ float first_contact_rho(ft::Rig& rig, int max_ms, bool left) {
         }
     }
     return -1.0f;
-}
-
-// Whether the ball crosses y_target within max_ms of free flight; fills
-// speed/x at the crossing.
-bool crosses_y(ft::Rig& rig, int max_ms, float y_target, float* speed_at, float* x_at) {
-    for (int i = 0; i < max_ms; ++i) {
-        run(rig, 1, false, false);
-        if (rig.state.balls[0].pos.y >= y_target) {
-            if (speed_at != nullptr) {
-                *speed_at = ft::speed(rig);
-            }
-            if (x_at != nullptr) {
-                *x_at = rig.state.balls[0].pos.x;
-            }
-            return true;
-        }
-        if (ft::drained(rig)) {
-            return false;
-        }
-    }
-    return false;
 }
 
 } // namespace
@@ -338,7 +297,7 @@ TEST(feel_scenarios, ft03_cradle_hold) {
 }
 
 // FT-04 Backhand: cradle, release at 2.0 s, re-press at +50 ms and hold.
-// ADR-023: from the cradle crook the re-stroke scoops the ball up off the
+// ADR-022: from the cradle crook the re-stroke scoops the ball up off the
 // blade base late in the stroke (the wall pocket ejects at EOS); the
 // contract verifies the scoop's power window, upward direction, and that
 // the stroke completes.
@@ -396,7 +355,7 @@ TEST(feel_scenarios, ft05_post_pass) {
 }
 
 // FT-06 Tap pass: gentle lob transfer.
-// ADR-023: under the final solver the tap is absorbed at the crook and the
+// ADR-022: under the final solver the tap is absorbed at the crook and the
 // ball dribbles safely to rest in the right zone — the contract verifies a
 // dead-soft tap (no hot launch), rightward transfer, and no drain.
 TEST(feel_scenarios, ft06_tap_pass) {
@@ -476,7 +435,7 @@ TEST(feel_scenarios, ft07_tip_shot_power) {
 }
 
 // FT-08 Cradle escape via slap: release, ball rolls down; slap at 140 ms.
-// ADR-023: the wall pocket forces a late, soft ejection — the contract
+// ADR-022: the wall pocket forces a late, soft ejection — the contract
 // verifies the escape itself (upward ejection with a bounded power window,
 // no center drain) rather than a full-power save.
 TEST(feel_scenarios, ft08_cradle_escape_slap) {

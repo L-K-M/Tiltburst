@@ -26,7 +26,6 @@ constexpr float kGridCell = 0.032f;       // broadphase cell size
 
 constexpr float kDefaultSlopeDeg = 6.5f;
 constexpr int kMaxBalls = 6;
-constexpr int kMaxFlippers = 8; // per-table flipper cap (bitmask width)
 
 enum class BallMode : uint8_t { Free = 0, Ramp = 1, Captured = 2 };
 

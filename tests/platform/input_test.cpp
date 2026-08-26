@@ -8,8 +8,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <chrono>
-#include <thread>
 #include <vector>
 
 // Input system contracts (05-engine-core.md §9.2) and the M4 input→latch

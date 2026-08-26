@@ -16,6 +16,8 @@ constexpr uint32_t kPopFlashTicks = 60;       // §6.3 skirt flash window
 constexpr float kSpinnerDecayPerTick = 0.99940234f;
 static_assert(kTickDt > 0.0009f && kTickDt < 0.0011f,
               "kSpinnerDecayPerTick assumes 1 ms ticks; recompute 0.55^kTickDt");
+static_assert(kSpinnerDecayPerTick > 0.999402f && kSpinnerDecayPerTick < 0.999403f,
+              "kSpinnerDecayPerTick must stay exp(ln(0.55) * 0.001)");
 
 float point_segment_distance(Vec2 p, Vec2 a, Vec2 b) {
     const Vec2 ab = b - a;

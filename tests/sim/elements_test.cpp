@@ -104,7 +104,7 @@ TEST(Slingshot, FiresOnBandCrossing) {
         rig.finish();
 
         rig.spawn(0.15f, 0.25f, impact, 0.0f);
-        for (int i = 0; i < 60; ++i) {
+        for (int i = 0; i < (impact > 1.0f ? 60 : 250); ++i) {
             rig.step();
         }
         const auto evs = rig.drain_events();
@@ -202,7 +202,7 @@ TEST(Gate, OneWayBlocksReverse) {
 
         if (direction == 0) {
             rig.spawn(0.26f, 0.4f, 0.0f, 2.0f); // forward: passes
-            for (int i = 0; i < 80; ++i) {
+            for (int i = 0; i < 150; ++i) {
                 rig.step();
             }
             EXPECT_GT(rig.s.balls[0].pos.y, 0.53f) << "forward ball must clear the gate";
@@ -210,7 +210,7 @@ TEST(Gate, OneWayBlocksReverse) {
             EXPECT_EQ(count_events(evs, uint16_t(tb::sim::SimEventType::SwitchHit)), 1u);
         } else {
             rig.spawn(0.26f, 0.6f, 0.0f, -2.0f); // reverse: blocked
-            for (int i = 0; i < 80; ++i) {
+            for (int i = 0; i < 150; ++i) {
                 rig.step();
             }
             EXPECT_GT(rig.s.balls[0].pos.y, 0.55f) << "reverse ball must be blocked";

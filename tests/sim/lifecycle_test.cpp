@@ -135,7 +135,7 @@ TEST(DropBank, CompletesAndResets) {
     // Strike each face in sequence from the left, fast enough (≥ 0.3 m/s).
     const float xs[3] = {0.15f, 0.20f, 0.25f};
     for (int which = 0; which < 3; ++which) {
-        rig.spawn(0, xs[which] - 0.05f, 0.45f, 2.0f, 0.0f);
+        rig.spawn(0, xs[which] - 0.07f, 0.45f, 2.0f, 0.0f);
         for (int i = 0; i < 400 && rig.s.drop_banks[0].targets[size_t(which)].state ==
                                        tb::sim::DropTargetState::Up;
              ++i) {

@@ -389,6 +389,9 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
             fail("kicker 'capture_ms' must be >= 0", pointer + "/capture_ms", file);
         }
         k.eject_speed = get_number(obj, "eject_speed", 3.0f, pointer, file);
+        if (k.eject_speed <= 0.0f) {
+            fail("kicker 'eject_speed' must be > 0", pointer + "/eject_speed", file);
+        }
         k.eject_angle_deg = get_number(obj, "eject_angle_deg", 90.0f, pointer, file);
         return Element{std::move(k)};
     }
@@ -452,6 +455,9 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
         get_xy(obj, "pos", lock.pos, pointer, file);
         lock.capacity = get_int(obj, "capacity", 2, 1, 6, pointer, file);
         lock.eject_speed = get_number(obj, "eject_speed", 2.5f, pointer, file);
+        if (lock.eject_speed <= 0.0f) {
+            fail("ball_lock 'eject_speed' must be > 0", pointer + "/eject_speed", file);
+        }
         lock.eject_angle_deg = get_number(obj, "eject_angle_deg", -90.0f, pointer, file);
         return Element{std::move(lock)};
     }

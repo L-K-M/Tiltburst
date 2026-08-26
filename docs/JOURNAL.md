@@ -109,3 +109,19 @@ corrections are new entries. Format: 03-process.md §3.1.
     06 §16.1 does not exist in the plan (ledger defect #4); RenderFrame
     delivery per 04 M3 wins.
   - Local box has no Vulkan loader; render smoke verified on CI lavapipe.
+
+## M04 — Flippers & input (WIP, unmerged)
+
+- Branch milestone/M04-flippers-input carries: FlipperSim (08 §5.2 state
+  machine), moving-capsule CCD (§3.5 conservative advancement + static
+  fast path), solver integration (step 2, dynamic-collider sweep,
+  surface-velocity impulses §5.3, live catch §5.4), generalized
+  resolve_surface, FT rig + all eight M4 scenarios.
+- Feel results: FT-01/03/05/07 green. FT-02/04/06/08 red.
+- Diagnosis so far: caught-ball micro-rattle in the flipper/inlane pocket
+  sustains |v| ≈ 0.10–0.13 (FT-02 band boundary); backhand/tap shots die
+  or overpower depending on resume-from-drop timing. Suspected solver gap:
+  resting/tangential contacts within kSkin get no friction (sweep fires
+  only on normal crossings), so slide decay relies solely on discrete
+  impacts. Next step: persistent-contact friction or §5.8 knob iteration
+  (kRestSpeed/kSkin/live-catch window) with ADR + JOURNAL entries.

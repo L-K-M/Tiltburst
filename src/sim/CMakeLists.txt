@@ -4,6 +4,8 @@ add_library(tb_sim STATIC
     math.cpp
     material.cpp
     ccd.cpp
+    flipper.cpp
+    flipper_ccd.cpp
     broadphase.cpp
     replay.cpp
     sim.cpp

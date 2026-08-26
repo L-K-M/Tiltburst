@@ -7,8 +7,6 @@ namespace tb::sim {
 
 namespace {
 
-constexpr float kPi = 3.14159265358979f;
-
 inline Vec2 clamp_speed(Vec2 v) {
     const float speed_sq = length_sq(v);
     if (speed_sq > kMaxSpeed * kMaxSpeed) {
@@ -51,29 +49,40 @@ inline void absorb(SimState& s, uint64_t tick, SimEventType type, uint16_t eleme
 
 } // namespace
 
-float Solver::resolve_static(SimState& s, Ball& ball, Vec2 n, const Material& mat) {
-    // §4.1 impulse equations; surface velocity zero for static colliders.
+float Solver::resolve_surface(SimState& s, Ball& ball, Vec2 n,
+                              const Material& mat, Vec2 surface_vel,
+                              float live_catch_scale) {
+    // §4.1 impulse equations against an infinite-mass moving surface.
+    // V_s is zero for static colliders; §3.5 for flippers.
     const Vec2 t = perp(n);
 
-    // Ball surface-point velocity: v_p = v − r·omega_z·perp(n̂); u = v_p.
+    // Relative contact velocity: u = v_p − V_s.
     const Vec2 vp = ball.vel - kBallRadius * ball.omega_z * perp(n);
-    const float u_n = dot(vp, n);
+    const Vec2 u_vec = vp - surface_vel;
+    const float u_n = dot(u_vec, n);
     if (u_n >= 0.0f) {
         return 0.0f; // separating — never apply impulses
     }
-    const float u_t = dot(vp, t);
+    const float u_t = dot(u_vec, t);
 
     const float approach = -u_n;
-    const float e_eff = restitution_curve(s, mat.restitution, approach);
+    float e_eff =
+        restitution_curve(s, mat.restitution, approach) * live_catch_scale;
+    float mu_s = mat.mu_s;
+    float mu_k = mat.mu_k;
+    if (live_catch_scale < 1.0f) {
+        mu_s = std::min(1.0f, 2.0f * mu_s); // tangential grip (§5.4)
+        mu_k = std::min(1.0f, 2.0f * mu_k);
+    }
     const float j_n = -(1.0f + e_eff) * u_n * kBallMass;
 
     // Tangential effective mass: 1/m_t = 7/(2m) → m_t = 2m/7.
     const float j_stick = -(2.0f * kBallMass / 7.0f) * u_t;
     float j_t;
-    if (std::fabs(j_stick) <= mat.mu_s * j_n) {
+    if (std::fabs(j_stick) <= mu_s * j_n) {
         j_t = j_stick;
     } else {
-        j_t = -std::copysign(mat.mu_k * j_n, u_t);
+        j_t = -std::copysign(mu_k * j_n, u_t);
     }
 
     ball.vel += (j_n * n + j_t * t) * (1.0f / kBallMass);
@@ -112,6 +121,20 @@ void Solver::resolve_pair(SimState& s, Ball& a, Ball& b, Vec2 n) {
     b.vel = clamp_speed(b.vel);
     a.omega_z = std::clamp(a.omega_z, -kMaxSpin, kMaxSpin);
     b.omega_z = std::clamp(b.omega_z, -kMaxSpin, kMaxSpin);
+}
+
+void Solver::resolve_flipper(SimState& s, Ball& ball, Flipper& f,
+                             const FlipperHit& hit) {
+    const Material mat = material_row(MaterialId::FlipperRubber);
+
+    // Live catch damping (§5.4): a just-raised HOLD absorbs the ball.
+    float scale = 1.0f;
+    if (f.state == FlipperState::Hold &&
+        f.ticks_since_eos <= kLiveCatchWindowTicks) {
+        scale = kLiveCatchFactor;
+    }
+
+    resolve_surface(s, ball, hit.normal, mat, hit.surface_vel, scale);
 }
 
 Solver::Contact Solver::find_earliest(SimState& s, float t_cur) {
@@ -169,6 +192,34 @@ Solver::Contact Solver::find_earliest(SimState& s, float t_cur) {
             }
         }
 
+        // Dynamic colliders bypass the grid (§3.7): flippers in id order.
+        for (Flipper& f : s.flippers) {
+            if (ball.layer != 0) {
+                continue; // flippers live on layer 0 in v1
+            }
+            FlipperHit fh;
+            if (sweep_circle_vs_flipper(ball.pos, ball.vel, kBallRadius, f,
+                                        window, fh)) {
+                float toi = t_cur + fh.toi;
+                bool better = best.kind == Contact::None
+                              || toi < best.toi - kToiEps;
+                // FLIPPER ties: after STATIC, before PAIR.
+                if (!better && best.kind == Contact::Static &&
+                    toi <= best.toi + kToiEps) {
+                    better = true; // deterministic: first flipper in id order
+                }
+                if (better) {
+                    best.toi = toi;
+                    best.kind = Contact::Flipper;
+                    best.ball = bi;
+                    best.ball2 = bi;
+                    best.normal = fh.normal;
+                    best.collider = nullptr;
+                    best.flipper = &f;
+                }
+            }
+        }
+
         // Ball-ball pairs (§8): fixed i<j order, same layer only.
         for (uint8_t bj = uint8_t(bi + 1); bj < kMaxBalls; ++bj) {
             Ball& other = s.balls[bj];
@@ -204,7 +255,24 @@ Solver::Contact Solver::find_earliest(SimState& s, float t_cur) {
     return best;
 }
 
-void Solver::step(SimState& s, const TickInput&) {
+void Solver::step(SimState& s, const TickInput& input_latched) {
+    const TickInput* input = &input_latched;
+    step_body(s, input);
+}
+
+void Solver::step(SimState& s, const TickInput* input) {
+    step_body(s, input);
+}
+
+void Solver::step_body(SimState& s, const TickInput* input) {
+    // Step 2 — flipper state update (§5.2), id order; (theta_start,
+    // omega) held constant for CCD this tick.
+    for (Flipper& f : s.flippers) {
+        bool pressed =
+            f.enabled && ((input->buttons >> f.params.action) & 1u) != 0u;
+        FlipperSim::tick(f, pressed);
+    }
+
     // Step 3 — forces + velocity update (FREE balls, index order).
     const float slope_rad = s.slope_deg * (float(kPi) / 180.0f);
     const float g_slope = kGravity * std::sin(slope_rad);
@@ -266,7 +334,20 @@ void Solver::step(SimState& s, const TickInput&) {
         }
         t_cur = t_adv;
 
-        if (best.kind == Contact::Static) {
+        if (best.kind == Contact::Flipper) {
+            Ball& ball = s.balls[best.ball];
+            const float speed_before = length(ball.vel);
+            const float t_back = std::min(kSkin / std::max(speed_before, 1e-6f), t_cur);
+            ball.pos -= ball.vel * t_back;
+
+            resolve_flipper(s, ball, *best.flipper, FlipperHit{
+                best.toi, best.normal,
+                ball.pos - best.normal * kBallRadius,
+                best.flipper->omega * perp(ball.pos - best.normal * kBallRadius -
+                                           best.flipper->params.pivot)});
+
+            resolved_[best.ball]++;
+        } else if (best.kind == Contact::Static) {
             Ball& ball = s.balls[best.ball];
             const float speed = length(ball.vel);
             if (speed > 0.0f) {
@@ -275,7 +356,9 @@ void Solver::step(SimState& s, const TickInput&) {
             }
 
             const float approach =
-                resolve_static(s, ball, best.normal, material_row(best.collider->material));
+                resolve_surface(s, ball, best.normal,
+                                material_row(best.collider->material),
+                                {0.0f, 0.0f}, 1.0f);
 
             // Collision event for audio/particles (§4.1): emit at speed.
             // Absorb into the sequence hash first (dispatch order).

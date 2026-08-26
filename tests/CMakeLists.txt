@@ -15,6 +15,7 @@ add_executable(tb_tests
     sim/broadphase_test.cpp
     sim/ccd_test.cpp
     sim/determinism_test.cpp
+    sim/feel_test.cpp
     sim/golden_test.cpp
     sim/perf_and_layout_test.cpp
     sim/snapshot_test.cpp

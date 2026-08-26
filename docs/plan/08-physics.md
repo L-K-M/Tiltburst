@@ -162,7 +162,7 @@ Speed clamp: after the force phase **and** after every contact impulse,
 | `kSpinDamp` | 0.7 s⁻¹ | free spin decay rate |
 | `kSkin` | 1e-4 m | contact separation kept after TOI |
 | `kToiEps` | 1e-9 s | TOI tie/validity epsilon |
-| `kRestSpeed` | 0.03 m/s | below this normal speed, restitution = 0 |
+| `kRestSpeed` | 0.05 m/s | below this normal speed, restitution = 0 (ADR-020: raised from 0.03 per §5.8 tuning row) |
 | `kMaxToiIter` | 8 | contact resolutions per ball per tick |
 | `kGridCell` | 0.032 m | broadphase cell size |
 
@@ -603,7 +603,7 @@ less at high impact speed. For approach speed `s = −u_n` (m/s):
 
 ```
 restitution_curve(e, s):
-  if s < kRestSpeed (0.03): return 0            // resting contact, no bounce
+  if s < kRestSpeed (0.05): return 0            // resting contact, no bounce
   return e / (1 + kFalloff · max(0, s − kSoft))
 kSoft    = 0.5 m/s     // full elasticity below this
 kFalloff = 0.12 s/m    // e halves around ~9 m/s over kSoft

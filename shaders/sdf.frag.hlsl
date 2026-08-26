@@ -5,13 +5,13 @@ struct FSIn
 {
     float4 pos : SV_Position;
     float2 lp : TEXCOORD0;
-    float4 n0 : TEXCOORD1; // rot, kind, p0, p1
-    float4 n1 : TEXCOORD2; // p2, p3, p4, glow_radius
-    float4 n2 : TEXCOORD3; // fill0 rgba (premultiplied linear)
-    float4 n3 : TEXCOORD4; // fill1
-    float4 n4 : TEXCOORD5; // grad: xy dir, z length|radius, w mode
-    float4 n5 : TEXCOORD6; // stroke rgb, w = width (m); 0 = none
-    float4 n6 : TEXCOORD7; // glow rgb, a = intensity [0,2]
+    nointerpolation float4 n0 : TEXCOORD1; // rot, kind, p0, p1
+    nointerpolation float4 n1 : TEXCOORD2; // p2, p3, p4, glow_radius
+    nointerpolation float4 n2 : TEXCOORD3; // fill0 rgba (premultiplied linear)
+    nointerpolation float4 n3 : TEXCOORD4; // fill1
+    nointerpolation float4 n4 : TEXCOORD5; // grad: xy dir, z length|radius, w mode
+    nointerpolation float4 n5 : TEXCOORD6; // stroke rgb, w = width (m); 0 = none
+    nointerpolation float4 n6 : TEXCOORD7; // glow rgb, a = intensity [0,2]
 };
 
 float sd_circle(float2 p, float r)
@@ -66,9 +66,10 @@ float sd_dispatch(float kind, float2 lp, float4 P01, float4 P234)
 float4 eval_fill(float4 f0, float4 f1, float4 grad, float2 lp)
 {
     if (grad.w == 0.0) return f0;
+    const float glen = max(grad.z, 1e-6); // grad.z == 0 -> inf/NaN fill
     float t = (grad.w == 1.0)
-                  ? saturate(dot(lp, grad.xy) / grad.z + 0.5)
-                  : saturate(length(lp) / grad.z);
+                  ? saturate(dot(lp, grad.xy) / glen + 0.5)
+                  : saturate(length(lp) / glen);
     return lerp(f0, f1, t);
 }
 

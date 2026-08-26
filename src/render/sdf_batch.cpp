@@ -68,6 +68,11 @@ bool SdfBatch::init(SDL_GPUDevice* device,
         return false;
     }
     void* map = SDL_MapGPUTransferBuffer(device_, tb, false);
+    if (!map) {
+        SDL_ReleaseGPUTransferBuffer(device_, tb);
+        shutdown();
+        return false;
+    }
     SDL_memcpy(map, strip, sizeof(strip));
     SDL_UnmapGPUTransferBuffer(device_, tb);
 
@@ -160,7 +165,11 @@ bool SdfBatch::init(SDL_GPUDevice* device,
         return false;
     }
 
-    reserve(512);
+    if (!ensure_capacity(512)) {
+        TB_LOG_ERROR("main", "sdf instance buffer allocation failed: {}", SDL_GetError());
+        shutdown();
+        return false;
+    }
     return true;
 }
 
@@ -216,7 +225,7 @@ void SdfBatch::push(const SdfInstance& inst) {
 }
 
 bool SdfBatch::ensure_capacity(uint32_t count) {
-    if (count <= capacity_) {
+    if (count <= capacity_ && gpu_ != nullptr && upload_ != nullptr) {
         return true;
     }
     uint32_t cap = capacity_ == 0 ? 512 : capacity_;
@@ -273,6 +282,10 @@ void SdfBatch::upload_and_draw(SDL_GPURenderPass* pass) {
     SDL_PushGPUVertexUniformData(cmd_, 0, &push, sizeof(push));
 
     void* map = SDL_MapGPUTransferBuffer(device_, upload_, true);
+    if (!map) {
+        pending_.clear();
+        return;
+    }
     SDL_memcpy(map, pending_.data(), pending_.size() * sizeof(SdfInstance));
     SDL_UnmapGPUTransferBuffer(device_, upload_);
 

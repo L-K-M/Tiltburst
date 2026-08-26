@@ -15,13 +15,13 @@ struct VSOut
 {
     float4 pos : SV_Position;
     float2 lp : TEXCOORD0;   // local meters within the instance quad
-    float4 n0 : TEXCOORD1;
-    float4 n1 : TEXCOORD2;
-    float4 n2 : TEXCOORD3;
-    float4 n3 : TEXCOORD4;
-    float4 n4 : TEXCOORD5;
-    float4 n5 : TEXCOORD6;
-    float4 n6 : TEXCOORD7;
+    nointerpolation float4 n0 : TEXCOORD1;
+    nointerpolation float4 n1 : TEXCOORD2;
+    nointerpolation float4 n2 : TEXCOORD3;
+    nointerpolation float4 n3 : TEXCOORD4;
+    nointerpolation float4 n4 : TEXCOORD5;
+    nointerpolation float4 n5 : TEXCOORD6;
+    nointerpolation float4 n6 : TEXCOORD7;
 };
 
 struct Inst

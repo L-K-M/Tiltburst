@@ -4,22 +4,7 @@
 #include <SDL3/SDL.h>
 #include <gtest/gtest.h>
 
-#include <vector>
-
-namespace {
-
-// Creates a headless GPU device the same way --render-smoke does. Returns
-// nullptr when no backend exists (CI runners without a GPU).
-SDL_GPUDevice* try_headless_device() {
-    if (SDL_Init(SDL_INIT_VIDEO) == 0) {
-        return nullptr;
-        // Note: SDL_Init returns true on success in SDL3; inverted check
-        // handled by caller via device creation below.
-    }
-    return nullptr;
-}
-
-} // namespace
+#include <filesystem>
 
 // RenderSmoke.DeviceClearPresent: create a GPU device with no window,
 // clear to bg0, read back one pixel, and assert it is not the clear color
@@ -51,7 +36,9 @@ TEST(render_smoke, device_clear_present) {
     // The PNG must exist and be exactly 64×64 RGBA.
     std::error_code ec;
     ASSERT_TRUE(std::filesystem::exists(png, ec));
-    EXPECT_GT(std::filesystem::file_size(png, ec), 64u);
+    const auto png_bytes = std::filesystem::file_size(png, ec);
+    ASSERT_FALSE(ec) << "file_size failed";
+    EXPECT_GT(png_bytes, 64u);
 
     std::filesystem::remove(png, ec);
     gpu->shutdown();

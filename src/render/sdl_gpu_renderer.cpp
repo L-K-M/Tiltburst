@@ -25,7 +25,7 @@ namespace {
 
 // Palette bg0 (13-art-direction.md §2) — authored sRGB for the UI variant.
 constexpr SDL_FColor kClearColor{0x0D / 255.f, 0x02 / 255.f, 0x21 / 255.f, 1.0f};
-constexpr float kOverlayColor[4] = {0.0f, 0xE5f / 255.f, 1.0f, 1.0f};
+constexpr float kOverlayColor[4] = {0.0f, 0xE5 / 255.f, 1.0f, 1.0f};
 
 #ifndef TB_SHADER_FALLBACK_DIR
 #define TB_SHADER_FALLBACK_DIR ""
@@ -408,7 +408,7 @@ bool SdlGpuRenderer::write_png(const std::filesystem::path& out_png) {
         return false;
     }
     SDL_GPUCopyPass* copy = SDL_BeginGPUCopyPass(cmd);
-    SDL_GPUTextureRegion src{offscreen_, 0, 0, 0, offscreen_w_, offscreen_h_, 1};
+    SDL_GPUTextureRegion src{offscreen_, 0, 0, 0, 0, offscreen_w_, offscreen_h_, 1};
     SDL_GPUTextureTransferInfo dst{smoke_readback_, 0, offscreen_w_, offscreen_h_};
     SDL_DownloadFromGPUTexture(copy, &src, &dst);
     SDL_EndGPUCopyPass(copy);
@@ -480,11 +480,11 @@ bool SdlGpuRenderer::capture_to_png(const std::filesystem::path& png) {
         return false;
     }
 
-    draw_scene(cmd, last_, 0.0);
+    draw_scene(cmd, last_, last_.snapshot ? double(last_.snapshot->tick) * 0.001 : 0.0);
     present_.add_pass(cmd, scene_, capture_);
 
     SDL_GPUCopyPass* copy = SDL_BeginGPUCopyPass(cmd);
-    SDL_GPUTextureRegion src{capture_, 0, 0, 0, capture_w_, capture_h_, 1};
+    SDL_GPUTextureRegion src{capture_, 0, 0, 0, 0, capture_w_, capture_h_, 1};
     SDL_GPUTextureTransferInfo dst{readback_, 0, capture_w_, capture_h_};
     SDL_DownloadFromGPUTexture(copy, &src, &dst);
     SDL_EndGPUCopyPass(copy);

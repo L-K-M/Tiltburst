@@ -19,6 +19,6 @@ float3 srgb_encode(float3 c)
 
 float4 main(FSIn i) : SV_Target
 {
-    const float3 c = scene.Sample(samp, i.uv).rgb;
+    const float3 c = max(scene.Sample(samp, i.uv).rgb, 0.0f); // pow(neg) -> NaN
     return float4(srgb_encode(c), 1.0);
 }

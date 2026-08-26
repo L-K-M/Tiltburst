@@ -50,6 +50,8 @@ TEST(unit_tick_loop, produces_1000_ticks_per_sim_second) {
     });
     sim.join();
 
+    // Exact only because the loop honors stop between every tick,
+    // including inside a catch-up burst.
     const uint64_t n = ticks.load();
     EXPECT_EQ(n, 5000u);
     // 5000 ticks = 5 simulated seconds; the clock may run a hair past.
@@ -74,9 +76,19 @@ TEST(unit_tick_loop, overrun_clamps_at_50) {
             fake_wait(fake_now() + 200'000'000ull);
         }
         if (n >= 70 && !stop_requested.exchange(true)) {
-            sim.request_stop(); // self-stop freezes drop accounting
+            // Self-stop well past the clamp burst (which ends around tick
+            // 60) so overrun/drop accounting is final before join.
+            sim.request_stop();
         }
     });
+
+    // Bounded observation: if the overflow policy regresses and the loop
+    // stalls before tick 71, fail fast instead of hanging CI.
+    int64_t guard = 0;
+    while (ticks.load(std::memory_order_relaxed) < 71 && !stop_requested.load()) {
+        tb::cpu_pause();
+        ASSERT_LT(++guard, 200'000'000ll) << "sim stalled; overflow policy regressed";
+    }
     sim.join();
 
     EXPECT_EQ(sim.overruns(), 1u);

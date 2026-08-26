@@ -130,7 +130,12 @@ bool PresentPass::init(SDL_GPUDevice* device,
     bi.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
     bi.size = 4 * sizeof(CornerVertex);
     vertices_ = SDL_CreateGPUBuffer(device_, &bi);
-    return vertices_ && upload_;
+    if (!sampler_ || !vertices_ || !upload_) {
+        TB_LOG_ERROR("main", "present pass resource creation failed: {}", SDL_GetError());
+        shutdown();
+        return false;
+    }
+    return true;
 }
 
 void PresentPass::shutdown() {
@@ -199,6 +204,9 @@ void PresentPass::build_corners(const ViewTransform& view, uint32_t swap_w, uint
     }
 
     void* map = SDL_MapGPUTransferBuffer(device_, upload_, false);
+    if (!map) {
+        return;
+    }
     SDL_memcpy(map, out, sizeof(out));
     SDL_UnmapGPUTransferBuffer(device_, upload_);
 

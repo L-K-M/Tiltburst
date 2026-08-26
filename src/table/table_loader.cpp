@@ -353,6 +353,14 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
         sl.face_b[1] = face[1][1].get<float>();
         sl.kick_speed = get_number(obj, "kick_speed", 3.5f, pointer, file);
         sl.cooldown_ms = get_number(obj, "cooldown_ms", 80.0f, pointer, file);
+        const float fx = sl.face_b[0] - sl.face_a[0];
+        const float fy = sl.face_b[1] - sl.face_a[1];
+        const float flen = std::sqrt(fx * fx + fy * fy);
+        if (flen < 0.040f || flen > 0.100f) {
+            fail("slingshot 'face' length must be in [0.040, 0.100] (§4.6)",
+                 pointer + "/face",
+                 file);
+        }
         return Element{std::move(sl)};
     }
     if (type == "spinner") {

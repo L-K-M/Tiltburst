@@ -127,7 +127,7 @@ void bake_wall(const WallDef& w, uint16_t element_id, tb::sim::SimState& out, ui
     }
 }
 
-// Segment of `len` centered at pos, perpendicular to facing_deg.
+// Unit vector along facing_deg (0° = +x, 90° = +y).
 tb::sim::Vec2 facing_vec(float facing_deg) {
     const float phi = facing_deg * kPi / 180.0f;
     return {std::cos(phi), std::sin(phi)};
@@ -298,7 +298,8 @@ void build_sim(const TableDef& def, tb::sim::SimState& out) {
             // it points into the playfield.
             tb::sim::Vec2 dseg = c.b - c.a;
             const float dlen = std::sqrt(dseg.x * dseg.x + dseg.y * dseg.y);
-            sl.face_normal = tb::sim::Vec2{-dseg.y / dlen, dseg.x / dlen};
+            sl.face_normal = dlen > 1e-9f ? tb::sim::Vec2{-dseg.y / dlen, dseg.x / dlen}
+                                          : tb::sim::Vec2{0.0f, 1.0f}; // loader rejects these
             sl.kick_speed = d.kick_speed;
             out.slingshots.push_back(sl);
         } else if (std::holds_alternative<PopBumperDef>(e.def)) {
@@ -355,6 +356,7 @@ void build_sim(const TableDef& def, tb::sim::SimState& out) {
             const tb::sim::Vec2 f = facing_vec(d.facing_deg);
             ro.a = {d.pos[0] - f.x * 0.025f, d.pos[1] - f.y * 0.025f};
             ro.b = {d.pos[0] + f.x * 0.025f, d.pos[1] + f.y * 0.025f};
+            ro.armed = true; // NSDMI covers it; explicit at the bake site
             out.rollovers.push_back(ro);
         } else if (std::holds_alternative<GateDef>(e.def)) {
             const GateDef& d = std::get<GateDef>(e.def);
@@ -380,8 +382,9 @@ void build_sim(const TableDef& def, tb::sim::SimState& out) {
             sp.common.layer = uint8_t(d.layer);
             const tb::sim::Vec2 f = facing_vec(d.facing_deg);
             // Trigger segment ⊥ facing_deg, length 0.025 (§6.6).
-            sp.a = {d.pos[0] + f.x * 0.0125f, d.pos[1] + f.y * 0.0125f};
-            sp.b = {d.pos[0] - f.x * 0.0125f, d.pos[1] - f.y * 0.0125f};
+            const tb::sim::Vec2 half{-f.y * 0.0125f, f.x * 0.0125f};
+            sp.a = {d.pos[0] + half.x, d.pos[1] + half.y};
+            sp.b = {d.pos[0] - half.x, d.pos[1] - half.y};
             sp.face_normal = f;
             out.spinners.push_back(sp);
         }

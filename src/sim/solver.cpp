@@ -8,6 +8,8 @@ namespace tb::sim {
 namespace {
 
 constexpr double kPiF = 3.14159265358979;
+constexpr uint32_t kSlingArmVisualTicks = 60; // §6.2 kicked visual: 60 ms
+constexpr uint32_t kPopFlashTicks = 60;       // §6.3 skirt flash window
 
 float point_segment_distance(Vec2 p, Vec2 a, Vec2 b) {
     const Vec2 ab = b - a;
@@ -433,9 +435,6 @@ Solver::Contact Solver::find_earliest(SimState& s, float t_cur) {
             if (s_pass >= 0.15f) {
                 continue;
             }
-            if (dot(ball.vel, sp.face_normal) == 0.0f && length_sq(ball.vel) > 0.0f) {
-                // Moving purely tangentially: the plate still deflects.
-            }
             SweepHit hit;
             if (sweep_circle_vs_segment(ball.pos, ball.vel, kBallRadius, sp.a, sp.b, window, hit)) {
                 const float toi = t_cur + hit.toi;
@@ -830,7 +829,7 @@ void Solver::step_elements(SimState& s) {
             ball->vel = sl.face_normal * out_n + t * v_t;
             ball->vel = clamp_speed(ball->vel);
             sl.common.cooldown_left = sl.common.cooldown_ticks;
-            sl.kick_visual_ticks = 60; // arm animation window (§6.2)
+            sl.kick_visual_ticks = kSlingArmVisualTicks;
             emit_element_event(s, SimEventType::SwitchHit, sl.common.table_id, *ball, c.approach);
             break;
         }
@@ -861,11 +860,11 @@ void Solver::step_elements(SimState& s) {
             if (ball == nullptr) {
                 continue;
             }
+            // The contact log already proves this ball hit this pop's
+            // circle; the current (post-rebound) position still gives a
+            // sound radial direction.
             Vec2 d = ball->pos - pop.pos;
             const float dist = length(d);
-            if (dist > pop.radius + kBallRadius + 0.002f) {
-                continue; // log hit a different surface of the same element
-            }
             if (dist > 1e-6f) {
                 d = d * (1.0f / dist);
             } else {
@@ -878,7 +877,7 @@ void Solver::step_elements(SimState& s) {
             ball->vel += kicked * pop.kick_speed;
             ball->vel = clamp_speed(ball->vel);
             pop.common.cooldown_left = pop.common.cooldown_ticks;
-            pop.flash_ticks = 60;
+            pop.flash_ticks = kPopFlashTicks;
             emit_element_event(
                 s, SimEventType::SwitchHit, pop.common.table_id, *ball, length(ball->vel));
             break;
@@ -914,13 +913,6 @@ void Solver::step_elements(SimState& s) {
             st.common.cooldown_left = st.common.cooldown_ticks;
             emit_element_event(s, SimEventType::SwitchHit, st.common.table_id, *ball, c.approach);
             break;
-        }
-    }
-
-    // --- Cooldown ticks for trigger-only elements.
-    for (RolloverElem& ro : s.rollovers) {
-        if (ro.common.cooldown_left > 0) {
-            --ro.common.cooldown_left;
         }
     }
 
@@ -991,6 +983,7 @@ void Solver::step_elements(SimState& s) {
             const bool on_plate = std::abs(along) < kBallRadius;
             if (sp.crossing_armed && on_plate) {
                 sp.crossing_armed = false;
+                sp.last_ball = b.index;
                 if (std::abs(s_pass) >= 0.15f) {
                     // Spin-up + one-shot ball slowdown (plate inertia).
                     const float side = s_pass > 0.0f ? 1.0f : -1.0f;
@@ -1010,7 +1003,7 @@ void Solver::step_elements(SimState& s) {
         if (std::abs(sp.plate_omega) >= 0.5f) {
             sp.plate_angle += sp.plate_omega * kTickDt;
             sp.rev_angle_acc += std::abs(sp.plate_omega) * kTickDt;
-            sp.plate_omega *= 0.55f * kTickDt + (1.0f - kTickDt); // 0.55 per second
+            sp.plate_omega *= std::pow(0.55f, kTickDt); // friction^dt, 0.55/s (§6.6)
             if (sp.rev_angle_acc >= 2.0f * float(kPiF)) {
                 sp.rev_angle_acc -= 2.0f * float(kPiF);
                 for (Ball& b : s.balls) {

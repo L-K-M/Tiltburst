@@ -250,8 +250,8 @@ TEST(Spinner, SpinCountFromBallSpeed) {
     MiniRig rig;
     tb::sim::SpinnerElem sp;
     sp.common.table_id = 17;
-    sp.a = {0.2512f, 0.45f};
-    sp.b = {0.2488f, 0.55f}; // 0.025 m span, ⊥ facing (+x)
+    sp.a = {0.2512f, 0.4875f};
+    sp.b = {0.2488f, 0.5125f}; // 0.025 m span, ⊥ facing (+x)
     sp.face_normal = {1.0f, 0.0f};
     rig.s.spinners.push_back(sp);
     rig.finish();
@@ -325,4 +325,36 @@ TEST(Determinism, TestLabAllElementsReplay) {
     for (size_t i = 0; i < a.size(); ++i) {
         ASSERT_EQ(a[i], b[i]) << "test-lab replay diverged at sample " << i;
     }
+}
+
+// Builder regression (review cycle 1): a table-authored spinner bakes its
+// trigger segment perpendicular to facing_deg, and table rollovers start
+// armed.
+TEST(Spinner, BuilderBakesPerpendicularSegment) {
+    tb::table::TableDef def;
+    def.width = 0.52f;
+    def.height = 1.04f;
+    tb::table::SpinnerDef sp_def;
+    sp_def.id = "sp";
+    sp_def.pos[0] = 0.26f;
+    sp_def.pos[1] = 0.5f;
+    sp_def.facing_deg = 90.0f;
+    def.elements.push_back(tb::table::Element{sp_def});
+    tb::table::RolloverDef ro_def;
+    ro_def.id = "ro";
+    ro_def.pos[0] = 0.2f;
+    ro_def.pos[1] = 0.5f;
+    def.elements.push_back(tb::table::Element{ro_def});
+
+    tb::sim::SimState sim;
+    tb::table::build_sim(def, sim);
+    ASSERT_EQ(sim.spinners.size(), 1u);
+    const auto& sp = sim.spinners[0];
+    // facing 90° = +y: the segment must be horizontal (⊥ to +y).
+    EXPECT_NEAR(sp.a.y, sp.b.y, 1e-6f);
+    EXPECT_NEAR(sp.face_normal.x, 0.0f, 1e-6f);
+    EXPECT_NEAR(sp.face_normal.y, 1.0f, 1e-6f);
+    EXPECT_NEAR(length(sp.b - sp.a), 0.025f, 1e-5f);
+    ASSERT_EQ(sim.rollovers.size(), 1u);
+    EXPECT_TRUE(sim.rollovers[0].armed);
 }

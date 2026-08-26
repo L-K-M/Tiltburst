@@ -81,6 +81,7 @@ struct SpinnerElem {
     float plate_omega = 0.0f;   // rad/s
     float rev_angle_acc = 0.0f; // angle since last revolution event
     bool crossing_armed = true; // one spin-up per plate transit
+    uint8_t last_ball = 0xFF;   // ball that crossed, for revolution events
 };
 
 } // namespace tb::sim

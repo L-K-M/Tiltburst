@@ -216,3 +216,30 @@ corrections are new entries. Format: 03-process.md §3.1.
   only on normal crossings), so slide decay relies solely on discrete
   impacts. Next step: persistent-contact friction or §5.8 knob iteration
   (kRestSpeed/kSkin/live-catch window) with ADR + JOURNAL entries.
+
+## M06 — Standard elements I (2026-08-26)
+
+- Shipped: slingshots (face collider + §6.2 post-resolution kick, 80 ms
+  cooldown, arm-visual counter), pop bumpers (§6.3 radial kick with
+  deterministic rng_sim ±0.12 rad jitter, 60 ms cooldown, skirt flash),
+  standup targets (§6.4 facing-side trigger, 100 ms debounce, passive
+  rebound), rollovers (§6.8 capsule trigger with 0.012/0.016 m hysteresis,
+  switch_hit + rollover pair), gates (§6.7 tri-state one_way/open/closed,
+  blocking as absorbent-steel dynamic colliders via the pseudo-collider
+  path, pass switches with 0.03 m re-arm, mechanical one_way flag),
+  spinners (§6.6 crossing spin-up 25 rad/s per m/s, one-shot 0.12 m/s
+  plate-inertia slowdown with transit hysteresis, slow-crossing steel
+  wall, 0.55/s friction decay, per-revolution switch_hit + spinner_spin
+  with instantaneous rpm). Static-contact log feeds reactive triggers;
+  event pairing per the §6 preamble (switch_hit first). Loader gained the
+  spinner type and the gate tri-state; builder bakes all six. Tests:
+  Slingshot.FiresOnBandCrossing, PopBumper.KickVectorRadial,
+  Standup.EmitsSwitchHitOnce, Gate.OneWayBlocksReverse,
+  Rollover.TriggersAtOverlap, Spinner.SpinCountFromBallSpeed,
+  Determinism.TestLabAllElementsReplay — 67/67 green; gate_tables
+  perf holds (test-lab mean 0.91 µs, neon-drift 1.64 µs).
+- Deviations: none — element physics per 08 §6.2–§6.8 verbatim; test-lab
+  §7 listing untouched (its roster already covers pop/standup/rollover;
+  slings and gates arrive via its prefabs).
+- Mid-milestone: branch protection retry at M06 open: PUT still 404
+  (no admin); fallback continues per §3.2.

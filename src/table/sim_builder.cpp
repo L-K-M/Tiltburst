@@ -1,5 +1,6 @@
 #include "table/sim_builder.h"
 
+#include "sim/elements.h"
 #include "sim/flipper.h"
 
 #include <cmath>
@@ -126,6 +127,12 @@ void bake_wall(const WallDef& w, uint16_t element_id, tb::sim::SimState& out, ui
     }
 }
 
+// Unit vector along facing_deg (0° = +x, 90° = +y).
+tb::sim::Vec2 facing_vec(float facing_deg) {
+    const float phi = facing_deg * kPi / 180.0f;
+    return {std::cos(phi), std::sin(phi)};
+}
+
 } // namespace
 
 void build_sim(const TableDef& def, tb::sim::SimState& out) {
@@ -135,6 +142,12 @@ void build_sim(const TableDef& def, tb::sim::SimState& out) {
     out.flippers.clear();
     out.outholes.clear();
     out.lights.clear();
+    out.slingshots.clear();
+    out.pop_bumpers.clear();
+    out.standups.clear();
+    out.rollovers.clear();
+    out.gates.clear();
+    out.spinners.clear();
     for (auto& b : out.balls) {
         b = tb::sim::Ball{};
     }
@@ -261,10 +274,122 @@ void build_sim(const TableDef& def, tb::sim::SimState& out) {
         } else if (e.type_name() == std::string("light")) {
             const LightDef& l = std::get<LightDef>(e.def);
             out.lights.push_back({{l.pos[0], l.pos[1]}, l.size, false});
+        } else if (std::holds_alternative<SlingshotDef>(e.def)) {
+            const SlingshotDef& d = std::get<SlingshotDef>(e.def);
+            // Face segment collider (rubber) — endpoints capped.
+            tb::sim::Collider c{};
+            c.kind = tb::sim::Collider::Kind::Segment;
+            c.a = {d.face_a[0], d.face_a[1]};
+            c.b = {d.face_b[0], d.face_b[1]};
+            c.element_id = element_id;
+            c.sub_index = next_sub++;
+            c.layer = uint8_t(d.layer);
+            c.material = tb::sim::MaterialId::Rubber;
+            out.colliders.push_back(c);
+
+            tb::sim::SlingshotElem sl;
+            sl.common.kind = tb::sim::ElementKind::Slingshot;
+            sl.common.table_id = element_id;
+            sl.common.layer = uint8_t(d.layer);
+            sl.common.cooldown_ticks = uint32_t(d.cooldown_ms);
+            sl.face_a = c.a;
+            sl.face_b = c.b;
+            // Active normal: left of a→b (§6.2); authors order the face so
+            // it points into the playfield.
+            tb::sim::Vec2 dseg = c.b - c.a;
+            const float dlen = std::sqrt(dseg.x * dseg.x + dseg.y * dseg.y);
+            sl.face_normal = dlen > 1e-9f ? tb::sim::Vec2{-dseg.y / dlen, dseg.x / dlen}
+                                          : tb::sim::Vec2{0.0f, 1.0f}; // loader rejects these
+            sl.kick_speed = d.kick_speed;
+            out.slingshots.push_back(sl);
+        } else if (std::holds_alternative<PopBumperDef>(e.def)) {
+            const PopBumperDef& d = std::get<PopBumperDef>(e.def);
+            tb::sim::Collider c{};
+            c.kind = tb::sim::Collider::Kind::Point;
+            c.a = {d.pos[0], d.pos[1]};
+            c.radius = d.radius;
+            c.element_id = element_id;
+            c.sub_index = next_sub++;
+            c.layer = uint8_t(d.layer);
+            c.material = tb::sim::MaterialId::Rubber;
+            out.colliders.push_back(c);
+
+            tb::sim::PopBumperElem pop;
+            pop.common.kind = tb::sim::ElementKind::PopBumper;
+            pop.common.table_id = element_id;
+            pop.common.layer = uint8_t(d.layer);
+            pop.common.cooldown_ticks = uint32_t(d.cooldown_ms);
+            pop.pos = c.a;
+            pop.radius = d.radius;
+            pop.kick_speed = d.kick_speed;
+            out.pop_bumpers.push_back(pop);
+        } else if (std::holds_alternative<StandupTargetDef>(e.def)) {
+            const StandupTargetDef& d = std::get<StandupTargetDef>(e.def);
+            tb::sim::Vec2 f = facing_vec(d.facing_deg);
+            tb::sim::Vec2 half{-f.y * d.width * 0.5f, f.x * d.width * 0.5f};
+            tb::sim::Collider c{};
+            c.kind = tb::sim::Collider::Kind::Segment;
+            c.a = {d.pos[0] - half.x, d.pos[1] - half.y};
+            c.b = {d.pos[0] + half.x, d.pos[1] + half.y};
+            c.element_id = element_id;
+            c.sub_index = next_sub++;
+            c.layer = uint8_t(d.layer);
+            c.material = tb::sim::MaterialId::Plastic;
+            out.colliders.push_back(c);
+
+            tb::sim::StandupTargetElem st;
+            st.common.kind = tb::sim::ElementKind::StandupTarget;
+            st.common.table_id = element_id;
+            st.common.layer = uint8_t(d.layer);
+            st.common.cooldown_ticks = 100; // §6.4 debounce
+            st.face_a = c.a;
+            st.face_b = c.b;
+            st.face_normal = f;
+            st.min_speed = d.min_speed;
+            out.standups.push_back(st);
+        } else if (std::holds_alternative<RolloverDef>(e.def)) {
+            const RolloverDef& d = std::get<RolloverDef>(e.def);
+            tb::sim::RolloverElem ro;
+            ro.common.kind = tb::sim::ElementKind::Rollover;
+            ro.common.table_id = element_id;
+            ro.common.layer = uint8_t(d.layer);
+            const tb::sim::Vec2 f = facing_vec(d.facing_deg);
+            ro.a = {d.pos[0] - f.x * 0.025f, d.pos[1] - f.y * 0.025f};
+            ro.b = {d.pos[0] + f.x * 0.025f, d.pos[1] + f.y * 0.025f};
+            ro.armed = true; // NSDMI covers it; explicit at the bake site
+            out.rollovers.push_back(ro);
+        } else if (std::holds_alternative<GateDef>(e.def)) {
+            const GateDef& d = std::get<GateDef>(e.def);
+            tb::sim::GateElem g;
+            g.common.kind = tb::sim::ElementKind::Gate;
+            g.common.table_id = element_id;
+            g.common.layer = uint8_t(d.layer);
+            const tb::sim::Vec2 f = facing_vec(d.facing_deg);
+            const tb::sim::Vec2 half{-f.y * d.width * 0.5f, f.x * d.width * 0.5f};
+            g.a = {d.pos[0] - half.x, d.pos[1] - half.y};
+            g.b = {d.pos[0] + half.x, d.pos[1] + half.y};
+            g.face_normal = f;
+            g.state = d.state_closed ? tb::sim::GateState::Closed
+                      : d.state_open ? tb::sim::GateState::Open
+                                     : tb::sim::GateState::OneWay;
+            g.mechanical = !d.state_open && !d.state_closed;
+            out.gates.push_back(g);
+        } else if (std::holds_alternative<SpinnerDef>(e.def)) {
+            const SpinnerDef& d = std::get<SpinnerDef>(e.def);
+            tb::sim::SpinnerElem sp;
+            sp.common.kind = tb::sim::ElementKind::Spinner;
+            sp.common.table_id = element_id;
+            sp.common.layer = uint8_t(d.layer);
+            const tb::sim::Vec2 f = facing_vec(d.facing_deg);
+            // Trigger segment ⊥ facing_deg, length 0.025 (§6.6).
+            const tb::sim::Vec2 half{-f.y * 0.0125f, f.x * 0.0125f};
+            sp.a = {d.pos[0] + half.x, d.pos[1] + half.y};
+            sp.b = {d.pos[0] - half.x, d.pos[1] - half.y};
+            sp.face_normal = f;
+            out.spinners.push_back(sp);
         }
-        // M6+ types (gate, rollover, slingshot, pop_bumper,
-        // standup_target): parsed and retained in the TableDef; their sims
-        // arrive with their milestones (04-milestones.md §M5 scope-out).
+        // M7+ types: parsed and retained in the TableDef; their sims arrive
+        // with their milestones.
     }
 
     out.grid.build(out.colliders, out.width, out.height);

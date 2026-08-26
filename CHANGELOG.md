@@ -8,6 +8,10 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Added
 
+- M06: slingshots, pop bumpers, standup targets, rollovers, gates, and
+  spinners per 08-physics.md §6.2–§6.8, with switch_hit pairing, cooldowns,
+  and the spinner plate model (per-revolution spinner_spin events).
+
 - M05: table.json loader with prefab expansion (flipper_pair_standard,
   plunger_lane incl. merged variant, sling_pair, inlane_outlane_pair,
   orbit), sim builder with path/material baking, plunger charge-release

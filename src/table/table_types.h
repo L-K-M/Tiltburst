@@ -100,7 +100,16 @@ struct GateDef {
     float pos[2]{};
     float width = 0.040f;
     float facing_deg = 90.0f;
-    bool default_open = false;
+    // "one_way" (default, mechanical) | "open" | "closed" (§6.7).
+    bool state_open = false;
+    bool state_closed = false;
+};
+
+struct SpinnerDef {
+    std::string id;
+    int layer = 0;
+    float pos[2]{};
+    float facing_deg = 90.0f;
 };
 
 struct RolloverDef {
@@ -150,6 +159,7 @@ struct Element {
                  LightDef,
                  GateDef,
                  RolloverDef,
+                 SpinnerDef,
                  SlingshotDef,
                  PopBumperDef,
                  StandupTargetDef>

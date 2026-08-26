@@ -147,6 +147,19 @@ corrections are new entries. Format: 03-process.md §3.1.
     flipper_tap.hashes committed for the M4 tape.
 - Mid-milestone: branch protection retry at M04 open: PUT still 404
   (no admin); fallback continues per §3.2.
+- Reviewer-unavailable fallback taken at merge (03-process.md §2.7):
+  review run 32979466497 concluded completed/cancelled at the workflow's
+  own 90-minute job cap with zero output posted (no review, inline, or
+  issue comment for any head SHA); an earlier run was manually cancelled
+  at 74 min on a wrong zombie diagnosis (its frozen updated_at is normal
+  for in-flight jobs — noted for future polling). Retrigger attempts
+  (empty-commit pushes at acff58c and a4849a6, plus a PR close/reopen)
+  created no runs at all — a GitHub Actions event-delivery outage
+  (workflow_dispatch still worked). CI green for the merged tree was
+  confirmed via a dispatched Build & Test run on a4849a6 (identical
+  content; the only later commit is this journal note). Self-review
+  checklist completed; findings fixed in the cleanup commit (dead WIP
+  helpers, ADR reference numbers, F3 page in --latency-test).
 - Worries: cradle-parking is sensitive to restitution shape (any future
   change to §4.2 must re-run the full FT suite); WinRaw source compiled
   but only exercisable on Windows runners; evdev replug path untested

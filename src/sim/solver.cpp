@@ -657,14 +657,14 @@ void Solver::step_body(SimState& s, const TickInput* input) {
                                         kGravity * std::cos(slope_rad) * dz_ds;
                 const float damping = -0.10f * ball.s_dot;
                 const float fr = 0.015f * kGravity; // rolling resistance
-                const float s_dot_pre = ball.s_dot;
                 ball.s_dot += (a_gravity + damping) * kTickDt;
-                // Friction never reverses the sign within the tick.
+                // Friction never reverses the sign within the tick: use the
+                // post-gravity sign so a within-tick reversal isn't helped.
                 const float fr_dv = fr * kTickDt;
                 if (std::abs(ball.s_dot) <= fr_dv) {
                     ball.s_dot = 0.0f;
                 } else {
-                    ball.s_dot -= std::copysign(fr_dv, s_dot_pre);
+                    ball.s_dot -= std::copysign(fr_dv, ball.s_dot);
                 }
                 ball.s_dot = std::clamp(ball.s_dot, -kMaxSpeed, kMaxSpeed);
                 ball.omega_z *= std::exp(-kSpinDamp * kTickDt);
@@ -748,7 +748,8 @@ void Solver::step_body(SimState& s, const TickInput* input) {
             ball.mode = BallMode::Free;
             ball.pos = ramp->point_at(ramp->total_s);
             ball.vel = t_exit * (ball.s_dot * 0.95f); // 5% exit loss
-            ball.layer = ramp->drop_exit ? 0 : ramp->seam_layer[1];
+            ball.layer =
+                ramp->drop_exit ? 0 : (ramp->seam_layer[1] == 0xFF ? 0 : ramp->seam_layer[1]);
             emit_element_event(
                 s, SimEventType::SwitchHit, ramp->element_id, ball, std::abs(ball.s_dot));
             absorb(s, s.tick, SimEventType::RampMade, ramp->element_id);
@@ -769,7 +770,7 @@ void Solver::step_body(SimState& s, const TickInput* input) {
             ball.mode = BallMode::Free;
             ball.pos = ramp->point_at(0.0f);
             ball.vel = t_entry * ball.s_dot; // s_dot < 0: exits backward
-            ball.layer = ramp->seam_layer[0];
+            ball.layer = ramp->seam_layer[0] == 0xFF ? 0 : ramp->seam_layer[0];
             continue;
         }
 

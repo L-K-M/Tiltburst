@@ -165,6 +165,9 @@ parse_path(const json& obj, const std::string& pointer, const std::filesystem::p
             continue;
         }
         if (n.is_object() && n.contains("arc")) {
+            if (nodes.empty()) {
+                fail("path must start with a point [x, y] before any arc", node_ptr, file);
+            }
             if (i == 0) {
                 fail("first path node must be a point", node_ptr, file);
             }
@@ -386,6 +389,7 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
     if (type == "ramp") {
         RampDef r;
         r.id = id;
+        r.layer = layer;
         r.path = parse_path(obj, pointer, file);
         r.width = get_number(obj, "width", 0.044f, pointer, file);
         if (!obj.contains("height_profile") || !obj.at("height_profile").is_array()) {

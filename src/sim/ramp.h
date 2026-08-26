@@ -47,7 +47,8 @@ struct MagnetSim {
     uint32_t pulse_ticks_left = 0; // pulse envelope remaining
     uint32_t pulse_total = 0;      // pulse duration (for the 0.6/0.4 envelope)
 
-    // §6.12: field acceleration on a FREE same-layer ball, or zero.
+    // §6.12: field acceleration for a ball inside the enabled field;
+    // layer match and ball freedom (not held/locked) are caller-gated.
     Vec2 accel(const Ball& ball) const;
     // §6.12 damping factors while inside the enabled field.
     void damp(Ball& ball) const;
@@ -59,6 +60,9 @@ struct MagnetSim {
     }
 
     void pulse(uint32_t ticks) {
+        if (ticks == 0) {
+            return; // zero-duration pulse must not latch the field on
+        }
         pulse_ticks_left = ticks;
         pulse_total = ticks;
         on = true;

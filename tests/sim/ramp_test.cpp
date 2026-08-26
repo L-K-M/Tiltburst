@@ -266,7 +266,7 @@ TEST(Magnet, CaptureEnvelope) {
     ASSERT_TRUE(entered) << "ball never entered the field";
     EXPECT_FALSE(left_field) << "caught ball must stay in the field";
     EXPECT_LE(vmax, 3.5f) << "field must not inject energy";
-    // By 3 s: near the core and slow.
+    // By 4 s (4000 ticks at 1 kHz): near the core and slow.
     const Ball& b = rig.s.balls[0];
     EXPECT_LE(length(b.pos - rig.s.magnets[0].pos), 0.03f);
     EXPECT_LE(length(b.vel), 0.35f);
@@ -359,11 +359,10 @@ TEST(feel_scenarios, ft10_ramp_make_rollback) {
         }
         ASSERT_EQ(binds, 1u) << "must bind exactly once";
         ASSERT_NE(exit_tick, 0u) << "must forward-exit";
-        EXPECT_EQ(exit_tick - bind_tick, exit_tick - bind_tick); // transit calc
         EXPECT_LE(exit_tick - bind_tick, 250u) << "transit ≤ 250 ms";
         EXPECT_GE(exit_s_dot, 3.0f);
         EXPECT_LE(exit_s_dot, 3.7f);
-        EXPECT_LE(max_per_tick, 0.012f) << "per-tick |Δs_dot| ≤ 0.01 (bind-tick slack)";
+        EXPECT_LE(max_per_tick, 0.012f) << "per-tick |Δs_dot| ≤ 0.012 (bind-tick slack)";
 
         const auto evs = rig.drain();
         EXPECT_EQ(count_of(evs, uint16_t(tb::sim::SimEventType::RampMade)), 1u);

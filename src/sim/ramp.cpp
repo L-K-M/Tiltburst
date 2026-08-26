@@ -1,6 +1,7 @@
 #include "sim/ramp.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 
 namespace tb::sim {
@@ -13,6 +14,7 @@ Vec2 lerp2(Vec2 a, Vec2 b, float t) {
 
 const RampPath::Sample& sample_at(const std::vector<RampPath::Sample>& samples, float s) {
     // Binary search for the bracketing sample; callers clamp s to [0, S].
+    assert(!samples.empty() && "RampPath must be baked before use");
     size_t lo = 0;
     size_t hi = samples.size() - 1;
     while (hi - lo > 1) {
@@ -81,6 +83,9 @@ void MagnetSim::damp(Ball& ball) const {
     }
     if (length(ball.pos - pos) > radius) {
         return;
+    }
+    if (pulse_total > 0 && pulse_ticks_left == 0) {
+        return; // envelope fully decayed: no field, so no eddy braking
     }
     // Eddy damping (§6.12, ADR-023): spin dies fast; the velocity brake
     // at 3.5/s is what lets the field actually hold a through ball — at

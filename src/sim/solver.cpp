@@ -215,10 +215,10 @@ void emit_bank_event(SimState& s, SimEventType type, uint16_t element) {
 }
 
 void emit_lock_event(SimState& s, const BallLockElem& lock) {
-    absorb(s, s.tick, SimEventType::BallLockEvent, lock.common.table_id);
+    absorb(s, s.tick, SimEventType::BallLockCapture, lock.common.table_id);
     SimEvent ev;
     ev.tick = s.tick;
-    ev.type = uint16_t(SimEventType::BallLockEvent);
+    ev.type = uint16_t(SimEventType::BallLockCapture);
     ev.element = lock.common.table_id;
     ev.a = float(lock.held); // payload {lock_id, count}: count = held
     s.render_ring.push(s.tick, ev);
@@ -1472,7 +1472,9 @@ void Solver::resolve_captive(SimState& s, Ball& ball, CaptiveBallElem& cap, Vec2
         const float denom = 1.0f / kBallMass + (ca * ca) / kBallMass;
         const float j = -(1.0f + e) * u_n / denom;
         ball.vel += n_hat * (j / kBallMass);
-        cap.s_dot += (j * ca / kBallMass);
+        // Newton's third law on the captive: reaction −j·n̂, projected on
+        // the slot axis â (n̂ points captive → ball in this convention).
+        cap.s_dot -= (j * ca / kBallMass);
         ball.vel = clamp_speed(ball.vel);
     }
 

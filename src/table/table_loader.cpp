@@ -377,11 +377,17 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
         k.layer = layer;
         get_xy(obj, "pos", k.pos, pointer, file);
         k.radius = get_number(obj, "radius", 0.014f, pointer, file);
+        if (k.radius <= 0.0f) {
+            fail("kicker 'radius' must be > 0", pointer + "/radius", file);
+        }
         k.style = get_string(obj, "style", "saucer", pointer, file);
         if (k.style != "saucer" && k.style != "scoop" && k.style != "vuk") {
             fail("kicker 'style' must be saucer/scoop/vuk", pointer + "/style", file);
         }
         k.capture_ms = get_number(obj, "capture_ms", 800.0f, pointer, file);
+        if (k.capture_ms < 0.0f) {
+            fail("kicker 'capture_ms' must be >= 0", pointer + "/capture_ms", file);
+        }
         k.eject_speed = get_number(obj, "eject_speed", 3.0f, pointer, file);
         k.eject_angle_deg = get_number(obj, "eject_angle_deg", 90.0f, pointer, file);
         return Element{std::move(k)};
@@ -429,6 +435,14 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
         }
         get_xy(obj.at("slot"), "a", cap.a, pointer + "/slot", file);
         get_xy(obj.at("slot"), "b", cap.b, pointer + "/slot", file);
+        const float sdx = cap.b[0] - cap.a[0];
+        const float sdy = cap.b[1] - cap.a[1];
+        const float slot_len = std::sqrt(sdx * sdx + sdy * sdy);
+        if (slot_len < 0.040f || slot_len > 0.120f) {
+            fail("captive_ball 'slot' length must be in [0.040, 0.120] (§4.15)",
+                 pointer + "/slot",
+                 file);
+        }
         return Element{std::move(cap)};
     }
     if (type == "ball_lock") {

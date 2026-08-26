@@ -277,13 +277,13 @@ TEST(Trough, CountsNeverGoNegative) {
         if (roll < 40) {
             // Serve: emulate the M5 loop's serve step.
             if (rig.s.trough_balls > 0 && count_active() == 0) {
-                --rig.s.trough_balls;
                 uint8_t next_idx = 0;
                 for (Ball& b : rig.s.balls) {
                     const bool slot_free = !b.live;
                     const uint8_t idx = next_idx;
                     ++next_idx;
                     if (slot_free) {
+                        --rig.s.trough_balls; // only when a slot takes the ball
                         b.index = idx;
                         b.live = true;
                         b.mode = BallMode::Free;

@@ -1,5 +1,6 @@
 #include "sim/flipper_ccd.h"
 
+#include <algorithm>
 #include <cmath>
 #include <initializer_list>
 

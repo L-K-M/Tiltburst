@@ -1,5 +1,6 @@
 #include "sim/flipper.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace tb::sim {
@@ -27,8 +28,7 @@ void FlipperSim::tick(Flipper& f, bool pressed) {
 
     case FlipperState::Rising: {
         // Linear ω ramp (constant α_rise), then cruise at ω_max.
-        const float ramp = std::min(
-            1.0f, float(f.rise_ticks * 0.001f) / kTauRise);
+        const float ramp = std::min(1.0f, float(f.rise_ticks * 0.001f) / kTauRise);
         f.omega = sign * omega_max * ramp;
         f.rise_ticks++;
         f.progress += std::fabs(f.omega) * kTickDt / swing;
@@ -68,8 +68,7 @@ void FlipperSim::tick(Flipper& f, bool pressed) {
         } else if (pressed) {
             // Resume the rise from current |ω| if it already exceeds ramp.
             f.state = FlipperState::Rising;
-            f.rise_ticks = uint32_t(std::fabs(f.omega) / omega_max *
-                                    (kTauRise / kTickDt));
+            f.rise_ticks = uint32_t(std::fabs(f.omega) / omega_max * (kTauRise / kTickDt));
         }
         break;
     }

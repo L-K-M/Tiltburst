@@ -148,6 +148,13 @@ void build_sim(const TableDef& def, tb::sim::SimState& out) {
     out.rollovers.clear();
     out.gates.clear();
     out.spinners.clear();
+    out.kickers.clear();
+    out.drop_banks.clear();
+    out.captives.clear();
+    out.ball_locks.clear();
+    out.ball_count = def.ball_count;
+    out.locked_balls = 0;
+    out.ball_save = {};
     for (auto& b : out.balls) {
         b = tb::sim::Ball{};
     }

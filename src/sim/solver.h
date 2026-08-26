@@ -59,6 +59,15 @@ struct SimState {
     std::vector<RolloverElem> rollovers;
     std::vector<GateElem> gates;
     std::vector<SpinnerElem> spinners;
+    std::vector<KickerElem> kickers;
+    std::vector<DropBankElem> drop_banks;
+    std::vector<CaptiveBallElem> captives;
+    std::vector<BallLockElem> ball_locks;
+
+    // Ball accounting: active (FREE) + trough + locked == ball_count.
+    int ball_count = 4;
+    int locked_balls = 0;
+    BallSaveState ball_save{};
 
     // Balls.
     Ball balls[kMaxBalls]{};
@@ -95,12 +104,13 @@ private:
 
 private:
     struct Contact {
-        enum Kind : uint8_t { None = 0, Static = 1, Pair = 2, Flipper = 3 };
+        enum Kind : uint8_t { None = 0, Static = 1, Pair = 2, Flipper = 3, Captive = 4 };
 
         float toi = 0.0f;
         uint8_t kind = None;
         uint8_t ball = 0;
         uint8_t ball2 = 0;
+        uint8_t captive_idx = 0;
         Vec2 normal{};
         const Collider* collider = nullptr;
         struct Flipper* flipper = nullptr;
@@ -132,8 +142,10 @@ private:
                           float live_catch_scale); // returns approach speed
     void resolve_flipper(SimState& s, Ball& ball, Flipper& f, const FlipperHit& hit);
     void resolve_pair(SimState& s, Ball& a, Ball& b, Vec2 normal);
+    void resolve_captive(SimState& s, Ball& ball, CaptiveBallElem& cap, Vec2 normal);
     void step_regions(SimState& s, const TickInput* input);
     void step_elements(SimState& s);
+    void step_lifecycle(SimState& s, const TickInput* input);
     void pushout(SimState& s);
 
     // Per-tick scratch, reused across ticks (never allocated in step()).

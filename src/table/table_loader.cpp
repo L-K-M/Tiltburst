@@ -371,6 +371,76 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
         sp.facing_deg = get_number(obj, "facing_deg", 90.0f, pointer, file);
         return Element{std::move(sp)};
     }
+    if (type == "kicker") {
+        KickerDef k;
+        k.id = id;
+        k.layer = layer;
+        get_xy(obj, "pos", k.pos, pointer, file);
+        k.radius = get_number(obj, "radius", 0.014f, pointer, file);
+        k.style = get_string(obj, "style", "saucer", pointer, file);
+        if (k.style != "saucer" && k.style != "scoop" && k.style != "vuk") {
+            fail("kicker 'style' must be saucer/scoop/vuk", pointer + "/style", file);
+        }
+        k.capture_ms = get_number(obj, "capture_ms", 800.0f, pointer, file);
+        k.eject_speed = get_number(obj, "eject_speed", 3.0f, pointer, file);
+        k.eject_angle_deg = get_number(obj, "eject_angle_deg", 90.0f, pointer, file);
+        return Element{std::move(k)};
+    }
+    if (type == "drop_target_bank") {
+        DropTargetBankDef bank;
+        bank.id = id;
+        bank.layer = layer;
+        if (!obj.contains("targets") || !obj.at("targets").is_array()) {
+            fail("missing required field 'targets' (2–7 entries)", pointer, file);
+        }
+        const json& arr = obj.at("targets");
+        if (arr.size() < 2 || arr.size() > 7) {
+            fail("field 'targets' must hold 2–7 entries", pointer + "/targets", file);
+        }
+        for (size_t i = 0; i < arr.size(); ++i) {
+            const std::string tptr = pointer + "/targets/" + std::to_string(i);
+            const json& t = arr[i];
+            if (!t.is_object()) {
+                fail("target entry must be an object", tptr, file);
+            }
+            DropTargetBankDef::TargetDef td;
+            get_xy(t, "pos", td.pos, tptr, file);
+            td.width = get_number(t, "width", 0.025f, tptr, file);
+            if (!t.contains("facing_deg")) {
+                fail("missing required field 'facing_deg'", tptr + "/facing_deg", file);
+            }
+            td.facing_deg = get_number(t, "facing_deg", 0.0f, tptr, file);
+            bank.targets.push_back(td);
+        }
+        const std::string reset = get_string(obj, "reset", "script", pointer, file);
+        if (reset != "script" && reset != "auto") {
+            fail("bank 'reset' must be script/auto", pointer + "/reset", file);
+        }
+        bank.auto_reset = reset == "auto";
+        bank.auto_reset_ms = get_number(obj, "auto_reset_ms", 1500.0f, pointer, file);
+        return Element{std::move(bank)};
+    }
+    if (type == "captive_ball") {
+        CaptiveBallDef cap;
+        cap.id = id;
+        cap.layer = layer;
+        if (!obj.contains("slot") || !obj.at("slot").is_object()) {
+            fail("missing required field 'slot' {a, b}", pointer, file);
+        }
+        get_xy(obj.at("slot"), "a", cap.a, pointer + "/slot", file);
+        get_xy(obj.at("slot"), "b", cap.b, pointer + "/slot", file);
+        return Element{std::move(cap)};
+    }
+    if (type == "ball_lock") {
+        BallLockDef lock;
+        lock.id = id;
+        lock.layer = layer;
+        get_xy(obj, "pos", lock.pos, pointer, file);
+        lock.capacity = get_int(obj, "capacity", 2, 1, 6, pointer, file);
+        lock.eject_speed = get_number(obj, "eject_speed", 2.5f, pointer, file);
+        lock.eject_angle_deg = get_number(obj, "eject_angle_deg", -90.0f, pointer, file);
+        return Element{std::move(lock)};
+    }
     if (type == "pop_bumper") {
         PopBumperDef p;
         p.id = id;

@@ -8,6 +8,10 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Added
 
+- M07: kickers, drop target banks, captive balls, and ball locks per
+  08-physics.md §6.5/§6.9/§6.13/§6.14, plus the ball-save mechanism and
+  the active+trough+locked ball-accounting invariant.
+
 - M06: slingshots, pop bumpers, standup targets, rollovers, gates, and
   spinners per 08-physics.md §6.2–§6.8, with switch_hit pairing, cooldowns,
   and the spinner plate model (per-revolution spinner_spin events).

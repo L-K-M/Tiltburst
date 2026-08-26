@@ -14,6 +14,8 @@ constexpr uint32_t kPopFlashTicks = 60;       // §6.3 skirt flash window
 // = -5.97837e-4, exp of that. std::pow per spinner per tick is hot-path
 // waste for a compile-time constant.
 constexpr float kSpinnerDecayPerTick = 0.99940234f;
+static_assert(kTickDt > 0.0009f && kTickDt < 0.0011f,
+              "kSpinnerDecayPerTick assumes 1 ms ticks; recompute 0.55^kTickDt");
 
 float point_segment_distance(Vec2 p, Vec2 a, Vec2 b) {
     const Vec2 ab = b - a;

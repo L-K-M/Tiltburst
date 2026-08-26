@@ -434,6 +434,12 @@ int run(const CliOptions& cli) {
 
         FrameStats stats;
         std::deque<float> ring;
+        int debug_level = 0; // F2: 0 off, 1 colliders, 2 +broadphase
+
+        // Render-side mirror of the synthetic scene colliders (static
+        // after build; the sim thread owns its own instance).
+        tb::sim::SimState render_scene;
+        tb::sim::make_synthetic_scene(render_scene, 424242);
         uint64_t last_frame_ns = tb_now_ns();
         uint64_t next_cap_ns = last_frame_ns;
         bool show_overlay = true;
@@ -450,6 +456,14 @@ int run(const CliOptions& cli) {
                         g_quit.store(true);
                     } else if (!event.key.repeat && event.key.scancode == SDL_SCANCODE_F1) {
                         show_overlay = !show_overlay;
+                    } else if (!event.key.repeat && event.key.scancode == SDL_SCANCODE_F2) {
+                        debug_level = (debug_level + 1) % 3; // 16.1 cycle
+                    } else if (!event.key.repeat && event.key.scancode == SDL_SCANCODE_F12) {
+                        renderer->request_screenshot(
+                            (paths::pref() / "screenshots" /
+                             ("tiltburst_" + std::to_string(tb_now_ns()) + ".png"))
+                                .string()
+                                .c_str());
                     }
                     break;
                 default:
@@ -507,6 +521,9 @@ int run(const CliOptions& cli) {
 
             frame.quads = quads.data();
             frame.quad_count = uint32_t(quads.size());
+            frame.show_colliders = debug_level >= 1;
+            frame.debug_colliders = render_scene.colliders.data();
+            frame.debug_collider_count = uint32_t(render_scene.colliders.size());
 
             renderer->render_playfield(frame);
 

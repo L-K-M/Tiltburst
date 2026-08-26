@@ -1,0 +1,59 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct type_ViewUniforms
+{
+    float4x4 u_to_clip;
+    float2 u_target_px;
+    float u_ppm;
+    float u_time;
+};
+
+struct main0_out
+{
+    float2 out_var_TEXCOORD0 [[user(locn0)]];
+    float4 out_var_TEXCOORD1 [[user(locn1)]];
+    float4 out_var_TEXCOORD2 [[user(locn2)]];
+    float4 out_var_TEXCOORD3 [[user(locn3)]];
+    float4 out_var_TEXCOORD4 [[user(locn4)]];
+    float4 out_var_TEXCOORD5 [[user(locn5)]];
+    float4 out_var_TEXCOORD6 [[user(locn6)]];
+    float4 out_var_TEXCOORD7 [[user(locn7)]];
+    float4 gl_Position [[position]];
+};
+
+struct main0_in
+{
+    float2 in_var_TEXCOORD0 [[attribute(0)]];
+    float4 in_var_TEXCOORD1 [[attribute(1)]];
+    float4 in_var_TEXCOORD2 [[attribute(2)]];
+    float4 in_var_TEXCOORD3 [[attribute(3)]];
+    float4 in_var_TEXCOORD4 [[attribute(4)]];
+    float4 in_var_TEXCOORD5 [[attribute(5)]];
+    float4 in_var_TEXCOORD6 [[attribute(6)]];
+    float4 in_var_TEXCOORD7 [[attribute(7)]];
+    float4 in_var_TEXCOORD8 [[attribute(8)]];
+};
+
+vertex main0_out main0(main0_in in [[stage_in]], constant type_ViewUniforms& ViewUniforms [[buffer(0)]])
+{
+    main0_out out = {};
+    float _50 = cos(in.in_var_TEXCOORD2.x);
+    float _51 = sin(in.in_var_TEXCOORD2.x);
+    float2 _53 = in.in_var_TEXCOORD0 * in.in_var_TEXCOORD1.zw;
+    float _55 = _53.x;
+    float _57 = _53.y;
+    out.gl_Position = ViewUniforms.u_to_clip * float4(in.in_var_TEXCOORD1.xy + float2((_55 * _50) - (_57 * _51), (_55 * _51) + (_57 * _50)), 0.0, 1.0);
+    out.out_var_TEXCOORD0 = _53;
+    out.out_var_TEXCOORD1 = in.in_var_TEXCOORD2;
+    out.out_var_TEXCOORD2 = in.in_var_TEXCOORD3;
+    out.out_var_TEXCOORD3 = in.in_var_TEXCOORD4;
+    out.out_var_TEXCOORD4 = in.in_var_TEXCOORD5;
+    out.out_var_TEXCOORD5 = in.in_var_TEXCOORD6;
+    out.out_var_TEXCOORD6 = in.in_var_TEXCOORD7;
+    out.out_var_TEXCOORD7 = in.in_var_TEXCOORD8;
+    return out;
+}
+

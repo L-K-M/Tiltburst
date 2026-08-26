@@ -8,6 +8,10 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Added
 
+- M03: renderer v1 — SDF primitive pipeline (circle/ring/rbox/capsule/arc/
+  ball with stroke and glow), RGBA16F scene target, rotated letterbox
+  present pass with piecewise sRGB encode, F2 debug draw of colliders and
+  balls, F12 screenshots, and projection math unit tests.
 - M02: headless simulation core — analytic CCD (segment/point/arc/ball
   pair), uniform-grid broadphase, shared-timeline TOI loop with push-out,
   §4.1 impulse contacts with velocity-dependent restitution, ball-ball

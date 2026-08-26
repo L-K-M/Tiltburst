@@ -5,13 +5,14 @@
 #include "platform/gpu_device.h"
 #include "platform/paths.h"
 #include "render/shader_load.h"
+#include "render/view.h"
 
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_video.h>
 
 #include <algorithm>
 #include <cmath>
-#include <fstream>
+#include <filesystem>
 #include <vector>
 
 // stb_image_write implementation lives here (single TU in tb_render).
@@ -22,9 +23,9 @@ namespace tb::render {
 
 namespace {
 
-// Palette bg0, neon palette (13-art-direction.md §2) — authored sRGB,
-// written straight through the swapchain/UI variant.
+// Palette bg0 (13-art-direction.md §2) — authored sRGB for the UI variant.
 constexpr SDL_FColor kClearColor{0x0D / 255.f, 0x02 / 255.f, 0x21 / 255.f, 1.0f};
+constexpr float kOverlayColor[4] = {0.0f, 0xE5f / 255.f, 1.0f, 1.0f};
 
 #ifndef TB_SHADER_FALLBACK_DIR
 #define TB_SHADER_FALLBACK_DIR ""
@@ -36,12 +37,109 @@ std::vector<std::filesystem::path> shader_search_dirs() {
 
 } // namespace
 
+// ---------------------------------------------------------------------------
+// F2 debug instances (06 §16.1): colliders + ball bodies, table space.
+// ---------------------------------------------------------------------------
+
+void SdlGpuRenderer::collider_instances(const sim::Collider& c,
+                                        float ppm,
+                                        std::vector<SdfInstance>& out) {
+    const float half_w = 1.5f / ppm * 0.5f; // 1.5 px stroke in meters
+
+    auto seg_color = [&](float* rgb) {
+        rgb[0] = 0.0f; // #00FF66
+        rgb[1] = 1.0f;
+        rgb[2] = 0.4f;
+    };
+    auto arc_color = [&](float* rgb) {
+        rgb[0] = 0.0f; // #00CCFF
+        rgb[1] = 0.8f;
+        rgb[2] = 1.0f;
+    };
+
+    SdfInstance i{};
+    i.glow_radius = 0.0f;
+
+    if (c.kind == sim::Collider::Kind::Segment) {
+        const sim::Vec2 d = c.b - c.a;
+        const float len = length(d);
+        i.cx = (c.a.x + c.b.x) * 0.5f;
+        i.cy = (c.a.y + c.b.y) * 0.5f;
+        i.rot = std::atan2(d.y, d.x);
+        i.kind = kSdfCapsule;
+        i.p0 = -len * 0.5f;
+        i.p1 = 0.0f;
+        i.p2 = len * 0.5f;
+        i.p3 = 0.0f;
+        i.p4 = half_w;
+        i.hx = len * 0.5f + half_w + 0.001f;
+        i.hy = half_w + 0.001f;
+        seg_color(i.stroke);
+        i.stroke[3] = half_w * 2.0f;
+        out.push_back(i);
+        return;
+    }
+
+    if (c.kind == sim::Collider::Kind::Point) {
+        i.cx = c.a.x;
+        i.cy = c.a.y;
+        i.kind = kSdfCircle;
+        i.p0 = c.radius + half_w;
+        i.hx = i.hy = i.p0 + 0.002f;
+        arc_color(i.stroke);
+        i.stroke[3] = half_w * 2.0f;
+        out.push_back(i);
+        return;
+    }
+
+    // Arc: a0/a1 ride p0/p1; radius/thickness p2/p3 (shader §8 mapping).
+    i.cx = c.a.x;
+    i.cy = c.a.y;
+    i.kind = kSdfArc;
+    i.p0 = c.a0;
+    i.p1 = c.a1;
+    i.p2 = c.radius;
+    i.p3 = half_w;
+    i.hx = i.hy = c.radius + half_w + 0.002f;
+    arc_color(i.stroke);
+    i.stroke[3] = half_w * 2.0f;
+    out.push_back(i);
+}
+
+void SdlGpuRenderer::ball_instances(const SimSnapshot& snap, std::vector<SdfInstance>& out) {
+    for (uint32_t i = 0; i < snap.ball_count; ++i) {
+        const auto& b = snap.balls[i];
+        SdfInstance ball{};
+        ball.cx = b.x;
+        ball.cy = b.y;
+        ball.kind = kSdfBall;
+        ball.p0 = 0.0135f;
+        ball.hx = ball.hy = 0.0135f + 0.002f;
+        // Fake-chrome placeholder gradient (M13 refines per §11).
+        for (int k = 0; k < 3; ++k) {
+            ball.fill0[k] = 0.75f;
+            ball.fill1[k] = 0.25f;
+        }
+        ball.fill0[3] = ball.fill1[3] = 1.0f;
+        ball.grad[1] = -1.0f;
+        ball.grad[2] = 0.027f;
+        ball.grad[3] = 1.0f;
+        out.push_back(ball);
+    }
+}
+
+// ---------------------------------------------------------------------------
+
+SdlGpuRenderer::~SdlGpuRenderer() {
+    shutdown();
+}
+
 bool SdlGpuRenderer::init(const RendererConfig& cfg) {
     playfield_ = cfg.playfield_window;
     backglass_ = cfg.backglass_window;
     rotation_ = cfg.playfield_rotation;
 
-    platform::SwapchainInit sc =
+    const platform::SwapchainInit sc =
         platform::create_device_for_window(playfield_, cfg.debug_device, "auto");
     if (!sc.device) {
         return false;
@@ -53,8 +151,8 @@ bool SdlGpuRenderer::init(const RendererConfig& cfg) {
         backglass_ = nullptr;
     }
 
-    const std::filesystem::path shader_dir = find_shader_dir(shader_search_dirs());
-    if (shader_dir.empty()) {
+    const std::filesystem::path dir = find_shader_dir(shader_search_dirs());
+    if (dir.empty()) {
         TB_LOG_ERROR("main",
                      "no complete shader blob set found; see "
                      "/shaders/compiled and ADR-012");
@@ -62,22 +160,39 @@ bool SdlGpuRenderer::init(const RendererConfig& cfg) {
         return false;
     }
 
-    if (!quads_.init(device_, sc.format, shader_dir)) {
+    if (!quads_.init(device_, sc.format, dir) || !sdf_.init(device_, sc.format, dir) ||
+        !present_.init(device_, sc.format, dir)) {
         shutdown();
         return false;
     }
+    scene_w_ = 0; // recreate on first frame via ensure_scene
+    scene_h_ = 0;
     return true;
 }
 
 void SdlGpuRenderer::destroy_device() {
     quads_.shutdown();
-    if (offscreen_) {
-        SDL_ReleaseGPUTexture(device_, offscreen_);
-        offscreen_ = nullptr;
+    sdf_.shutdown();
+    present_.shutdown();
+    if (scene_) {
+        SDL_ReleaseGPUTexture(device_, scene_);
+        scene_ = nullptr;
+    }
+    if (capture_) {
+        SDL_ReleaseGPUTexture(device_, capture_);
+        capture_ = nullptr;
     }
     if (readback_) {
         SDL_ReleaseGPUTransferBuffer(device_, readback_);
         readback_ = nullptr;
+    }
+    if (offscreen_) {
+        SDL_ReleaseGPUTexture(device_, offscreen_);
+        offscreen_ = nullptr;
+    }
+    if (smoke_readback_) {
+        SDL_ReleaseGPUTransferBuffer(device_, smoke_readback_);
+        smoke_readback_ = nullptr;
     }
     if (device_) {
         SDL_WaitForGPUIdle(device_);
@@ -92,34 +207,57 @@ void SdlGpuRenderer::shutdown() {
     destroy_device();
 }
 
-void SdlGpuRenderer::render_playfield(const RenderFrame& frame) {
-    SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(device_);
-    if (!cmd) {
-        return;
+bool SdlGpuRenderer::ensure_scene(SDL_GPUTextureFormat) {
+    if (scene_ && view_.scene_w == scene_w_ && view_.scene_h == scene_h_) {
+        return true;
     }
-
-    SDL_GPUTexture* tex = nullptr;
-    Uint32 w = 0;
-    Uint32 h = 0;
-    if (!SDL_WaitAndAcquireGPUSwapchainTexture(cmd, playfield_, &tex, &w, &h) || tex == nullptr) {
-        // Minimized/occluded: skip the frame — every acquired command
-        // buffer is submitted or cancelled exactly once (06 §4).
-        SDL_CancelGPUCommandBuffer(cmd);
-        ++stats_.playfield_skips;
-        return;
+    if (scene_) {
+        SDL_ReleaseGPUTexture(device_, scene_);
+        scene_ = nullptr;
     }
+    scene_w_ = view_.scene_w;
+    scene_h_ = view_.scene_h;
 
-    const uint64_t frame_start = tb_now_ns();
+    SDL_GPUTextureCreateInfo ti{};
+    ti.type = SDL_GPU_TEXTURETYPE_2D;
+    ti.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    ti.width = std::max(1u, scene_w_);
+    ti.height = std::max(1u, scene_h_);
+    ti.layer_count_or_depth = 1;
+    ti.num_levels = 1;
+    // RGBA16F per §7; consumed by the bloom chain at M13.
+    ti.format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
+    scene_ = SDL_CreateGPUTexture(device_, &ti);
+    return scene_ != nullptr;
+}
 
-    quads_.begin_frame(cmd, w, h, frame.snapshot ? double(frame.snapshot->tick) * 0.001 : 0.0);
+void SdlGpuRenderer::draw_scene(SDL_GPUCommandBuffer* cmd,
+                                const RenderFrame& frame,
+                                double time_s) {
+    float table_clip[16];
+    table_to_clip(float(scene_w_), float(scene_h_), table_clip);
 
-    SDL_GPUColorTargetInfo target{};
-    target.texture = tex;
-    target.clear_color = kClearColor;
-    target.load_op = SDL_GPU_LOADOP_CLEAR;
-    target.store_op = SDL_GPU_STOREOP_STORE;
+    quads_.begin_frame(cmd, scene_w_, scene_h_, time_s);
+    sdf_.begin_frame(cmd, table_clip, scene_w_, scene_h_, time_s);
 
-    SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(cmd, &target, 1, nullptr);
+    SDL_GPUColorTargetInfo tgt{};
+    tgt.texture = scene_;
+    tgt.clear_color = kClearColor;
+    tgt.load_op = SDL_GPU_LOADOP_CLEAR;
+    tgt.store_op = SDL_GPU_STOREOP_STORE;
+
+    SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(cmd, &tgt, 1, nullptr);
+
+    debug_instances_.clear();
+    if (frame.show_colliders && frame.debug_colliders != nullptr) {
+        for (uint32_t i = 0; i < frame.debug_collider_count; ++i) {
+            collider_instances(frame.debug_colliders[i], view_.ppm, debug_instances_);
+        }
+    }
+    if (frame.snapshot != nullptr) {
+        ball_instances(*frame.snapshot, debug_instances_);
+    }
+    sdf_.upload_and_draw(pass);
 
     if (frame.quad_count > 0) {
         for (uint32_t i = 0; i < frame.quad_count; ++i) {
@@ -136,6 +274,38 @@ void SdlGpuRenderer::render_playfield(const RenderFrame& frame) {
     }
 
     SDL_EndGPURenderPass(pass);
+}
+
+void SdlGpuRenderer::render_playfield(const RenderFrame& frame) {
+    SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(device_);
+    if (!cmd) {
+        return;
+    }
+
+    SDL_GPUTexture* tex = nullptr;
+    Uint32 w = 0;
+    Uint32 h = 0;
+    if (!SDL_WaitAndAcquireGPUSwapchainTexture(cmd, playfield_, &tex, &w, &h) || tex == nullptr) {
+        // Minimized/occluded: skip — every acquired buffer is submitted or
+        // cancelled exactly once (06 §4).
+        SDL_CancelGPUCommandBuffer(cmd);
+        ++stats_.playfield_skips;
+        return;
+    }
+
+    const uint64_t frame_start = tb_now_ns();
+
+    view_ = compute_view(uint32_t(int(rotation_)), w, h, kReferenceTableW, kReferenceTableH);
+    if (!ensure_scene(SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT)) {
+        SDL_CancelGPUCommandBuffer(cmd);
+        return;
+    }
+
+    draw_scene(cmd, frame, frame.snapshot ? double(frame.snapshot->tick) * 0.001 : 0.0);
+
+    present_.build_corners(view_, w, h);
+    present_.add_pass(cmd, scene_, tex);
+
     SDL_SubmitGPUCommandBuffer(cmd);
 
     const float ms = float(tb_now_ns() - frame_start) / 1e6f;
@@ -143,20 +313,20 @@ void SdlGpuRenderer::render_playfield(const RenderFrame& frame) {
     while (frame_ms_.size() > 240) {
         frame_ms_.pop_front();
     }
+    stats_.sdf_instances = uint32_t(debug_instances_.size());
     ++stats_.frames;
+
+    if (!pending_screenshot_.empty()) {
+        capture_to_png(pending_screenshot_);
+        pending_screenshot_.clear();
+    }
 }
 
 bool SdlGpuRenderer::render_backglass(const BackglassFrame&) {
-    if (backglass_ == nullptr) {
-        return false;
-    }
-    // Backglass content arrives with the display system (M12); the
-    // non-blocking ~30 Hz path is wired there.
-    return false;
+    return backglass_ != nullptr; // content arrives at M12
 }
 
 void SdlGpuRenderer::request_screenshot(const char* png_path) {
-    // F12 capture path lands with debug draw at M3 (06 §15.1).
     pending_screenshot_ = png_path != nullptr ? png_path : "";
 }
 
@@ -180,15 +350,15 @@ bool SdlGpuRenderer::init_offscreen(uint32_t width, uint32_t height, bool debug_
     offscreen_w_ = width;
     offscreen_h_ = height;
 
-    SDL_GPUTextureCreateInfo tinfo{};
-    tinfo.type = SDL_GPU_TEXTURETYPE_2D;
-    tinfo.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
-    tinfo.width = width;
-    tinfo.height = height;
-    tinfo.layer_count_or_depth = 1;
-    tinfo.num_levels = 1;
-    tinfo.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
-    offscreen_ = SDL_CreateGPUTexture(device_, &tinfo);
+    SDL_GPUTextureCreateInfo ti{};
+    ti.type = SDL_GPU_TEXTURETYPE_2D;
+    ti.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    ti.width = width;
+    ti.height = height;
+    ti.layer_count_or_depth = 1;
+    ti.num_levels = 1;
+    ti.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    offscreen_ = SDL_CreateGPUTexture(device_, &ti);
     if (!offscreen_) {
         TB_LOG_WARN("main", "offscreen target failed: {}", SDL_GetError());
         shutdown();
@@ -198,18 +368,22 @@ bool SdlGpuRenderer::init_offscreen(uint32_t width, uint32_t height, bool debug_
     SDL_GPUTransferBufferCreateInfo rb{};
     rb.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
     rb.size = size_t(width) * height * 4;
-    readback_ = SDL_CreateGPUTransferBuffer(device_, &rb);
-    if (!readback_) {
+    smoke_readback_ = SDL_CreateGPUTransferBuffer(device_, &rb);
+    if (!smoke_readback_) {
         shutdown();
         return false;
     }
 
-    const std::filesystem::path shader_dir = find_shader_dir(shader_search_dirs());
-    if (shader_dir.empty() ||
-        !quads_.init(device_, SDL_GPUTextureFormat(tinfo.format), shader_dir)) {
+    const std::filesystem::path dir = find_shader_dir(shader_search_dirs());
+    if (dir.empty() || !quads_.init(device_, ti.format, dir) ||
+        !sdf_.init(device_, ti.format, dir)) {
         shutdown();
         return false;
     }
+
+    view_.rotation = 0;
+    view_.scene_w = width;
+    view_.scene_h = height;
     return true;
 }
 
@@ -218,40 +392,13 @@ bool SdlGpuRenderer::render_offscreen_frame(const RenderFrame& frame) {
     if (!cmd) {
         return false;
     }
-    quads_.begin_frame(cmd,
-                       offscreen_w_,
-                       offscreen_h_,
-                       frame.snapshot ? double(frame.snapshot->tick) * 0.001 : 0.0);
-
-    SDL_GPUColorTargetInfo target{};
-    target.texture = offscreen_;
-    target.clear_color = kClearColor;
-    target.load_op = SDL_GPU_LOADOP_CLEAR;
-    target.store_op = SDL_GPU_STOREOP_STORE;
-
-    SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(cmd, &target, 1, nullptr);
-    if (frame.quad_count > 0) {
-        for (uint32_t i = 0; i < frame.quad_count; ++i) {
-            quads_.push(frame.quads[i].cx,
-                        frame.quads[i].cy,
-                        frame.quads[i].hx,
-                        frame.quads[i].hy,
-                        frame.quads[i].r,
-                        frame.quads[i].g,
-                        frame.quads[i].b,
-                        frame.quads[i].a);
-        }
-        quads_.upload_and_draw(pass);
-    }
-    SDL_EndGPURenderPass(pass);
-    SDL_SubmitGPUCommandBuffer(cmd);
-
+    draw_scene(cmd, frame, frame.snapshot ? double(frame.snapshot->tick) * 0.001 : 0.0);
     ++stats_.frames;
     return true;
 }
 
 bool SdlGpuRenderer::write_png(const std::filesystem::path& out_png) {
-    if (!device_ || !offscreen_ || !readback_) {
+    if (!device_ || !offscreen_ || !smoke_readback_) {
         return false;
     }
     SDL_WaitForGPUIdle(device_);
@@ -260,10 +407,85 @@ bool SdlGpuRenderer::write_png(const std::filesystem::path& out_png) {
     if (!cmd) {
         return false;
     }
-
     SDL_GPUCopyPass* copy = SDL_BeginGPUCopyPass(cmd);
     SDL_GPUTextureRegion src{offscreen_, 0, 0, 0, offscreen_w_, offscreen_h_, 1};
-    SDL_GPUTextureTransferInfo dst{readback_, 0, offscreen_w_, offscreen_h_};
+    SDL_GPUTextureTransferInfo dst{smoke_readback_, 0, offscreen_w_, offscreen_h_};
+    SDL_DownloadFromGPUTexture(copy, &src, &dst);
+    SDL_EndGPUCopyPass(copy);
+
+    SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(cmd);
+    SDL_WaitForGPUFences(device_, true, &fence, 1);
+    SDL_ReleaseGPUFence(device_, fence);
+
+    void* map = SDL_MapGPUTransferBuffer(device_, smoke_readback_, false);
+    if (!map) {
+        return false;
+    }
+    const int ok = stbi_write_png(out_png.string().c_str(),
+                                  int(offscreen_w_),
+                                  int(offscreen_h_),
+                                  4,
+                                  map,
+                                  int(offscreen_w_) * 4);
+    SDL_UnmapGPUTransferBuffer(device_, smoke_readback_);
+
+    if (!ok) {
+        TB_LOG_WARN("main", "stbi_write_png failed for {}", out_png.string());
+        return false;
+    }
+    TB_LOG_INFO("main", "wrote {}", out_png.string());
+    return true;
+}
+
+bool SdlGpuRenderer::capture_to_png(const std::filesystem::path& png) {
+    // F12 (§15.1): re-render one cached frame into an RGBA8 target sized to
+    // the scene and download it — never copies the swapchain.
+    if (scene_w_ == 0 || scene_h_ == 0 || !device_) {
+        return false;
+    }
+    if (capture_w_ != scene_w_ || capture_h_ != scene_h_ || !capture_ || !readback_) {
+        if (capture_) {
+            SDL_ReleaseGPUTexture(device_, capture_);
+            capture_ = nullptr;
+        }
+        if (readback_) {
+            SDL_ReleaseGPUTransferBuffer(device_, readback_);
+            readback_ = nullptr;
+        }
+        SDL_GPUTextureCreateInfo ti{};
+        ti.type = SDL_GPU_TEXTURETYPE_2D;
+        ti.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
+        ti.width = scene_w_;
+        ti.height = scene_h_;
+        ti.layer_count_or_depth = 1;
+        ti.num_levels = 1;
+        ti.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+        capture_ = SDL_CreateGPUTexture(device_, &ti);
+
+        SDL_GPUTransferBufferCreateInfo rb{};
+        rb.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
+        rb.size = size_t(scene_w_) * scene_h_ * 4;
+        readback_ = SDL_CreateGPUTransferBuffer(device_, &rb);
+
+        capture_w_ = scene_w_;
+        capture_h_ = scene_h_;
+    }
+    if (!capture_ || !readback_) {
+        return false;
+    }
+
+    SDL_WaitForGPUIdle(device_);
+    SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(device_);
+    if (!cmd) {
+        return false;
+    }
+
+    draw_scene(cmd, last_, 0.0);
+    present_.add_pass(cmd, scene_, capture_);
+
+    SDL_GPUCopyPass* copy = SDL_BeginGPUCopyPass(cmd);
+    SDL_GPUTextureRegion src{capture_, 0, 0, 0, capture_w_, capture_h_, 1};
+    SDL_GPUTextureTransferInfo dst{readback_, 0, capture_w_, capture_h_};
     SDL_DownloadFromGPUTexture(copy, &src, &dst);
     SDL_EndGPUCopyPass(copy);
 
@@ -275,20 +497,11 @@ bool SdlGpuRenderer::write_png(const std::filesystem::path& out_png) {
     if (!map) {
         return false;
     }
-    const int ok = stbi_write_png(out_png.string().c_str(),
-                                  int(offscreen_w_),
-                                  int(offscreen_h_),
-                                  4,
-                                  map,
-                                  int(offscreen_w_) * 4);
+    const int ok = stbi_write_png(
+        png.string().c_str(), int(capture_w_), int(capture_h_), 4, map, int(capture_w_) * 4);
     SDL_UnmapGPUTransferBuffer(device_, readback_);
-
-    if (!ok) {
-        TB_LOG_WARN("main", "stbi_write_png failed for {}", out_png.string());
-        return false;
-    }
-    TB_LOG_INFO("main", "wrote {}", out_png.string());
-    return true;
+    TB_LOG_INFO("main", "screenshot {}", ok != 0 ? png.string() : std::string("failed"));
+    return ok != 0;
 }
 
 } // namespace tb::render

@@ -89,3 +89,23 @@ corrections are new entries. Format: 03-process.md §3.1.
   was fixed to shift bits 6–9 down one (05 §13.1), changing the m2_bounce
   button stream; tests/golden/determinism/linux/m2_bounce.hashes
   regenerated per §2.4.4.
+
+## M03 — Renderer v1 & debug draw (2026-08-26)
+
+- Shipped: SDF primitive pipeline (sdf.vert/frag per 06 §8: circle, ring,
+  rounded box, capsule, arc, ball; analytic AA, fill/stroke/glow), RGBA16F
+  scene target sized by the §6.2 fit math, present pass (§12.5 pass F
+  bloomless variant) drawing the rotated letterbox quad with piecewise sRGB,
+  F2 debug cycle (colliders → +broadphase placeholder), F12 screenshots via
+  offscreen re-render (never swapchain copy, §15.1), ViewTransform pure-math
+  unit tests (corner mapping rot90, letterbox bars).
+- Deviations:
+  - Bloom chain, TBArt, real text stay out until M13 per milestone split;
+    present pass is the bloomless variant of §12.5.
+  - F2 broadphase-grid page renders nothing yet (grid data not published to
+    the snapshot debug section; arrives with the table loader at M5).
+  - Debug draw reads colliders from a render-side mirror scene rather than
+    "the snapshot's debug section" — the snapshot debug section named by
+    06 §16.1 does not exist in the plan (ledger defect #4); RenderFrame
+    delivery per 04 M3 wins.
+  - Local box has no Vulkan loader; render smoke verified on CI lavapipe.

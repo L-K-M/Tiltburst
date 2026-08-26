@@ -5,8 +5,11 @@ add_library(tb_render STATIC
     render.cpp
     overlay.cpp
     pipeline_quad.cpp
+    present_pass.cpp
+    sdf_batch.cpp
     sdl_gpu_renderer.cpp
     shader_load.cpp
+    view.cpp
 )
 
 target_include_directories(tb_render PUBLIC ${CMAKE_SOURCE_DIR}/src)

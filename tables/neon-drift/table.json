@@ -1,0 +1,76 @@
+{
+  // neon-drift — greybox layout (M5). Full element roster per
+  // 15-launch-tables.md §1.3 arrives with M6–M8; this greybox carries the
+  // M5 element set: boundary, orbit, merged shooter lane, three flippers,
+  // inlane/outlane pairs, sling bodies, drain, trough, insert lights.
+  "format_version": 1,
+
+  "meta": {
+    "slug": "neon-drift",
+    "name": "Neon Drift",
+    "theme": "synthwave night-street racing",
+    "author": "Tiltburst",
+    "description": "Momentum table: shift up through five gears, chain ramps like drifting through corners, and let the drift corner magnet bend your orbit shots sideways. Greybox milestone 5 layout.",
+    "rules_card": "Shift up through the gears on the drop bank. Chain ramps to hold the multiplier. Drift the corner."
+  },
+
+  "playfield": {
+    "size": [0.52, 1.04],
+    "slope_deg": 6.5,
+    "ball_count": 4
+  },
+
+  "elements": [
+
+    // Outer boundary (15 §1.3 standard table: r = 0.130 corners).
+    { "id": "outer_wall", "type": "wall", "closed": true, "material": "wood",
+      "path": [
+        [0.000, 0.000],
+        [0.000, 0.910],
+        { "arc": { "to": [0.130, 1.040], "radius": 0.130, "dir": "cw" } },
+        [0.390, 1.040],
+        { "arc": { "to": [0.520, 0.910], "radius": 0.130, "dir": "cw" } },
+        [0.520, 0.000]
+      ]
+    },
+
+    // Upper-right flipper: the third flipper (15 §1.3 roster row 1).
+    { "id": "upper_flipper", "type": "flipper", "pos": [0.448, 0.615],
+      "length": 0.062, "rest_angle_deg": -100, "swing_deg": 46,
+      "side": "right", "input": "right" },
+
+    // Drain + trough.
+    { "id": "drain", "type": "outhole",
+      "region": { "a": [0.020, 0.010], "b": [0.460, 0.010] } },
+    { "id": "main_trough", "type": "trough", "capacity": 4 },
+
+    // R-P-M top-lane inserts (state only in M5).
+    { "id": "light_rpm_r", "type": "light", "pos": [0.180, 0.880],
+      "shape": "arrow", "direction_deg": 270, "color": "#FF2975" },
+    { "id": "light_rpm_p", "type": "light", "pos": [0.220, 0.880],
+      "shape": "arrow", "direction_deg": 270, "color": "#08F7FE" },
+    { "id": "light_rpm_m", "type": "light", "pos": [0.260, 0.880],
+      "shape": "arrow", "direction_deg": 270, "color": "#9D4EFF" }
+  ],
+
+  "prefabs": [
+
+    // Orbit hugging the boundary (15 §0.8 numbers).
+    { "id": "loop", "prefab": "orbit", "mouth_x": 0.075, "top_radius": 0.130,
+      "entry_y_left": 0.620, "entry_y_right": 0.900 },
+
+    // Shooter lane — merges into the orbit's right leg above y = 0.888,
+    // so this instance emits no top post (09 §5.2 merged variant).
+    { "id": "shooter", "prefab": "plunger_lane",
+      "lane_width": 0.040, "top_y": 0.880 },
+
+    // Standard bottom (15 §0.4): flippers, inlane/outlane pairs, slings.
+    { "id": "flippers", "prefab": "flipper_pair_standard",
+      "pos": [0.240, 0.115] },
+
+    { "id": "left_lanes", "prefab": "inlane_outlane_pair", "side": "left" },
+    { "id": "right_lanes", "prefab": "inlane_outlane_pair", "side": "right" },
+
+    { "id": "slings", "prefab": "sling_pair", "pos": [0.240, 0.210] }
+  ]
+}

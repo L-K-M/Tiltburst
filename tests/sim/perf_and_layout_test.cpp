@@ -1,6 +1,8 @@
 #include "sim/solver.h"
 #include "support/alloc_hook.h"
 #include "support/data_path.h"
+#include "table/sim_builder.h"
+#include "table/table_loader.h"
 
 #include <gtest/gtest.h>
 
@@ -167,5 +169,57 @@ TEST(perf_tick, gate_synthetic) {
 
     EXPECT_LT(mean, 100.0) << "median-of-3 mean tick time exceeded 100 µs";
     EXPECT_LT(p99, 200.0) << "median-of-3 p99 tick time exceeded 200 µs";
+#endif
+}
+
+// perf_tick.gate_tables (04-milestones.md M5; 16-testing-ci.md §2.9): the
+// same mean/p99 limits as gate_synthetic, loading test-lab and every
+// shipped table pack through tb_table. rules.lua loading joins at M9.
+TEST(perf_tick, gate_tables) {
+#ifndef NDEBUG
+    GTEST_SKIP() << "perf gates are Release-only";
+#else
+    using Clock = std::chrono::steady_clock;
+
+    for (const char* slug : {"test-lab", "neon-drift"}) {
+        const tb::table::TableDef def =
+            tb::table::load_table(tb::test::data_path(std::string("tables/") + slug));
+        tb::sim::SimState s;
+        tb::table::build_sim(def, s);
+
+        tb::sim::Solver solver;
+        tb::sim::TickInput input;
+        input.buttons = 1u; // one flipper held: exercises dynamic colliders
+
+        for (int i = 0; i < 5000; ++i) {
+            solver.step(s, input); // warmup
+        }
+
+        constexpr int kTimed = 60000;
+        std::vector<double> samples;
+        samples.resize(size_t(kTimed));
+        for (int i = 0; i < kTimed; ++i) {
+            const auto t0 = Clock::now();
+            solver.step(s, input);
+            samples[size_t(i)] =
+                double(std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - t0)
+                           .count()) /
+                1000.0;
+        }
+
+        std::sort(samples.begin(), samples.end());
+        double sum = 0.0;
+        for (double v : samples) {
+            sum += v;
+        }
+        const double mean = sum / double(kTimed);
+        const double p99 = samples[size_t(std::ceil(0.99 * double(kTimed)) - 1)];
+
+        EXPECT_LT(mean, 100.0) << slug << ": mean tick over 100 us";
+        EXPECT_LT(p99, 200.0) << slug << ": p99 tick over 200 us";
+
+        std::cout << "perf_tick.gate_tables[" << slug << "]: mean_us=" << mean << " p99_us=" << p99
+                  << std::endl;
+    }
 #endif
 }

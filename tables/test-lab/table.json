@@ -1,0 +1,101 @@
+{
+  // test-lab — minimal valid Tiltburst table. Canon: PLAN.md 5.8.
+  // Used by tb_table unit tests and as the authoring starter.
+  "format_version": 1,
+
+  "meta": {
+    "slug": "test-lab",
+    "name": "Test Lab",
+    "theme": "calibration chamber",
+    "author": "Tiltburst",
+    "description": "Minimal valid table used by unit tests and the authoring docs. One bumper, two targets, one top lane.",
+    "rules_card": "Hit both targets to light the top lane. Top lane scores 5000."
+  },
+
+  "playfield": {
+    "size": [0.52, 1.04],   // default table, meters
+    "slope_deg": 6.5,
+    "ball_count": 4
+  },
+
+  "elements": [
+
+    // Outer boundary: rectangle with two rounded top corners (r = 0.10).
+    // Closed => the final segment [0.520,0] -> [0.000,0] is implicit.
+    { "id": "outer_wall", "type": "wall", "closed": true, "material": "wood",
+      "path": [
+        [0.000, 0.000],
+        [0.000, 0.940],
+        { "arc": { "to": [0.100, 1.040], "radius": 0.100, "dir": "cw" } },
+        [0.420, 1.040],
+        { "arc": { "to": [0.520, 0.940], "radius": 0.100, "dir": "cw" } },
+        [0.520, 0.000]
+      ]
+    },
+
+    // Lower guides funneling the ball to the flippers. Their lower ends
+    // stop 16.1 mm from the flipper pivots -- 5.1 mm of surface gap past
+    // the 0.011 pivot radius, well under the 0.024 blocking threshold, so
+    // nothing squeezes past outboard of the flippers. Their upper ends sit
+    // on the side walls at y = 0.270, which sets the narrowest passable
+    // neck on the table: guide to the sling back corner [0.127, 0.190],
+    // 0.0359 m. That is above the 0.033 minimum lane width and clear of
+    // the 0.025-0.032 jam band (section 6). Raising these ends back to
+    // y = 0.300 closes the neck to 0.0310 m -- inside the jam band.
+    { "id": "left_drain_guide", "type": "wall", "material": "wood",
+      "path": [[0.000, 0.270], [0.135, 0.130]] },
+    { "id": "right_drain_guide", "type": "wall", "material": "wood",
+      "path": [[0.480, 0.270], [0.345, 0.130]] },
+
+    // One pop bumper mid-table (defaults: radius 0.031, kick 4.5 m/s).
+    { "id": "pop_main", "type": "pop_bumper", "pos": [0.240, 0.760],
+      "tags": ["scoring"] },
+
+    // Two standup targets angled toward the playfield center.
+    { "id": "target_left", "type": "standup_target", "pos": [0.085, 0.620],
+      "facing_deg": -55, "tags": ["lab_targets"] },
+    { "id": "target_right", "type": "standup_target", "pos": [0.395, 0.620],
+      "facing_deg": -125, "tags": ["lab_targets"] },
+
+    // Rollover in the top arch; the plunged ball crosses it.
+    { "id": "top_lane", "type": "rollover", "pos": [0.240, 0.900],
+      "facing_deg": 90 },
+
+    // Drain sensor spanning the bottom, stopping short of the shooter
+    // lane (x < 0.480) so it never captures the ball on the plunger.
+    { "id": "drain", "type": "outhole",
+      "region": { "a": [0.020, 0.010], "b": [0.460, 0.010] } },
+
+    // Ball store. capacity >= playfield.ball_count (V009).
+    { "id": "main_trough", "type": "trough", "capacity": 4 },
+
+    // Two insert lights, addressed by rules.lua via tb.light_on(id).
+    { "id": "light_pop", "type": "light", "pos": [0.240, 0.715],
+      "shape": "circle", "color": "#ff9a00" },
+    { "id": "light_top_lane", "type": "light", "pos": [0.240, 0.860],
+      "shape": "arrow", "direction_deg": 90, "color": "#00e5ff" }
+  ],
+
+  "prefabs": [
+
+    // Standard lower flippers. Expands to flippers_left_flipper and
+    // flippers_right_flipper; pivots at [0.141, 0.115] / [0.339, 0.115],
+    // tip gap 0.068 (section 5.1).
+    { "id": "flippers", "prefab": "flipper_pair_standard",
+      "pos": [0.240, 0.115] },
+
+    // Right shooter lane. Expands to shooter_wall (x = 0.480, running from
+    // y = 0 up to the gate line y = 0.888), shooter_top_post at
+    // [0.472, 0.888] (tangent to the wall, out of the lane), shooter_gate
+    // (one-way, y = 0.888, span [0.480, 0.888]-[0.520, 0.888], both
+    // endpoints 0.000 m from a collider), and shooter_plunger at
+    // [0.500, 0.030] (section 5.2).
+    { "id": "shooter", "prefab": "plunger_lane",
+      "lane_width": 0.040, "top_y": 0.880 },
+
+    // Slingshots above the flippers. Expands to slings_left_wall,
+    // slings_left_sling, slings_right_wall, slings_right_sling
+    // (section 5.3).
+    { "id": "slings", "prefab": "sling_pair", "pos": [0.240, 0.210] }
+  ]
+}

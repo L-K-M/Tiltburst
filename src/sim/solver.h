@@ -24,6 +24,10 @@ struct SimTickStats {
 };
 
 struct SimState {
+    // Materials default to the canonical §4.3 rows; build_sim applies
+    // per-table overrides over them.
+    SimState();
+
     // Table geometry (baked once at build; never mutated by step()).
     std::vector<Collider> colliders;
     Broadphase grid;
@@ -36,9 +40,23 @@ struct SimState {
     float air_drag = kDragK;
     float restitution_falloff = 0.12f;
     float restitution_soft = 0.5f;
+    float live_catch_window_ticks = kLiveCatchWindowTicks;
+    float live_catch_factor = kLiveCatchFactor;
+
+    // Table elements (M5): plunger, drain sensors, trough, lights.
+    bool has_plunger = false;
+    PlungerState plunger{};
+    std::vector<OutholeRegion> outholes;
+    int trough_balls = 0;
+    std::vector<LightState> lights;
+    uint32_t serve_delay_ticks = 0; // drain → serve countdown (basic M5 loop)
 
     // Balls.
     Ball balls[kMaxBalls]{};
+
+    // Material table (08 §4.3 rows; build_sim applies per-table overrides
+    // over the canonical defaults). Indexed by MaterialId.
+    Material mats[5]{};
 
     // Flippers (M4): dynamic colliders bypassing the grid.
     std::vector<Flipper> flippers;
@@ -88,6 +106,7 @@ private:
                           float live_catch_scale); // returns approach speed
     void resolve_flipper(SimState& s, Ball& ball, Flipper& f, const FlipperHit& hit);
     void resolve_pair(SimState& s, Ball& a, Ball& b, Vec2 normal);
+    void step_regions(SimState& s, const TickInput* input);
     void pushout(SimState& s);
 
     // Per-tick scratch, reused across ticks (never allocated in step()).

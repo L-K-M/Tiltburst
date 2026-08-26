@@ -10,7 +10,10 @@ namespace tb::sim {
 // Physics-side event types; values are stable (they enter state hashes and
 // replay records). Script/framework types join at M9/M10.
 enum class SimEventType : uint16_t {
-    Collision = 1, // ball vs static collider, speed ≥ 0.25 m/s (08 §4.1)
+    Collision = 1,    // ball vs static collider, speed ≥ 0.25 m/s (08 §4.1)
+    Drain = 2,        // ball entered an outhole region (08 §6.15)
+    BallLaunched = 3, // plunger release with a ball in the zone (08 §6.16)
+    BallServed = 4,   // trough served a ball onto the plunger (08 §6.15)
     None = 0xFFFF,
 };
 

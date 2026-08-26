@@ -8,6 +8,19 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Added
 
+- M05: table.json loader with prefab expansion (flipper_pair_standard,
+  plunger_lane incl. merged variant, sling_pair, inlane_outlane_pair,
+  orbit), sim builder with path/material baking, plunger charge-release
+  sim, outhole drain + trough serve, `tables/test-lab` and the Neon Drift
+  greybox, `--table` boot, F5 hot-reload, and perf_tick.gate_tables.
+
+### Fixed
+
+- M05: live-catch window restored to the documented 50 ms default
+  (merged M4 carried 70 ms; ADR-021 text and code now agree).
+
+### Added
+
 - M04: flipper stroke state machine, moving-capsule CCD, surface-velocity
   impulses and live catch; FT-01…FT-08 feel scenarios on the §5.6 code rig.
 - M04: raw input layer (05 §9) — SDL/WinRaw/evdev producers over per-source

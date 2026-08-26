@@ -30,13 +30,13 @@ struct FlipperParams {
 };
 
 // Global stroke constants (08 §5.5).
-constexpr float kOmegaMax = 42.0f;             // rad/s at strength 1
-constexpr float kTauRise = 0.011f;             // s ramp-up
-constexpr float kAlphaDrop = 2400.0f;          // rad/s²
-constexpr float kOmegaDropMax = 24.0f;         // rad/s release cap
-constexpr float kMovingOmegaFastPath = 1.0f;   // below: static swept path
-constexpr uint32_t kLiveCatchWindowTicks = 70; // §1.3 default (50 ms)
-constexpr float kLiveCatchFactor = 0.15;       // §1.3 default
+constexpr float kOmegaMax = 42.0f;           // rad/s at strength 1
+constexpr float kTauRise = 0.011f;           // s ramp-up
+constexpr float kAlphaDrop = 2400.0f;        // rad/s²
+constexpr float kOmegaDropMax = 24.0f;       // rad/s release cap
+constexpr float kMovingOmegaFastPath = 1.0f; // below: static swept path
+constexpr uint32_t kLiveCatchWindowTicks = 50;
+constexpr float kLiveCatchFactor = 0.15; // §1.3 default
 
 // Per-tick kinematic state: ω held constant within the tick (step 2),
 // θ advances after CCD used it (§5.2).

@@ -165,6 +165,42 @@ corrections are new entries. Format: 03-process.md §3.1.
   but only exercisable on Windows runners; evdev replug path untested
   without /dev/input write access on CI.
 
+## M05 — Table format v1 & Neon Drift greybox (2026-08-26)
+
+- Shipped: table.json loader (nlohmann-json, comments on, JSON-pointer
+  qualified TableLoadError) with the M5 schema — meta/playfield/physics/
+  materials overrides + wall (point/arc paths), post, flipper, plunger,
+  outhole, trough, light, plus parse-only slingshot/gate/rollover/
+  pop_bumper/standup_target for prefab children and test-lab; prefab
+  expansion engine (flipper_pair_standard, plunger_lane standalone +
+  merged-variant detection, sling_pair, inlane_outlane_pair, orbit) with
+  §5.1 expansion golden; sim_builder (path baking with arc nodes + corner
+  caps, material table in SimState with per-table overrides); plunger sim
+  per 08 §6.16 (charge curve, skill-shot bit-identical guarantee tested);
+  outhole drain + basic M5 drain→serve loop; tables/test-lab (§7 listing)
+  and tables/neon-drift greybox (M5 subset of 15 §1.3: orbit + merged
+  shooter lane, 3 flippers, inlane/outlane pairs, sling bodies, inserts);
+  --table boots in windowed and headless paths; F5 hot-reload (stop sim,
+  rebuild, restart); lights drawn as debug circles; perf_tick.gate_tables
+  (test-lab mean ≈ 1.0 µs, neon-drift ≈ 1.2 µs — far inside 100/200 µs).
+- Deviations:
+  - kLiveCatchWindowTicks drift fixed: merged M4 carried 70 ms while
+    ADR-021/§1.3 say 50 ms; restored to 50 (feel suite green both ways —
+    verified before choosing the documented value).
+  - Determinism.NeonDriftGreyboxReplay runs the greybox twice in-process
+    comparing hashes every 5k ticks (60 s total) rather than through a
+    committed .tbreplay tape — the milestone's "stable hash" contract;
+    tape-machinery coverage already exists via
+    det_replay.flipper_tape_hash_stable.
+  - M6+ element types parse but have no sim yet (milestone scope-out);
+    their prefab children (gates, rollovers, slingshot faces, pops,
+    standups) are inert until M6 lands.
+  - Windowed greybox boot (F12 screenshot, F5 reload) is
+    measured-on-non-reference: no local GPU/display; the load path is
+    identical to the tested one and render-smoke covers lavapipe on CI.
+- Mid-milestone: branch protection retry at M05 open: PUT still 404
+  (no admin); fallback continues per §3.2.
+
 ## M04 — Flippers & input (WIP, unmerged)
 
 - Branch milestone/M04-flippers-input carries: FlipperSim (08 §5.2 state

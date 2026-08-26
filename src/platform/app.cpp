@@ -15,6 +15,8 @@
 #include "sim/sim_thread.h"
 #include "sim/snapshot.h"
 #include "sim/solver.h"
+#include "table/sim_builder.h"
+#include "table/table_loader.h"
 
 #include <SDL3/SDL.h>
 
@@ -88,6 +90,19 @@ private:
     double accum_s_ = 0.0;
     int frames_ = 0;
     float fps_ = 0.0f;
+};
+
+// Resolves a --table argument: an explicit directory, or "tables/<slug>".
+std::filesystem::path resolve_table_dir(const std::string& arg) {
+    std::filesystem::path dir = arg;
+    if (dir.is_relative() && !std::filesystem::is_directory(dir)) {
+        dir = std::filesystem::path("tables") / arg;
+    }
+    return dir;
+}
+
+struct LoadedTable {
+    tb::table::TableDef def;
 };
 
 // §9/§14 input pipeline: producer sources in §9.8 priority order (raw
@@ -387,7 +402,19 @@ int run(const CliOptions& cli) {
         // GPU/audio, run the sim loop, report the tick rate, exit 0.
         tb::SnapshotBuffer snapshots;
         tb::sim::SimState sim_state;
-        tb::sim::make_synthetic_scene(sim_state, 424242);
+        if (!cli.table.empty()) {
+            const std::filesystem::path dir = resolve_table_dir(cli.table);
+            try {
+                tb::table::build_sim(tb::table::load_table(dir), sim_state);
+            } catch (const tb::table::TableLoadError& e) {
+                TB_LOG_ERROR("main", "table load failed: {} ({})", e.what(), e.json_pointer);
+                log::flush_now();
+                SDL_Quit();
+                return 1;
+            }
+        } else {
+            tb::sim::make_synthetic_scene(sim_state, 424242);
+        }
         tb::sim::Solver solver;
         tb::SimThread sim;
         sim.start([&snapshots, &solver, &sim_state](uint64_t tick) {
@@ -670,14 +697,33 @@ int run(const CliOptions& cli) {
 
         tb::SnapshotBuffer snapshots;
         tb::sim::SimState sim_state;
-        tb::sim::make_synthetic_scene(sim_state, 424242);
+        std::unique_ptr<LoadedTable> loaded_table;
+        std::filesystem::path table_dir;
+        if (!cli.table.empty()) {
+            table_dir = resolve_table_dir(cli.table);
+            try {
+                loaded_table = std::make_unique<LoadedTable>();
+                loaded_table->def = tb::table::load_table(table_dir);
+                tb::table::build_sim(loaded_table->def, sim_state);
+                TB_LOG_INFO("main",
+                            "table '{}' loaded: {} elements",
+                            loaded_table->def.slug,
+                            loaded_table->def.elements.size());
+            } catch (const tb::table::TableLoadError& e) {
+                TB_LOG_ERROR("main", "table load failed: {} ({})", e.what(), e.json_pointer);
+                log::flush_now();
+                SDL_Quit();
+                return 1;
+            }
+        } else {
+            tb::sim::make_synthetic_scene(sim_state, 424242);
+        }
         tb::sim::Solver solver;
 
         InputPipeline input;
         input.start(settings);
 
-        tb::SimThread sim;
-        sim.start([&snapshots, &solver, &sim_state, &input](uint64_t tick) {
+        auto tick_fn = [&snapshots, &solver, &sim_state, &input](uint64_t tick) {
             // §2.1 step 1: late-latch the freshest input exactly once.
             const uint64_t latch_ts = tb_now_ns();
             const uint32_t buttons = tb::input::latch_input(input.sources.data(),
@@ -721,17 +767,24 @@ int run(const CliOptions& cli) {
             rec.latch_ts_ns = latch_ts;
             rec.publish_ts_ns = tb_now_ns();
             input.ring.submit_sim(rec);
-        });
+        };
+
+        tb::SimThread sim;
+        sim.start(tick_fn);
 
         FrameStats stats;
         std::deque<float> ring;
         int debug_level = 0;       // F2: 0 off, 1 colliders, 2 +broadphase
         bool show_latency = false; // F3 latency-detail page (§14.3)
 
-        // Render-side mirror of the synthetic scene colliders (static
-        // after build; the sim thread owns its own instance).
+        // Render-side mirror of the scene colliders (static after build;
+        // the sim thread owns its own instance).
         tb::sim::SimState render_scene;
-        tb::sim::make_synthetic_scene(render_scene, 424242);
+        if (loaded_table != nullptr) {
+            tb::table::build_sim(loaded_table->def, render_scene);
+        } else {
+            tb::sim::make_synthetic_scene(render_scene, 424242);
+        }
         uint64_t last_frame_ns = tb_now_ns();
         uint64_t next_cap_ns = last_frame_ns;
         bool show_overlay = true;
@@ -761,6 +814,25 @@ int run(const CliOptions& cli) {
                         debug_level = (debug_level + 1) % 3; // 16.1 cycle
                     } else if (!event.key.repeat && event.key.scancode == SDL_SCANCODE_F3) {
                         show_latency = !show_latency;
+                    } else if (!event.key.repeat && event.key.scancode == SDL_SCANCODE_F5 &&
+                               loaded_table != nullptr) {
+                        // M5 hot-reload: stop the sim, rebuild, restart.
+                        sim.request_stop();
+                        sim.join();
+                        try {
+                            loaded_table->def = tb::table::load_table(table_dir);
+                            tb::table::build_sim(loaded_table->def, sim_state);
+                            tb::table::build_sim(loaded_table->def, render_scene);
+                            TB_LOG_INFO("main",
+                                        "table reloaded: {} elements",
+                                        loaded_table->def.elements.size());
+                        } catch (const tb::table::TableLoadError& e) {
+                            TB_LOG_ERROR("main",
+                                         "reload failed (kept old table): {} ({})",
+                                         e.what(),
+                                         e.json_pointer);
+                        }
+                        sim.start(tick_fn);
                     } else if (!event.key.repeat && event.key.scancode == SDL_SCANCODE_F12) {
                         renderer->request_screenshot(
                             (paths::pref() / "screenshots" /
@@ -863,6 +935,21 @@ int run(const CliOptions& cli) {
                                            uint32_t(h));
                         y += 16.f;
                     }
+                }
+            }
+
+            if (debug_level >= 1) {
+                // Insert lights drawn as debug circles (04-milestones.md M5).
+                for (const auto& light : render_scene.lights) {
+                    const float s = light.size * 0.5f;
+                    quads.push_back(tb::render::QuadInstance{light.pos.x * 1000.f,
+                                                             light.pos.y * 1000.f,
+                                                             s * 1000.f,
+                                                             s * 1000.f,
+                                                             0.0f,
+                                                             0.9f,
+                                                             0.6f,
+                                                             0.5f});
                 }
             }
 

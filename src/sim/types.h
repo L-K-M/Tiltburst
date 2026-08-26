@@ -70,4 +70,33 @@ struct TickInput {
     uint32_t buttons = 0;
 };
 
+// Plunger state (08-physics.md §6.16). One per table (V023).
+struct PlungerState {
+    Vec2 pos{};      // resting face-tip position
+    Vec2 lane_dir{}; // ĵ_lane (unit)
+    float max_speed = 7.5f;
+    float charge_ticks = 1500.0f; // charge_time_s · 1000
+    bool auto_launch = false;
+    uint32_t auto_delay_ticks = 500;
+    uint32_t held_ticks = 0; // charge while a ball sits in the zone
+    bool ball_in_zone = false;
+    uint32_t auto_timer = 0; // autolauncher settle timer
+};
+
+// Outhole drain sensor (08 §6.15): capsule of radius 0.02 around a→b.
+struct OutholeRegion {
+    Vec2 a{};
+    Vec2 b{};
+};
+
+// Insert light (state only in M5; drawn as debug circles).
+struct LightState {
+    Vec2 pos{};
+    float size = 0.012f;
+    bool on = false;
+};
+
+constexpr uint16_t kInvalidElement = 0xFFFF;
+constexpr float kOutholeRadius = 0.02f; // 08 §6.15 capsule radius
+
 } // namespace tb::sim

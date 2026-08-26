@@ -1,0 +1,22 @@
+{
+  // Prefab.FlipperPairExpansionGolden — §5.1 expansion of
+  // flipper_pair_standard at pos [0.240, 0.115] with default params.
+  // D = tip_gap + 2·length·cos(31°) = 0.068 + 0.130290 = 0.198290;
+  // pivots at 0.240 ± D/2 = 0.140855 / 0.339145 (09 §7 quotes these).
+  "left": {
+    "id": "flippers_left_flipper",
+    "pos": [0.140855, 0.115],
+    "rest_angle_deg": -31.0,
+    "side": "left",
+    "input": "left",
+    "length": 0.076
+  },
+  "right": {
+    "id": "flippers_right_flipper",
+    "pos": [0.339145, 0.115],
+    "rest_angle_deg": -149.0,
+    "side": "right",
+    "input": "right",
+    "length": 0.076
+  }
+}

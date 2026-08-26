@@ -5,6 +5,14 @@
 
 namespace tb::sim {
 
+SimState::SimState() {
+    mats[uint8_t(MaterialId::Wood)] = material_row(MaterialId::Wood);
+    mats[uint8_t(MaterialId::Steel)] = material_row(MaterialId::Steel);
+    mats[uint8_t(MaterialId::Rubber)] = material_row(MaterialId::Rubber);
+    mats[uint8_t(MaterialId::Plastic)] = material_row(MaterialId::Plastic);
+    mats[uint8_t(MaterialId::FlipperRubber)] = material_row(MaterialId::FlipperRubber);
+}
+
 namespace {
 
 inline Vec2 clamp_speed(Vec2 v) {
@@ -488,7 +496,7 @@ void Solver::step_body(SimState& s, const TickInput* input) {
             }
 
             const float approach = resolve_surface(
-                s, ball, best.normal, material_row(best.collider->material), {0.0f, 0.0f}, 1.0f);
+                s, ball, best.normal, s.mats[uint8_t(best.collider->material)], {0.0f, 0.0f}, 1.0f);
 
             // Collision event for audio/particles (§4.1): emit at speed.
             // Absorb into the sequence hash first (dispatch order).
@@ -518,6 +526,10 @@ void Solver::step_body(SimState& s, const TickInput* input) {
         }
     }
 
+    // Step 6 — triggers and regions (§2.1): plunger zone, outholes,
+    // trough serve. Positions are final for this tick.
+    step_regions(s, input);
+
     // Step 7c — last_safe_pos for balls that ended penetration-free.
     for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
         Ball& ball = s.balls[bi];
@@ -532,6 +544,146 @@ void Solver::step_body(SimState& s, const TickInput* input) {
     }
 
     ++s.tick;
+}
+
+void Solver::step_regions(SimState& s, const TickInput* input) {
+    constexpr uint32_t kPlungerActionBit = 4;  // 05 §9.1 action index
+    constexpr uint32_t kServeDelayTicks = 500; // drain → serve delay (M5 loop)
+
+    // ---- Plunger (08 §6.16) ----
+    if (s.has_plunger) {
+        bool in_zone = false;
+        uint8_t zone_ball = 0xFF;
+        for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
+            const Ball& b = s.balls[bi];
+            if (b.live && b.mode == BallMode::Free && length(b.pos - s.plunger.pos) < 0.04f) {
+                in_zone = true;
+                zone_ball = bi;
+                break;
+            }
+        }
+        const bool was_in_zone = s.plunger.ball_in_zone;
+        s.plunger.ball_in_zone = in_zone;
+
+        const bool held = input != nullptr && ((input->buttons >> kPlungerActionBit) & 1u) != 0u;
+        if (held && in_zone) {
+            s.plunger.held_ticks++; // q grows only while a ball is in the zone
+        }
+        if (s.plunger.auto_launch && in_zone && !was_in_zone) {
+            s.plunger.auto_timer = 0; // settle timer starts on arrival
+        }
+        if (s.plunger.auto_launch && in_zone) {
+            ++s.plunger.auto_timer;
+        }
+
+        const bool do_launch =
+            (s.plunger.held_ticks > 0 && !held && in_zone) ||
+            (s.plunger.auto_launch && in_zone && s.plunger.auto_timer > s.plunger.auto_delay_ticks);
+        if (do_launch) {
+            Ball& b = s.balls[zone_ball];
+            const float q =
+                s.plunger.auto_launch
+                    ? 1.0f
+                    : std::min(1.0f, float(s.plunger.held_ticks) / s.plunger.charge_ticks);
+            const float v_launch = s.plunger.max_speed * (0.2f + 0.8f * q);
+            b.vel += s.plunger.lane_dir * v_launch;
+            b.vel = clamp_speed(b.vel);
+
+            absorb(s, s.tick, SimEventType::BallLaunched, 0xFFFF);
+            SimEvent ev;
+            ev.tick = s.tick;
+            ev.type = uint16_t(SimEventType::BallLaunched);
+            ev.element = 0xFFFF;
+            ev.x = b.pos.x;
+            ev.y = b.pos.y;
+            ev.a = q;
+            ev.data = b.index;
+            s.render_ring.push(s.tick, ev);
+            s.game_ring.push(s.tick, ev);
+
+            s.plunger.held_ticks = 0;
+            s.plunger.auto_timer = 0;
+        } else if (!held) {
+            s.plunger.held_ticks = 0; // release with no ball resets silently
+        }
+    }
+
+    // ---- Outholes (08 §6.15): capsule radius 0.02 around a→b. ----
+    for (const OutholeRegion& hole : s.outholes) {
+        for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
+            Ball& b = s.balls[bi];
+            if (!b.live || b.mode != BallMode::Free || b.layer != 0) {
+                continue;
+            }
+            // Point-to-segment distance.
+            const Vec2 ab = hole.b - hole.a;
+            const float t =
+                std::clamp(dot(b.pos - hole.a, ab) / std::max(length_sq(ab), 1e-12f), 0.0f, 1.0f);
+            const Vec2 closest = hole.a + ab * t;
+            if (length(b.pos - closest) >= kOutholeRadius) {
+                continue;
+            }
+            b.live = false; // drained: slot freed, trough count grows
+            ++s.trough_balls;
+
+            absorb(s, s.tick, SimEventType::Drain, 0xFFFE);
+            SimEvent ev;
+            ev.tick = s.tick;
+            ev.type = uint16_t(SimEventType::Drain);
+            ev.element = 0xFFFE;
+            ev.x = b.pos.x;
+            ev.y = b.pos.y;
+            ev.a = 0.0f;
+            ev.data = b.index;
+            s.render_ring.push(s.tick, ev);
+            s.game_ring.push(s.tick, ev);
+        }
+    }
+
+    // ---- Trough serve (M5 basic loop: drain → auto-serve next ball). ----
+    bool any_free = false;
+    for (const Ball& b : s.balls) {
+        if (b.live && b.mode == BallMode::Free) {
+            any_free = true;
+            break;
+        }
+    }
+    if (any_free || s.trough_balls <= 0 || !s.has_plunger) {
+        s.serve_delay_ticks = 0;
+    } else {
+        ++s.serve_delay_ticks;
+        if (s.serve_delay_ticks >= kServeDelayTicks) {
+            s.serve_delay_ticks = 0;
+            for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
+                Ball& b = s.balls[bi];
+                if (b.live) {
+                    continue;
+                }
+                --s.trough_balls; // only once a free slot is confirmed
+                b.index = bi;
+                b.live = true;
+                b.mode = BallMode::Free;
+                b.layer = 0;
+                b.pos = s.plunger.pos + s.plunger.lane_dir * (kBallRadius + 0.002f);
+                b.vel = {0.0f, 0.0f};
+                b.omega_z = 0.0f;
+                b.last_safe_pos = b.pos;
+
+                absorb(s, s.tick, SimEventType::BallServed, 0xFFFD);
+                SimEvent ev;
+                ev.tick = s.tick;
+                ev.type = uint16_t(SimEventType::BallServed);
+                ev.element = 0xFFFD;
+                ev.x = b.pos.x;
+                ev.y = b.pos.y;
+                ev.a = 0.0f;
+                ev.data = b.index;
+                s.render_ring.push(s.tick, ev);
+                s.game_ring.push(s.tick, ev);
+                break;
+            }
+        }
+    }
 }
 
 void Solver::pushout(SimState& s) {

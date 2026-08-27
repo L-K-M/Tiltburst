@@ -61,6 +61,9 @@ tb.on("ball_start", function()
   tb.state.lane_lit = tb.state.lane_lit or false
   tb.state.frenzy = false                       -- frenzy never spans balls
   tb.light_off("light_pop")
+  -- A frenzy interrupted by a drain leaves the backglass on "mode": the
+  -- stale timer's token guard early-returns, so restore it here.
+  tb.backglass.set_layout("scores")
   set_lane_light()
   tb.ball_save(CONFIG.BALL_SAVE_MS)
 end)

@@ -348,6 +348,7 @@ bool ScriptHost::scripting_active() const {
 }
 
 bool ScriptHost::state_read_int(int player, const char* key, int64_t& out) const {
+    std::fprintf(stderr, "[tbdbg] state_read_int %s\n", key);
     if (impl_->lua == nullptr || !impl_->loaded) {
         return false;
     }
@@ -369,6 +370,7 @@ bool ScriptHost::state_read_int(int player, const char* key, int64_t& out) const
 }
 
 void ScriptHost::set_current_player(int index) {
+    std::fprintf(stderr, "[tbdbg] set_current_player\n");
     impl_->current_player = std::clamp(index, 1, 4);
     if (impl_->lua == nullptr || !impl_->loaded) {
         return;
@@ -769,12 +771,14 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
 }
 
 void ScriptHost::begin_tick(uint64_t tick) {
+    std::fprintf(stderr, "[tbdbg] begin_tick\n");
     impl_->game_tick = tick;
     impl_->instruction_budget = kTickInstructionBudget;
     impl_->budget_exhausted_this_tick = false;
 }
 
 void ScriptHost::dispatch(const SimEvent& event) {
+    std::fprintf(stderr, "[tbdbg] dispatch enter\n");
     if (!scripting_active()) {
         return;
     }
@@ -787,9 +791,11 @@ void ScriptHost::dispatch(const SimEvent& event) {
         return;
     }
     sol::state_view lua(*impl_->lua);
+    std::fprintf(stderr, "[tbdbg] dispatch: payload built, calling handlers\n");
     sol::table ev = lua.create_table();
     ev.set("name", std::string(name));
     fill_event_payload(*impl_, event, ev);
+    std::fprintf(stderr, "[tbdbg] dispatch: calling %zu handlers\n", it->second.size());
     for (HandlerEntry& h : it->second) {
         if (h.disabled) {
             continue;
@@ -801,6 +807,7 @@ void ScriptHost::dispatch(const SimEvent& event) {
 }
 
 void ScriptHost::end_tick(uint64_t tick) {
+    std::fprintf(stderr, "[tbdbg] end_tick enter\n");
     if (!scripting_active()) {
         return;
     }
@@ -848,7 +855,9 @@ void ScriptHost::end_tick(uint64_t tick) {
         --impl_->backglass_model.message_ticks_left;
     }
 
+    std::fprintf(stderr, "[tbdbg] end_tick: gc step\n");
     lua_gc(impl_->L, LUA_GCSTEP, 0); // §1.1 incremental step
+    std::fprintf(stderr, "[tbdbg] end_tick done\n");
 }
 
 void ScriptHost::fire_event(const char* name,

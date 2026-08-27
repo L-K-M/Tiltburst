@@ -8,8 +8,10 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <string>
 #include <utility>
 #include <vector>
@@ -95,9 +97,54 @@ struct FlipperRig {
     }
 };
 
+// Replays the tape for 3000 ticks and collects (tick, state_hash) at
+// every 100-tick sample. The compare and record paths share it so the
+// loop can never drift between them.
+std::vector<std::pair<uint64_t, uint64_t>> run_flipper_tape(const tb::test::Tape& tape) {
+    FlipperRig rig(tape.seed);
+    tb::sim::Solver solver;
+    std::vector<std::pair<uint64_t, uint64_t>> out;
+    for (uint64_t tick = 1; tick <= 3000; ++tick) {
+        tb::sim::TickInput in;
+        in.buttons = tick - 1 < tape.buttons_by_tick.size() ? tape.buttons_by_tick[size_t(tick - 1)]
+                                                            : tape.buttons_by_tick.back();
+        solver.step(rig.state, in);
+        if (tick % 100 == 0) {
+            out.emplace_back(tick, tb::sim::state_hash(rig.state));
+        }
+    }
+    return out;
+}
+
 } // namespace
 
 TEST(det_replay, flipper_tape_hash_stable) {
+    // TB_RECORD_GOLDEN=<path> regenerates instead of comparing (§2.4.4).
+    if (const char* record = std::getenv("TB_RECORD_GOLDEN")) {
+        tb::test::Tape tape;
+        ASSERT_TRUE(tb::test::load_tape(
+            tb::test::data_path("tests/fixtures/tapes/flipper_tap.replay.json"), tape));
+        // record is non-null by the enclosing getenv guard; the null half is
+        // belt-and-braces so the assertion reads as presence validation.
+        ASSERT_TRUE(record != nullptr && record[0] != '\0')
+            << "TB_RECORD_GOLDEN must be a non-empty path";
+        const auto hashes = run_flipper_tape(tape);
+        std::ofstream out(record);
+        ASSERT_TRUE(out.is_open()) << "cannot write golden to " << record;
+        out << "# tiltburst determinism golden v1\n";
+        out << "# regenerated M10: state_hash now folds tilt-bob/abuse/nudge"
+            << " envelope state, arm latches and coil gates (hash-scope"
+               " change, JOURNAL M10; 16 §2.4.4)\n";
+        out << "# table: rig(flipper) tape: flipper_tap.replay.json seed: " << tape.seed << "\n";
+        for (const auto& [tick, hash] : hashes) {
+            out << tick << " " << std::hex << std::setw(16) << std::setfill('0') << hash << std::dec
+                << "\n";
+        }
+        out.flush();
+        ASSERT_TRUE(out.good()) << "golden write failed to " << record;
+        SUCCEED() << "golden recorded";
+        return;
+    }
 #if !defined(__linux__)
     // ADR-013: goldens are compared same-OS only; other platforms skip
     // until their goldens land via CI artifacts.
@@ -113,24 +160,24 @@ TEST(det_replay, flipper_tape_hash_stable) {
         load_golden(tb::test::data_path("tests/golden/determinism/linux/flipper_tap.hashes"));
     ASSERT_GE(golden.size(), 6u);
 
-    constexpr uint64_t kTotalTicks = 3000;
-    FlipperRig rig(tape.seed);
-    tb::sim::Solver solver;
-
-    size_t gi = 0;
-    for (uint64_t tick = 1; tick <= kTotalTicks; ++tick) {
-        tb::sim::TickInput in;
-        in.buttons = tick - 1 < tape.buttons_by_tick.size() ? tape.buttons_by_tick[size_t(tick - 1)]
-                                                            : tape.buttons_by_tick.back();
-        solver.step(rig.state, in);
-
-        if (gi < golden.size() && tick == golden[gi].first) {
-            const uint64_t got = tb::sim::state_hash(rig.state);
-            ASSERT_EQ(got, golden[gi].second)
-                << "hash divergence at tick " << tick << " (replay machinery or sim drift)";
-            ++gi;
-        }
+    const auto hashes = run_flipper_tape(tape);
+    ASSERT_EQ(hashes.size(), 30u);
+    // The golden must cover EVERY sample: a truncated file (bad merge,
+    // interrupted record run) would otherwise pass while the tail of
+    // the replay window silently loses determinism coverage.
+    ASSERT_EQ(golden.size(), hashes.size())
+        << "golden must cover all 30 samples of the 3000-tick replay";
+    for (size_t gi = 0; gi < golden.size(); ++gi) {
+        ASSERT_LT(gi, hashes.size());
+        const uint64_t tick = golden[gi].first;
+        ASSERT_GT(tick, 0u);
+        ASSERT_EQ(tick % 100u, 0u) << "sample cadence mismatch";
+        const size_t idx = static_cast<size_t>(tick / 100u - 1);
+        ASSERT_LT(idx, hashes.size()) << "golden tick beyond replay range";
+        ASSERT_EQ(idx, gi) << "golden entries must be ordered, unique 100-tick samples";
+        ASSERT_EQ(hashes[idx].first, tick);
+        ASSERT_EQ(hashes[idx].second, golden[gi].second)
+            << "hash divergence at tick " << tick << " (replay machinery or sim drift)";
     }
-    EXPECT_EQ(gi, golden.size());
 #endif
 }

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 
 namespace tb::sim {
 
@@ -27,14 +28,15 @@ static_assert(kSpinnerDecayPerTick > 0.999402f && kSpinnerDecayPerTick < 0.99940
 void emit_bank_event(SimState& s, SimEventType type, uint16_t element);
 void emit_lock_event(SimState& s, const BallLockElem& lock);
 void request_bank_reset(SimState& s, DropBankElem& bank);
-void serve_ball(SimState& s);
+uint8_t serve_ball(SimState& s);
 void record_tick_event(SimState& s, const SimEvent& ev);
 
-// Serve one trough ball onto the plunger (§6.15 kinematics). No event:
-// callers decide whether BallServed applies (§3.5 fires none).
-void serve_ball(SimState& s) {
+// Serve one trough ball onto the plunger (§6.15 kinematics); returns
+// the spawned ball index (0xFF = nothing served). No event: callers
+// decide whether BallServed applies (§3.5 fires none).
+uint8_t serve_ball(SimState& s) {
     if (s.trough_balls <= 0 || !s.has_plunger) {
-        return;
+        return 0xFF;
     }
     for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
         Ball& b = s.balls[bi];
@@ -50,14 +52,15 @@ void serve_ball(SimState& s) {
         b.vel = {0.0f, 0.0f};
         b.omega_z = 0.0f;
         b.last_safe_pos = b.pos;
-        return;
+        return bi;
     }
+    return 0xFF;
 }
 
 // Per-tick emission-order log for the script host (§2.2 phase 2). Filled
 // only while a host is attached; the Collision audio event never records.
 void record_tick_event(SimState& s, const SimEvent& ev) {
-    if (s.script == nullptr) {
+    if (s.script == nullptr && s.fsm_step == nullptr) {
         return;
     }
     if (s.tick_event_n >= SimState::kTickEventCap) {
@@ -157,6 +160,27 @@ inline void absorb(SimState& s, uint64_t tick, SimEventType type, uint16_t eleme
         u8(element, 8),
     };
     s.event_seq_hash = fnv1a64(bytes, sizeof(bytes), s.event_seq_hash);
+}
+
+// Framework serve (§6.15 + §4.2): spawn AND emit BallServed — the M10
+// framework's serve windows close on that event (11 §2.5).
+void serve_ball_notified(SimState& s) {
+    const uint8_t spawned = serve_ball(s);
+    if (spawned != 0xFF) {
+        absorb(s, s.tick, SimEventType::BallServed, 0xFFFD);
+        SimEvent ev;
+        ev.tick = s.tick;
+        ev.type = uint16_t(SimEventType::BallServed);
+        ev.element = 0xFFFD;
+        // Attribute to the SPAWNED ball: with multiball live the
+        // lowest live index is some other ball.
+        ev.x = s.balls[spawned].pos.x;
+        ev.y = s.balls[spawned].pos.y;
+        ev.data = s.balls[spawned].index;
+        s.render_ring.push(s.tick, ev);
+        s.game_ring.push(s.tick, ev);
+        record_tick_event(s, ev);
+    }
 }
 
 } // namespace
@@ -673,16 +697,125 @@ void Solver::step_body(SimState& s, const TickInput* input) {
     // Phase 1 pre (10-scripting.md §2.2): apply the physical actions
     // latched during tick n−1's handlers; physics state stays immutable
     // while scripts run.
+    if (s.script != nullptr || s.fsm_step != nullptr) {
+        s.tick_event_n = 0; // BEFORE actions: serve/eject actions record
+                            // events this same tick (§2.2 phase 1)
+    }
     if (s.script != nullptr) {
         apply_script_actions(s, s.script->pending_actions());
         s.script->pending_actions().clear();
-        s.tick_event_n = 0;
+    }
+
+    // Nudge edges + tilt-bob integration (08 §7, M10). Edge-triggered:
+    // a new press starts a new envelope and kicks the bob; holding does
+    // nothing. Levels 1/2/3 per 08 §7.1 (side 0.15/0.25/0.35, front
+    // 0.20/0.30/0.40 m/s).
+    if (input != nullptr) {
+        constexpr uint32_t kNudgeLeftBit = 5; // 05 §9.1 action indices
+        constexpr uint32_t kNudgeRightBit = 6;
+        constexpr uint32_t kNudgeUpBit = 7;
+        const uint32_t rising = input->buttons & ~s.input_prev_buttons;
+        // 1..3 (settings; replay header). Anything out of range maps to
+        // the MIDDLE level — boundary clamping would turn garbage like
+        // 7 into the STRONGEST nudges.
+        const int level = (s.nudge_level >= 1 && s.nudge_level <= 3) ? s.nudge_level : 2;
+        auto nudge_dv = [level](uint32_t bit) -> std::pair<Vec2, Vec2> {
+            // Returns {ball d_hat·dv, cab d_hat·dv}: the button names the
+            // direction the cabinet is shoved; balls accelerate the
+            // opposite way relative to the table (08 §7.1).
+            const float side = level == 1 ? 0.15f : (level == 2 ? 0.25f : 0.35f);
+            const float front = level == 1 ? 0.20f : (level == 2 ? 0.30f : 0.40f);
+            switch (bit) {
+            case kNudgeLeftBit:
+                return {{+side, 0.0f}, {-side, 0.0f}};
+            case kNudgeRightBit:
+                return {{-side, 0.0f}, {+side, 0.0f}};
+            default:
+                return {{0.0f, +front}, {0.0f, -front}};
+            }
+        };
+        for (const uint32_t bit : {kNudgeLeftBit, kNudgeRightBit, kNudgeUpBit}) {
+            if (((rising >> bit) & 1u) == 0u) {
+                continue;
+            }
+            const auto [dv_ball, dv_cab] = nudge_dv(bit);
+            // Envelope: 30 ms half-sine, integral 0.0191·A = dv, so
+            // A = dv / (2·0.030/π) (08 §7.1).
+            const float kEnvelope = 2.0f * 0.030f / float(kPi); // 0.0191 s
+            bool placed = false;
+            for (SimState::NudgeEnvelope& e : s.nudge_envelopes) {
+                if (e.ticks_left == 0) {
+                    e.ax = dv_ball.x / kEnvelope;
+                    e.ay = dv_ball.y / kEnvelope;
+                    e.ticks_left = 30;
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) {
+                TB_LOG_WARN("sim", "nudge envelope cap reached; nudge dropped");
+            }
+            // Bob kick (08 §7.2) + abuse accumulator (08 §7.3).
+            s.tilt.v = s.tilt.v + dv_cab;
+            s.tilt.abuse_acc =
+                std::max(0.0f, s.tilt.abuse_acc + (std::fabs(dv_cab.x) + std::fabs(dv_cab.y)));
+        }
+        s.input_prev_buttons = input->buttons;
+    }
+    // Bob: p̈ = −ω_n²·p − 2ζω_n·ṗ, ω_n = 9, ζ = 0.15 (08 §7.2); abuse
+    // leaks 0.15 m/s per second. Both integrated with semi-implicit
+    // Euler at the tick rate, matching the sim's integrator.
+    {
+        constexpr float kOmegaN = 9.0f, kZeta = 0.15f;
+        const Vec2 a = s.tilt.p * (-kOmegaN * kOmegaN) - s.tilt.v * (2.0f * kZeta * kOmegaN);
+        s.tilt.v = s.tilt.v + a * 0.001f;
+        s.tilt.p = s.tilt.p + s.tilt.v * 0.001f;
+        s.tilt.abuse_acc = std::max(0.0f, s.tilt.abuse_acc - 0.15f * 0.001f);
+
+        // Threshold crossings, each independently armed, re-arming at
+        // 0.7× its own value (08 §7.2). Emission order within a tick:
+        // warn, hard, abuse (threshold order).
+        auto emit_danger = [&](SimEvent& ev, float magnitude, uint16_t source) {
+            ++s.tilt.crossings;
+            ev.type = uint16_t(SimEventType::DangerThreshold);
+            ev.element = 0xFFFF;
+            ev.a = magnitude;
+            ev.data = uint32_t(source) | (uint32_t(s.tilt.crossings) << 16);
+            absorb(s, s.tick, SimEventType::DangerThreshold, 0xFFFF);
+            // Rings too — the full emission pattern (serve_ball_notified,
+            // emit_bank_event): tilt-warning audio/HUD consumers read the
+            // rings, not the script log. absorb() already ran, so the
+            // event-sequence hash is unchanged.
+            s.render_ring.push(s.tick, ev);
+            s.game_ring.push(s.tick, ev);
+            record_tick_event(s, ev);
+        };
+        SimEvent ev;
+        ev.tick = s.tick;
+        const float mag = std::sqrt(dot(s.tilt.p, s.tilt.p));
+        if (s.tilt.warn_armed && mag >= s.tilt.warn_m) {
+            s.tilt.warn_armed = false;
+            emit_danger(ev, mag, 0);
+        }
+        if (s.tilt.hard_armed && mag >= s.tilt.hard_m) {
+            s.tilt.hard_armed = false;
+            emit_danger(ev, mag, 1);
+        }
+        if (s.tilt.abuse_armed && s.tilt.abuse_acc >= s.tilt.abuse_mps) {
+            s.tilt.abuse_armed = false;
+            emit_danger(ev, s.tilt.abuse_acc, 2);
+        }
+        s.tilt.warn_armed = s.tilt.warn_armed || mag < 0.7f * s.tilt.warn_m;
+        s.tilt.hard_armed = s.tilt.hard_armed || mag < 0.7f * s.tilt.hard_m;
+        s.tilt.abuse_armed = s.tilt.abuse_armed || s.tilt.abuse_acc < 0.7f * s.tilt.abuse_mps;
     }
 
     // Step 2 — flipper state update (§5.2), id order; (theta_start,
-    // omega) held constant for CCD this tick.
+    // omega) held constant for CCD this tick. Tilt clears the gate
+    // (11-game-framework.md §5: flippers dead after tilt).
     for (Flipper& f : s.flippers) {
-        bool pressed = f.enabled && ((input->buttons >> f.params.action) & 1u) != 0u;
+        bool pressed = f.enabled && s.flippers_enabled && input != nullptr &&
+                       ((input->buttons >> f.params.action) & 1u) != 0u;
         FlipperSim::tick(f, pressed);
     }
 
@@ -690,6 +823,20 @@ void Solver::step_body(SimState& s, const TickInput* input) {
     const float slope_rad = s.slope_deg * (float(kPi) / 180.0f);
     const float g_slope = kGravity * std::sin(slope_rad);
     const float rr = s.mu_rr * kGravity * std::cos(slope_rad);
+
+    // Active nudge envelopes apply a half-sine a(t) = A·sin(π·t/30)
+    // scaled per tick (08 §7.1); overlapping nudges sum. Applied to FREE
+    // balls only (all layers; never RAMP or CAPTURED).
+    Vec2 nudge_a{};
+    for (SimState::NudgeEnvelope& e : s.nudge_envelopes) {
+        if (e.ticks_left == 0) {
+            continue;
+        }
+        const float phase = float(30u - e.ticks_left) / 30.0f;
+        const float scale = std::sin(float(kPi) * phase);
+        nudge_a = nudge_a + Vec2{e.ax * scale, e.ay * scale};
+        --e.ticks_left;
+    }
 
     for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
         Ball& ball = s.balls[bi];
@@ -738,12 +885,23 @@ void Solver::step_body(SimState& s, const TickInput* input) {
         }
 
         Vec2 acc{0.0f, -g_slope}; // slope gravity
+        acc = acc + nudge_a;      // active nudge envelopes (08 §7.1)
 
-        // Magnet forces (§6.12), step 3 item 2.
-        for (const MagnetSim& mag : s.magnets) {
-            if (mag.layer == ball.layer) {
-                acc += mag.accel(ball);
-                mag.damp(ball);
+        // Magnet forces (§6.12), step 3 item 2. De-energized on tilt
+        // (11 §5): magnets do not energize — damping persists (eddy
+        // drains kinetic energy whether or not the coil is driven).
+        if (s.coils_enabled) {
+            for (const MagnetSim& mag : s.magnets) {
+                if (mag.layer == ball.layer) {
+                    acc += mag.accel(ball);
+                    mag.damp(ball);
+                }
+            }
+        } else {
+            for (const MagnetSim& mag : s.magnets) {
+                if (mag.layer == ball.layer) {
+                    mag.damp(ball);
+                }
             }
         }
 
@@ -997,9 +1155,14 @@ void Solver::step_body(SimState& s, const TickInput* input) {
     if (s.script != nullptr && s.script->scripting_active()) {
         s.script->begin_tick(s.tick);
         for (size_t i = 0; i < s.tick_event_n; ++i) {
-            s.script->dispatch(s.tick_events[i]);
+            s.script->dispatch(s.tick_events[i]); // phase 2
         }
-        s.script->end_tick(s.tick);
+        if (s.fsm_step != nullptr && input != nullptr) {
+            s.fsm_step(s.fsm_ctx, s, *input); // phase 3 (11 §1): GameFsm
+        }
+        s.script->end_tick(s.tick); // phase 4: timers + GC step
+    } else if (s.fsm_step != nullptr && input != nullptr) {
+        s.fsm_step(s.fsm_ctx, s, *input);
     }
     s.tick_event_n = 0;
 
@@ -1087,6 +1250,9 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
         if (k.held_ball != 0xFF) {
             continue; // one ball per kicker in v1 (§4.12 style)
         }
+        if (!s.coils_enabled) {
+            continue; // de-energized on tilt (11 §5): no NEW captures
+        }
         for (Ball& b : s.balls) {
             if (!b.live || b.mode != BallMode::Free || b.layer != k.common.layer) {
                 continue;
@@ -1173,7 +1339,13 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
         }
     }
 
-    // ---- Trough serve (M5 basic loop: drain → auto-serve next ball). ----
+    // ---- Trough serve (M5 basic loop: drain → auto-serve next ball).
+    // When the M10 framework is attached it owns serving (11 §4.2:
+    // BallReady/PlayerChange exit commands the eject; ball save and
+    // add_ball serve with autolaunch) — this loop steps aside.
+    if (s.fsm_step != nullptr) {
+        s.serve_delay_ticks = 0;
+    }
     bool any_free = false;
     for (const Ball& b : s.balls) {
         if (b.live && b.mode == BallMode::Free) {
@@ -1181,7 +1353,7 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
             break;
         }
     }
-    if (any_free || s.trough_balls <= 0 || !s.has_plunger) {
+    if (s.fsm_step != nullptr || any_free || s.trough_balls <= 0 || !s.has_plunger) {
         s.serve_delay_ticks = 0;
     } else {
         ++s.serve_delay_ticks;
@@ -1246,6 +1418,9 @@ void Solver::step_elements(SimState& s) {
             if (ball == nullptr) {
                 continue;
             }
+            if (!s.coils_enabled) {
+                break; // de-energized on tilt (11 §5): no impulse
+            }
             // Kick: keep tangential motion, force normal speed >= kick.
             const Vec2 t = perp(sl.face_normal);
             const float v_t = dot(ball->vel, t);
@@ -1284,6 +1459,9 @@ void Solver::step_elements(SimState& s) {
             }
             if (ball == nullptr) {
                 continue;
+            }
+            if (!s.coils_enabled) {
+                break; // de-energized on tilt (11 §5): no impulse
             }
             // The contact log already proves this ball hit this pop's
             // circle; the current (post-rebound) position still gives a
@@ -1504,6 +1682,28 @@ void Solver::step_elements(SimState& s) {
     }
 }
 
+// Eject the kicker's held ball at its element defaults (§6.9). Shared
+// by the capture_ms failsafe, tb.kick, and the tilt force-eject.
+void eject_kicker(SimState& s, KickerElem& k) {
+    if (k.held_ball == 0xFF) {
+        return;
+    }
+    for (Ball& b : s.balls) {
+        if (b.live && b.index == k.held_ball) {
+            const float phi = k.eject_angle_deg * float(3.14159265358979 / 180.0);
+            b.pos = k.pos;
+            b.vel = {k.eject_speed * float(std::cos(phi)), k.eject_speed * float(std::sin(phi))};
+            b.omega_z = 0.0f;
+            b.mode = BallMode::Free;
+            b.last_safe_pos = b.pos;
+            break;
+        }
+    }
+    k.held_ball = 0xFF;
+    k.has_hold = false;
+    k.hold_ticks = 0;
+}
+
 void Solver::step_lifecycle(SimState& s, const TickInput* input) {
     (void)input;
 
@@ -1641,7 +1841,7 @@ void Solver::step_lifecycle(SimState& s, const TickInput* input) {
 
     // --- Ball locks (§6.14): capture region + failsafe + 500 ms eject. ---
     for (BallLockElem& lock : s.ball_locks) {
-        if (lock.held < lock.capacity) {
+        if (s.coils_enabled && lock.held < lock.capacity) {
             for (Ball& b : s.balls) {
                 if (!b.live || b.mode != BallMode::Free || b.layer != lock.common.layer) {
                     continue;
@@ -1753,6 +1953,77 @@ void Solver::resolve_captive(SimState& s, Ball& ball, CaptiveBallElem& cap, Vec2
 
 void Solver::apply_script_actions(SimState& s, const std::vector<ScriptAction>& actions) {
     for (const ScriptAction& a : actions) {
+        // Framework commands always apply (ForceEjectAll is itself the
+        // tilt consequence).
+        switch (a.kind) {
+        case ScriptAction::Kind::FlippersEnabled:
+            s.flippers_enabled = a.flag;
+            continue;
+        case ScriptAction::Kind::CoilsEnabled:
+            s.coils_enabled = a.flag;
+            if (!a.flag) {
+                // §5: de-energized magnets are RELEASED, not merely
+                // forbidden to re-energize (same as the tilt path).
+                for (MagnetSim& mag : s.magnets) {
+                    mag.set_active(false);
+                }
+            }
+            continue;
+        case ScriptAction::Kind::ResetDanger:
+            reset_danger(s);
+            continue;
+        case ScriptAction::Kind::LocksToTrough: {
+            // §4.5 step 5: whatever is still locked goes home as pure
+            // bookkeeping — no eject, no kinematics, no drain event.
+            for (BallLockElem& lock : s.ball_locks) {
+                s.trough_balls += lock.held;
+                s.locked_balls -= lock.held;
+                lock.held = 0;
+                lock.release_pending = 0;
+                lock.release_timer = 0;
+            }
+            // Captured-by-kicker balls are NOT force-moved: capture_ms
+            // keeps running (§5 binding) and ejects them on their own
+            // timer.
+            continue;
+        }
+        case ScriptAction::Kind::ForceEjectAll: {
+            // 11-game-framework.md §5: every captured ball ejects at its
+            // element defaults; locks empty one ball per 500 ms via the
+            // ordinary release cadence; magnets released; script holds
+            // (has_hold + its hold_ticks countdown) cleared —
+            // capture_ticks itself is element config and stays.
+            for (KickerElem& k : s.kickers) {
+                eject_kicker(s, k);
+            }
+            for (BallLockElem& lock : s.ball_locks) {
+                if (lock.held > 0) {
+                    lock.release_pending = lock.held;
+                }
+            }
+            for (MagnetSim& mag : s.magnets) {
+                mag.set_active(false);
+            }
+            continue;
+        }
+        default:
+            break;
+        }
+        // De-energized coils (11 §5): scripted kicks/holds/magnet calls
+        // and lock releases are no-ops for the rest of a tilted ball.
+        if (!s.coils_enabled) {
+            switch (a.kind) {
+            case ScriptAction::Kind::Kick:
+            case ScriptAction::Kind::KickHold:
+            case ScriptAction::Kind::ReleaseLock:
+            case ScriptAction::Kind::MagnetOn:
+            case ScriptAction::Kind::MagnetOff:
+            case ScriptAction::Kind::MagnetPulse:
+                continue;
+            default:
+                break;
+            }
+        }
         switch (a.kind) {
         case ScriptAction::Kind::Kick: {
             for (KickerElem& k : s.kickers) {
@@ -1823,7 +2094,8 @@ void Solver::apply_script_actions(SimState& s, const std::vector<ScriptAction>& 
             break;
         case ScriptAction::Kind::AddBall:
             for (int i = 0; i < a.count && s.trough_balls > 0; ++i) {
-                serve_ball(s);
+                serve_ball_notified(s); // §4.2: BallServed closes the
+                                        // framework's serve window
             }
             break;
         case ScriptAction::Kind::DropBankReset:
@@ -1918,6 +2190,53 @@ void Solver::pushout(SimState& s) {
 
 namespace tb::sim {
 
+void absorb_framework_event(SimState& s, const char* name) {
+    // Same 12-byte layout as absorb() with type = 0xF000.. so framework
+    // and sim events never collide in the accumulator.
+    const uint64_t tick = s.tick;
+    const uint16_t type = 0xF000u;
+    const auto u8 = [](uint64_t v, int shift) {
+        return static_cast<unsigned char>((v >> shift) & 0xFFu);
+    };
+    const unsigned char bytes[12] = {
+        u8(tick, 0),
+        u8(tick, 8),
+        u8(tick, 16),
+        u8(tick, 24),
+        u8(tick, 32),
+        u8(tick, 40),
+        u8(tick, 48),
+        u8(tick, 56),
+        u8(type, 0),
+        u8(type, 8),
+        0xFF,
+        0xFF,
+    };
+    uint64_t h = fnv1a64(bytes, sizeof(bytes), s.event_seq_hash);
+    h = fnv1a64(name, std::strlen(name), h);
+    s.event_seq_hash = h;
+}
+
+// 08 §7.3: reset all danger state — bob p/v, abuse accumulator, arm
+// latches, crossing counter, and in-flight nudge envelopes. The input
+// edge latch (input_prev_buttons) is input plumbing, not danger state:
+// the button stream is continuous across balls and its edges must not
+// be re-fired. Commanded by the framework at end of ball
+// (11-game-framework.md §4.5 step 5); never a timer.
+void reset_danger(SimState& s) {
+    // 08 §7.3: the framework commands this at every end of ball;
+    // danger is strictly per ball. The physics.tilt thresholds are
+    // TABLE tuning (09 §2), not per-ball state — preserve them.
+    const float warn = s.tilt.warn_m, hard = s.tilt.hard_m, abuse = s.tilt.abuse_mps;
+    s.tilt = SimState::TiltState{};
+    s.tilt.warn_m = warn;
+    s.tilt.hard_m = hard;
+    s.tilt.abuse_mps = abuse;
+    for (SimState::NudgeEnvelope& e : s.nudge_envelopes) {
+        e = SimState::NudgeEnvelope{};
+    }
+}
+
 uint64_t state_hash(const SimState& s) {
     // Canonical serialization (16-testing-ci.md §2.4.1): balls in index
     // order — live/mode/layer bytes then raw IEEE-754 bit patterns of
@@ -1937,6 +2256,30 @@ uint64_t state_hash(const SimState& s) {
         mix(&b.vel.x, 4);
         mix(&b.vel.y, 4);
         mix(&b.omega_z, 4);
+    }
+
+    // Tilt bob + abuse accumulator are replayed state (08 §7.2/§7.3:
+    // nudges are inputs), as are the active nudge envelopes.
+    mix(&s.tilt.p.x, 4);
+    mix(&s.tilt.p.y, 4);
+    mix(&s.tilt.v.x, 4);
+    mix(&s.tilt.v.y, 4);
+    mix(&s.tilt.abuse_acc, 4);
+    mix(&s.tilt.crossings, sizeof(s.tilt.crossings));
+    // Arm latches and the framework gates gate future emission and
+    // physics — genuine replayed state.
+    const auto u8c = [](uint64_t v, int shift) {
+        return static_cast<unsigned char>((v >> shift) & 0xFFu);
+    };
+    const uint64_t armed = (s.tilt.warn_armed ? 1u : 0u) | (s.tilt.hard_armed ? 2u : 0u) |
+                           (s.tilt.abuse_armed ? 4u : 0u);
+    const uint64_t gates = (s.flippers_enabled ? 1u : 0u) | (s.coils_enabled ? 2u : 0u);
+    const unsigned char bytes[2] = {u8c(armed, 0), u8c(gates, 0)};
+    mix(bytes, sizeof(bytes));
+    for (const SimState::NudgeEnvelope& e : s.nudge_envelopes) {
+        mix(&e.ax, 4);
+        mix(&e.ay, 4);
+        mix(&e.ticks_left, sizeof(e.ticks_left));
     }
 
     mix(&s.rng_sim, sizeof(s.rng_sim));

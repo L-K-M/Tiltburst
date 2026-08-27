@@ -8,6 +8,7 @@ add_executable(tb_tests
     core/rng_test.cpp
     core/scaffold_test.cpp
     core/time_test.cpp
+    game/game_framework_test.cpp
     sim/det_replay_flipper_test.cpp
     platform/input_test.cpp
     sim/elements_test.cpp
@@ -37,7 +38,7 @@ target_include_directories(tb_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party
     ${Stb_INCLUDE_DIR})
 target_link_libraries(tb_tests PRIVATE
-    tb_core tb_sim tb_platform tb_render tb_table nlohmann_json::nlohmann_json
+    tb_core tb_sim tb_platform tb_render tb_table tb_game nlohmann_json::nlohmann_json
     GTest::gtest GTest::gtest_main)
 
 include(GoogleTest)

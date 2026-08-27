@@ -75,6 +75,47 @@ struct SimState {
     int locked_balls = 0;
     BallSaveState ball_save{};
 
+    // Nudge + tilt danger (08 §7, integrated M10). The bob is a damped
+    // 2-D oscillator kicked by nudge presses; the abuse accumulator is a
+    // leaky integrator. Danger thresholds emit DangerThreshold sim
+    // events (consumed by the framework, never by scripts).
+    static constexpr size_t kNudgeEnvelopeCap = 4;
+
+    struct NudgeEnvelope {
+        float ax = 0.0f, ay = 0.0f; // full acceleration A·d_hat (m/s²)
+        uint32_t ticks_left = 0;    // 30 at 1 kHz (08 §7.1)
+    };
+
+    NudgeEnvelope nudge_envelopes[kNudgeEnvelopeCap]{};
+    uint32_t input_prev_buttons = 0; // edge detection (nudges are edges)
+    int nudge_level = 2;             // settings level 1..3 (replay header)
+
+    struct TiltState {
+        Vec2 p{};               // bob position (m)
+        Vec2 v{};               // bob velocity (m/s)
+        float abuse_acc = 0.0f; // 08 §7.3 leaky integrator (m/s)
+        float warn_m = 0.055f;  // physics.tilt.warn override applied
+        float hard_m = 0.085f;  // physics.tilt.hard
+        float abuse_mps = 1.2f; // physics.tilt.abuse
+        uint16_t crossings = 0; // 1-based, per ball, all sources
+        bool warn_armed = true; // re-arm at 0.7× own threshold
+        bool hard_armed = true;
+        bool abuse_armed = true;
+    } tilt{};
+
+    // Framework gates (11-game-framework.md §5): on tilt the framework
+    // clears both; coils cover slings/pops/kicker+lock captures/magnet
+    // energize. The capture_ms auto-eject keeps running (binding).
+    bool flippers_enabled = true;
+    bool coils_enabled = true;
+    // The M10 GameMachine attaches here (phase 3 of the tick, between
+    // script dispatch and timers — 11-game-framework.md §1). Null in
+    // script-only / synthetic scenes. fsm_step != nullptr is the single
+    // source of truth for "framework attached": tick_events are
+    // recorded for it and the M5 auto-serve loop steps aside.
+    void (*fsm_step)(void* ctx, SimState&, const TickInput&) = nullptr;
+    void* fsm_ctx = nullptr;
+
     // Script plumbing (10-scripting.md §2.2). element_ids/tags are static
     // build data indexed by TableDef element index; tick_events is the
     // per-tick emission-order log the host dispatches in phase 2 (filled
@@ -182,6 +223,18 @@ private:
 // IEEE-754 bit patterns of each ball's pos/vel/spin, both RNG stream
 // states, and finally the event-sequence accumulator (16 §2.4.1).
 uint64_t state_hash(const SimState& state);
+
+// Fold a framework-originated event into the event-sequence hash
+// (16-testing-ci.md §2.4.1; framework events are replay-record —
+// 11-game-framework.md §1). `name` hashes by bytes; the type slot uses
+// 0xF000 | framework event ordinal space so sim and framework events
+// can never collide.
+void absorb_framework_event(SimState& s, const char* name);
+
+// 08 §7.3: reset all danger state (bob p/v, abuse accumulator, arm
+// latches, crossing counter). Commanded by the framework at end of ball
+// (11-game-framework.md §4.5 step 5); never a timer.
+void reset_danger(SimState& s);
 
 // Builds the §2.9 synthetic perf scene: closed border, 8×10 rubber post
 // lattice, four steel arcs, four balls with PCG32(seed=99) velocities.

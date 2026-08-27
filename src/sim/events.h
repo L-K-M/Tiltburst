@@ -23,6 +23,9 @@ enum class SimEventType : uint16_t {
     BallLockCapture = 11,   // lock captured a ball (08 §6.14)
     CaptiveFullTravel = 12, // captive hit the far end (08 §6.13)
     RampMade = 13,          // forward ramp traversal (08 §6.10.6)
+    DangerThreshold = 14,   // tilt-danger threshold crossed (08 §7.2/§7.3);
+                            // neutral sim event consumed by the framework
+                            // (11-game-framework.md §5) — NOT a script event
     None = 0xFFFF,
 };
 

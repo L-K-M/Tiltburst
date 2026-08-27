@@ -4,6 +4,8 @@
 #include "core/log.h"
 #include "core/time.h"
 #include "core/version.h"
+#include "game/game_machine.h"
+#include "game/high_scores.h"
 #include "platform/gpu_device.h"
 #include "platform/input.h"
 #include "platform/latency.h"
@@ -456,9 +458,10 @@ int run(const CliOptions& cli) {
                 SDL_Quit();
                 return 1;
             }
-            if (loaded_table.script_loaded) {
-                loaded_table.script.begin_game(1);
-            }
+            // The M10 GameMachine owns the game lifecycle in the
+            // windowed path: game_start fires from GameStarting on a
+            // Start press, not at load. Scripts stay loaded-but-idle in
+            // Attract (timers + ledger frozen, 11 §8.2).
         } else {
             tb::sim::make_synthetic_scene(sim_state, 424242);
         }
@@ -486,6 +489,15 @@ int run(const CliOptions& cli) {
                 ++n;
             }
             snap.ball_count = n;
+            snap.tilt_px = sim_state.tilt.p.x;
+            snap.tilt_py = sim_state.tilt.p.y;
+            snap.tilt_vx = sim_state.tilt.v.x;
+            snap.tilt_vy = sim_state.tilt.v.y;
+            snap.tilt_abuse = sim_state.tilt.abuse_acc;
+            snap.tilt_crossings = sim_state.tilt.crossings;
+            snap.tilt_armed = uint8_t((sim_state.tilt.warn_armed ? 1u : 0u) |
+                                      (sim_state.tilt.hard_armed ? 2u : 0u) |
+                                      (sim_state.tilt.abuse_armed ? 4u : 0u));
             snapshots.publish(snap);
         });
         const uint64_t start = tb_now_ns();
@@ -772,10 +784,137 @@ int run(const CliOptions& cli) {
         }
         tb::sim::Solver solver;
 
+        // M10 game framework (11-game-framework.md): only for a loaded
+        // table with rules; synthetic scenes run bare.
+        std::unique_ptr<tb::game::GameMachine> machine;
+        tb::game::HighScoreTable high_scores;
+        std::filesystem::path score_path;
+        std::string score_slug;
+        uint32_t score_retry_ticks = 0; // failed-save backoff (1 Hz)
+        if (loaded_table && loaded_table->script_loaded) {
+            tb::game::FrameworkConfig fcfg;
+            fcfg.balls_per_game = settings.balls_per_game;
+            fcfg.tilt_warnings = settings.tilt_warnings;
+            fcfg.ball_save_ticks = uint32_t(std::clamp(settings.ball_save_seconds, 0, 15)) * 1000;
+            fcfg.replay_score = loaded_table->def.replay_score;
+            {
+                const time_t now = ::time(nullptr);
+                tm lt{};
+#if defined(_WIN32)
+                localtime_s(&lt, &now);
+#else
+                localtime_r(&now, &lt);
+#endif
+                char stamp[16];
+                strftime(stamp, sizeof(stamp), "%Y-%m-%d", &lt);
+                fcfg.date_stamp = stamp;
+            }
+            std::error_code mk_ec;
+            std::filesystem::create_directories(paths::pref() / "scores", mk_ec);
+            if (mk_ec) {
+                TB_LOG_WARN("main", "cannot create scores directory: {}", mk_ec.message());
+            }
+            // The slug is third-party metadata and names a file we
+            // read AND write: strip anything outside [A-Za-z0-9._-] so
+            // no pack can escape the scores/ directory.
+            std::string safe_slug;
+            for (char c : loaded_table->def.slug) {
+                if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                    c == '.' || c == '_' || c == '-') {
+                    safe_slug.push_back(c);
+                }
+            }
+            if (safe_slug.empty() || safe_slug == "." || safe_slug == "..") {
+                safe_slug = "table";
+            }
+            // Windows DOS device names resolve even with an extension
+            // (con.json etc.); a slug that reduces to one is not usable
+            // as a file name there.
+            {
+                std::string low = safe_slug;
+                for (char& c : low) {
+                    c = char(std::tolower(static_cast<unsigned char>(c)));
+                }
+                std::string stem = low;
+                const size_t dot = stem.find('.');
+                if (dot != std::string::npos) {
+                    stem = stem.substr(0, dot);
+                }
+                const bool reserved =
+                    stem == "con" || stem == "prn" || stem == "aux" || stem == "nul" ||
+                    (stem.size() == 4 &&
+                     (stem.compare(0, 3, "com") == 0 || stem.compare(0, 3, "lpt") == 0) &&
+                     stem[3] >= '1' && stem[3] <= '9');
+                if (reserved) {
+                    // Prefix with a char the sanitizer NEVER emits ('~'
+                    // is stripped from real slugs above): a constant
+                    // fallback would merge reserved-slug tables, and an
+                    // allowed char like '-' or '_' stays forgeable by a
+                    // table literally named "T-Com1".
+                    safe_slug = "t~" + safe_slug;
+                }
+            }
+            score_slug = safe_slug;
+            score_path = paths::pref() / "scores" / (safe_slug + ".json");
+            if (!high_scores.load(score_path)) {
+                // §7: seed from meta.default_scores when the pack
+                // declares it; otherwise the list simply starts empty.
+                // A file that EXISTS but failed to load is corrupt —
+                // keep a .bad copy (settings.json pattern) so a
+                // transient read error can never silently eat a top 10.
+                if (std::filesystem::exists(score_path)) {
+                    const std::filesystem::path bad = score_path.string() + ".bad";
+                    std::error_code bad_ec;
+                    std::filesystem::rename(score_path, bad, bad_ec);
+                    if (bad_ec) {
+                        // A stale or locked .bad is the usual reason
+                        // the rename failed; clear it and retry before
+                        // giving up on the keep-copy.
+                        std::error_code rm_ec;
+                        std::filesystem::remove(bad, rm_ec);
+                        std::filesystem::rename(score_path, bad, bad_ec);
+                    }
+                    if (bad_ec) {
+                        // Both renames failed: leave the corrupt file
+                        // in place — the crash-safe save's rename below
+                        // replaces it atomically; destroying the only
+                        // copy buys nothing.
+                        TB_LOG_WARN("main",
+                                    "score file corrupt; keep-copy failed: {} (the "
+                                    "seeded save will replace it)",
+                                    bad_ec.message());
+                    } else {
+                        TB_LOG_WARN("main", "score file corrupt; moved to {}", bad.string());
+                    }
+                }
+                high_scores.seed_defaults(loaded_table->def.default_scores, fcfg.date_stamp);
+                if (!high_scores.save(score_path, score_slug)) {
+                    TB_LOG_WARN("main", "initial score seed write failed");
+                }
+            }
+            machine = std::make_unique<tb::game::GameMachine>(
+                loaded_table->script, sim_state, high_scores, fcfg);
+            sim_state.nudge_level = std::clamp(settings.nudge_level, 1, 3);
+            sim_state.fsm_ctx = machine.get();
+            sim_state.fsm_step = [](void* ctx, tb::sim::SimState& s, const tb::sim::TickInput& in) {
+                static_cast<tb::game::GameMachine*>(ctx)->step(in);
+            };
+            TB_LOG_INFO("main", "game framework attached: table '{}'", loaded_table->def.slug);
+        }
+
         InputPipeline input;
         input.start(settings);
 
-        auto tick_fn = [&snapshots, &solver, &sim_state, &input](uint64_t tick) {
+        auto tick_fn = [&snapshots,
+                        &solver,
+                        &sim_state,
+                        &input,
+                        &machine,
+                        &high_scores,
+                        &score_path,
+                        &score_slug,
+                        &score_retry_ticks,
+                        &loaded_table](uint64_t tick) {
             // §2.1 step 1: late-latch the freshest input exactly once.
             const uint64_t latch_ts = tb_now_ns();
             const uint32_t buttons = tb::input::latch_input(input.sources.data(),
@@ -783,7 +922,29 @@ int run(const CliOptions& cli) {
                                                             input.state,
                                                             latch_ts,
                                                             &input.histogram);
-            solver.step(sim_state, tb::sim::TickInput{buttons});
+            const tb::sim::TickInput tick_input{buttons};
+            const bool paused = machine && machine->state() == tb::game::GameState::Paused;
+            if (paused) {
+                // §8.5: physics + script ticks freeze; the FSM itself
+                // keeps consuming commands.
+                machine->step(tick_input);
+            } else {
+                solver.step(sim_state, tick_input); // fsm runs in phase 3
+            }
+            if (machine && machine->scores_dirty()) {
+                // Clear only after a successful write; a failing save
+                // retries at 1 Hz rather than every tick (a full JSON
+                // serialize per 1 kHz tick against a dead directory is
+                // its own hazard).
+                if (score_retry_ticks > 0) {
+                    --score_retry_ticks;
+                } else if (high_scores.save(score_path, score_slug)) {
+                    machine->clear_scores_dirty();
+                } else {
+                    score_retry_ticks = 1'000;
+                    TB_LOG_WARN_RATELIMITED("main", "score save failed; retrying at 1 Hz");
+                }
+            }
 
             tb::SimSnapshot snap;
             snap.tick = tick;
@@ -803,6 +964,15 @@ int run(const CliOptions& cli) {
                 ++n;
             }
             snap.ball_count = n;
+            snap.tilt_px = sim_state.tilt.p.x;
+            snap.tilt_py = sim_state.tilt.p.y;
+            snap.tilt_vx = sim_state.tilt.v.x;
+            snap.tilt_vy = sim_state.tilt.v.y;
+            snap.tilt_abuse = sim_state.tilt.abuse_acc;
+            snap.tilt_crossings = sim_state.tilt.crossings;
+            snap.tilt_armed = uint8_t((sim_state.tilt.warn_armed ? 1u : 0u) |
+                                      (sim_state.tilt.hard_armed ? 2u : 0u) |
+                                      (sim_state.tilt.abuse_armed ? 4u : 0u));
             snapshots.publish(snap);
 
             // §14.1 stages 1–3 of this tick's latency record.

@@ -32,6 +32,14 @@ struct ScriptAction {
         DropBankReset,
         GateOpen,
         GateClose,
+        // Framework commands (11-game-framework.md §5, M10): latched by
+        // the GameMachine through the same drain as script actions.
+        FlippersEnabled, // flag = gate state
+        CoilsEnabled,    // flag = gate state
+        ForceEjectAll,   // tilt/timeout: kick every hold, empty every
+                         // lock (staggered), release magnets
+        ResetDanger,     // 08 §7.3 end-of-ball danger reset
+        LocksToTrough,   // §4.5 step 5: bookkeeping drain, no eject
     };
 
     Kind kind = Kind::Kick;
@@ -102,6 +110,14 @@ public:
     void end_game();
     void set_current_player(int index);
     void set_timers_frozen(bool frozen); // §3.6: freeze outside BALL_IN_PLAY
+
+    // Framework seams (M10, 11-game-framework.md).
+    void add_player();              // mid-game join during P1 ball 1
+    void set_ball_number(int ball); // tb.game.ball_number (extra ball
+                                    // replays the same number)
+    void cancel_all_timers();       // §4.5 step 4: end-of-ball cancel
+    void set_ledger_frozen(bool);   // §5 tilt / §4.5 step 1: discard
+                                    // tb.score/add_bonus posts
 
     // Latched physical actions (drained by the solver at next phase 1).
     std::vector<ScriptAction>& pending_actions();

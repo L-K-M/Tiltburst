@@ -117,6 +117,9 @@ public:
     // values only). Returns false when the key is absent.
     bool state_read_int(int player, const char* key, int64_t& out) const;
 
+    // Test seam: string values (element ids, tags).
+    bool state_read_string(int player, const char* key, std::string& out) const;
+
 private:
     ScriptHostImpl* impl_ = nullptr;
 };

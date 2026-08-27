@@ -392,6 +392,19 @@ bool ScriptHost::state_read_int(int player, const char* key, int64_t& out) const
     return false;
 }
 
+bool ScriptHost::state_read_string(int player, const char* key, std::string& out) const {
+    if (impl_->lua == nullptr || !impl_->loaded) {
+        return false;
+    }
+    sol::state_view lua(*impl_->lua);
+    sol::object v = lua["tb"]["__states"][std::clamp(player, 1, 4)][key];
+    if (!v.is<std::string>()) {
+        return false;
+    }
+    out = v.as<std::string>();
+    return true;
+}
+
 void ScriptHost::set_current_player(int index) {
     impl_->current_player = std::clamp(index, 1, 4);
     if (impl_->lua == nullptr || !impl_->loaded) {

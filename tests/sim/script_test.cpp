@@ -245,16 +245,21 @@ TEST(Events, PayloadGoldenPerType) {
     host.end_tick(1);
 
     int64_t v = 0;
+    std::string sv;
     ASSERT_TRUE(host.state_read_int(1, "sw_ball", v));
     EXPECT_EQ(v, 1); // ball index 0 → 1-based id 1
     ASSERT_TRUE(host.state_read_int(1, "sw_speed", v));
     EXPECT_EQ(v, 2);
+    ASSERT_TRUE(host.state_read_string(1, "sw_tag1", sv)); // tags propagate
+    EXPECT_EQ(sv, "scoring");
 
     host.begin_tick(2);
     host.dispatch(synth(SimEventType::TargetDown, 3, 0.0f, 0, /*target_index=*/2.0f));
     host.end_tick(2);
     ASSERT_TRUE(host.state_read_int(1, "td_idx", v));
     EXPECT_EQ(v, 2);
+    ASSERT_TRUE(host.state_read_string(1, "td_bank", sv)); // bank_id = element id
+    EXPECT_EQ(sv, "gear_bank");
 
     host.begin_tick(3);
     host.dispatch(synth(SimEventType::SpinnerSpin, 6, 120.0f));
@@ -345,6 +350,11 @@ TEST(NeonDrift, ScriptedGameReachesGameEnd) {
     bool game_end_seen = false;
     int64_t drains_seen = 0;
 
+    // Ball 1 starts before the loop: the drain branch below is live from
+    // t == 0, so a late-armed initial ball_start would mis-sequence events
+    // if launch timing ever changed (review cycle 4).
+    host.fire_event("ball_start", {{"player", 1}, {"ball_number", 1}});
+
     for (int t = 0; t < 240000 && !game_end_seen; ++t) {
         TickInput in;
         const int phase = t % 5000;
@@ -377,10 +387,6 @@ TEST(NeonDrift, ScriptedGameReachesGameEnd) {
                 host.end_game();
                 game_end_seen = true;
             }
-        }
-
-        if (t == 100) {
-            host.fire_event("ball_start", {{"player", 1}, {"ball_number", 1}});
         }
     }
 
@@ -488,7 +494,7 @@ TEST(Events, DrainPayloadExcludesDrainingBall) {
     // Force a drain through the real region logic: ball into the outhole.
     tb::sim::SimState& s = *loaded.state;
     s.outholes.push_back({{0.02f, 0.01f}, {0.46f, 0.01f}});
-    Ball& ball = s.balls[0];
+    Ball& ball = s.balls[0]; // fixed array Ball[kMaxBalls] — always valid
     ball.index = 0;
     ball.live = true;
     ball.mode = BallMode::Free;

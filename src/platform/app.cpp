@@ -811,6 +811,9 @@ int run(const CliOptions& cli) {
             }
             std::error_code mk_ec;
             std::filesystem::create_directories(paths::pref() / "scores", mk_ec);
+            if (mk_ec) {
+                TB_LOG_WARN("main", "cannot create scores directory: {}", mk_ec.message());
+            }
             // The slug is third-party metadata and names a file we
             // read AND write: strip anything outside [A-Za-z0-9._-] so
             // no pack can escape the scores/ directory.
@@ -872,19 +875,22 @@ int run(const CliOptions& cli) {
                         std::filesystem::rename(score_path, bad, bad_ec);
                     }
                     if (bad_ec) {
-                        std::error_code rm_ec;
-                        const bool removed = std::filesystem::remove(score_path, rm_ec);
+                        // Both renames failed: leave the corrupt file
+                        // in place — the crash-safe save's rename below
+                        // replaces it atomically; destroying the only
+                        // copy buys nothing.
                         TB_LOG_WARN("main",
-                                    "score file corrupt; keep-copy failed: {} (original "
-                                    "removed: {})",
-                                    bad_ec.message(),
-                                    removed);
+                                    "score file corrupt; keep-copy failed: {} (the "
+                                    "seeded save will replace it)",
+                                    bad_ec.message());
                     } else {
                         TB_LOG_WARN("main", "score file corrupt; moved to {}", bad.string());
                     }
                 }
                 high_scores.seed_defaults(loaded_table->def.default_scores, fcfg.date_stamp);
-                high_scores.save(score_path, score_slug);
+                if (!high_scores.save(score_path, score_slug)) {
+                    TB_LOG_WARN("main", "initial score seed write failed");
+                }
             }
             machine = std::make_unique<tb::game::GameMachine>(
                 loaded_table->script, sim_state, high_scores, fcfg);
@@ -936,6 +942,7 @@ int run(const CliOptions& cli) {
                     machine->clear_scores_dirty();
                 } else {
                     score_retry_ticks = 1'000;
+                    TB_LOG_WARN_RATELIMITED("main", "score save failed; retrying at 1 Hz");
                 }
             }
 

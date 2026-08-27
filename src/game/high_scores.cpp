@@ -81,6 +81,9 @@ bool HighScoreTable::load(const std::filesystem::path& path) {
     if (!in.good()) {
         return false; // missing: caller seeds (§7)
     }
+    // Parse into a scratch vector: a failed load leaves entries_ EMPTY
+    // (a truncated fragment must never look like a valid short table).
+    std::vector<HighScoreEntry> parsed;
     try {
         json doc = json::parse(in);
         if (doc.value("version", 0) != 1 || !doc.contains("entries") ||
@@ -105,11 +108,12 @@ bool HighScoreTable::load(const std::filesystem::path& path) {
             if (!valid_initials(e.initials) || e.score == 0) {
                 return false;
             }
-            entries_.push_back(e);
+            parsed.push_back(e);
         }
-        if (entries_.size() > kMaxEntries) {
+        if (parsed.size() > kMaxEntries) {
             return false;
         }
+        entries_ = std::move(parsed);
         return true;
     } catch (const json::exception&) {
         return false; // corrupt
@@ -133,6 +137,9 @@ void HighScoreTable::seed_defaults(const std::vector<table::DefaultScore>& defau
 }
 
 bool HighScoreTable::qualifies(uint64_t score) const {
+    if (score == 0) {
+        return false; // matches insert(): 0 is not persistable (§7)
+    }
     if (entries_.size() < kMaxEntries) {
         return true;
     }

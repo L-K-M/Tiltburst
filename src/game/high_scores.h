@@ -39,7 +39,8 @@ public:
     void seed_defaults(const std::vector<table::DefaultScore>& defaults, const std::string& date);
 
     // §7: qualifies if < 10 entries or the score beats the 10th; ties
-    // insert below existing equal scores.
+    // insert below existing equal scores. A 0 score never qualifies
+    // (insert() rejects score-0 rows — load() treats them as corrupt).
     bool qualifies(uint64_t score) const;
 
     // Inserts sorted (ties below equals); returns the 1-based rank, or

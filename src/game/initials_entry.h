@@ -38,12 +38,18 @@ public:
     }
 
     void next_glyph() {
+        if (done_) {
+            return; // committed: terminal
+        }
         touch();
         ring_pos_ = (ring_pos_ + 1) % kRingSize;
         slots_[size_t(cursor_)] = glyph_at(ring_pos_);
     }
 
     void prev_glyph() {
+        if (done_) {
+            return; // committed: terminal
+        }
         touch();
         ring_pos_ = (ring_pos_ + kRingSize - 1) % kRingSize;
         slots_[size_t(cursor_)] = glyph_at(ring_pos_);
@@ -54,6 +60,9 @@ public:
     // (§7) — confirm() intercepts it here, before the advance/commit;
     // initials() sanitizing '<' to ' ' is only the timeout safety net.
     void confirm() {
+        if (done_) {
+            return;
+        }
         touch();
         if (ring_pos_ == kBackspaceIndex) {
             backspace(); // '<' + Start = backspace (§7)
@@ -70,6 +79,9 @@ public:
     // Plunger key: move back one slot. Returns true while there is a
     // slot to move back to (at slot 0 the caller treats it as a no-op).
     bool backspace() {
+        if (done_) {
+            return false;
+        }
         touch();
         if (cursor_ > 0) {
             --cursor_;

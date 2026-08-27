@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
 #include <cstring>
 #include <memory>
 #include <unordered_map>
@@ -107,7 +106,6 @@ struct ScriptHostImpl {
     std::vector<std::vector<std::string>> element_tags;
 
     ~ScriptHostImpl() {
-        std::fprintf(stderr, "[tbdbg] dtor enter\n");
         if (L != nullptr) {
             // Member sol references (handlers/timers) must unref BEFORE
             // the state dies: clear them here, manually, so the implicit
@@ -423,11 +421,16 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
         lua[g] = sol::lua_nil;
     }
     lua["string"]["dump"] = sol::lua_nil;
+    // luaL_error is NOT noreturn in the Lua headers: the returns are
+    // dead at runtime (it longjmps) but keep the lambdas well-formed —
+    // falling off a non-void function is UB that -O2 punishes.
     lua["math"]["random"] = [](sol::this_state s) -> int {
         luaL_error(s, "math.random is disabled; use tb.rng()");
+        return 0;
     };
     lua["math"]["randomseed"] = [](sol::this_state s) -> int {
         luaL_error(s, "math.randomseed is disabled; use tb.rng()");
+        return 0;
     };
     lua["print"] = [](const char* msg) { TB_LOG_INFO("[lua]", "{}", msg); };
     lua["collectgarbage"] = [](sol::this_state s, const char* what) {

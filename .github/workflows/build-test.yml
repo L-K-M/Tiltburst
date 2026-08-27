@@ -58,8 +58,6 @@ jobs:
             configure_preset: release
             build_preset: release
             test_preset: release
-            # TEMP triage: asan on the macOS script tests (revert with the fix)
-            extra_flags: "-DCMAKE_CXX_FLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer' -DCMAKE_CXX_FLAGS_DEBUG='' -DCMAKE_C_FLAGS='-fsanitize=address' -DCMAKE_EXE_LINKER_FLAGS='-fsanitize=address' -DCMAKE_SHARED_LINKER_FLAGS='-fsanitize=address'"
           - os: windows-latest
             configure_preset: windows
             build_preset: windows-release
@@ -71,7 +69,7 @@ jobs:
       - uses: ./.github/actions/tb-setup
 
       - name: Configure
-        run: cmake --preset ${{ matrix.configure_preset }} ${{ matrix.extra_flags }}
+        run: cmake --preset ${{ matrix.configure_preset }}
 
       - name: Build
         run: cmake --build --preset ${{ matrix.build_preset }}
@@ -227,8 +225,6 @@ jobs:
             configure_preset: release
             build_preset: release
             test_preset: release
-            # TEMP triage: asan on the macOS script tests (revert with the fix)
-            extra_flags: "-DCMAKE_CXX_FLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer' -DCMAKE_CXX_FLAGS_DEBUG='' -DCMAKE_C_FLAGS='-fsanitize=address' -DCMAKE_EXE_LINKER_FLAGS='-fsanitize=address' -DCMAKE_SHARED_LINKER_FLAGS='-fsanitize=address'"
           - os: windows-latest
             configure_preset: windows
             build_preset: windows-release

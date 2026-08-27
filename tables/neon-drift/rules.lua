@@ -79,9 +79,7 @@ end)
 
 -- Scoring ------------------------------------------------------------------
 tb.on("switch_hit", function(ev)
-  for _, tag in ipairs(ev.tags or {}) do  -- buttons never score (§4.1)
-    if tag == "button" then return end
-  end
+  if has_tag(ev, "button") then return end   -- buttons never score (§4.1)
 
   if ev.id == "loop_left_switch" or ev.id == "loop_right_switch" then
     local base = CONFIG.SCORE_ORBIT

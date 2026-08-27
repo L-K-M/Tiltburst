@@ -715,9 +715,10 @@ void Solver::step_body(SimState& s, const TickInput* input) {
         constexpr uint32_t kNudgeRightBit = 6;
         constexpr uint32_t kNudgeUpBit = 7;
         const uint32_t rising = input->buttons & ~s.input_prev_buttons;
-        // 1..3 (settings; replay header). Anything out of range clamps
-        // to the MIDDLE level, never silently the strongest.
-        const int level = std::clamp(s.nudge_level, 1, 3);
+        // 1..3 (settings; replay header). Anything out of range maps to
+        // the MIDDLE level — boundary clamping would turn garbage like
+        // 7 into the STRONGEST nudges.
+        const int level = (s.nudge_level >= 1 && s.nudge_level <= 3) ? s.nudge_level : 2;
         auto nudge_dv = [level](uint32_t bit) -> std::pair<Vec2, Vec2> {
             // Returns {ball d_hat·dv, cab d_hat·dv}: the button names the
             // direction the cabinet is shoved; balls accelerate the

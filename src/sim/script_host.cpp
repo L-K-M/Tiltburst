@@ -498,9 +498,15 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
     sol::table tb = lua.create_named_table("tb");
 
     // ---- events (§2.3) ----
-    tb.set_function("on", [this](sol::this_state s, const std::string& name, sol::function fn) {
+    tb.set_function("on", [this](sol::this_state s, const char* name, sol::function fn) {
+        // const char* (Lua-owned view): sol would otherwise construct a
+        // temporary std::string argument whose destructor the
+        // unknown-name luaL_error longjmp skips (LeakSanitizer).
+        if (name == nullptr) {
+            luaL_error(s, "tb.on: event name must be a string");
+        }
         if (!is_canon_event(name)) {
-            luaL_error(s, "unknown event name: %s", name.c_str());
+            luaL_error(s, "unknown event name: %s", name);
         }
         impl_->handlers[name].push_back(HandlerEntry{sol::protected_function(fn), 0, false});
     });
@@ -527,7 +533,10 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
     });
 
     // ---- lights (§3.2): flip SimState light state by element id ----
-    auto set_light = [this](const std::string& id, bool on) {
+    auto set_light = [this](const char* id, bool on) {
+        if (id == nullptr) {
+            return;
+        }
         const auto it = impl_->element_index.find(id);
         if (it == impl_->element_index.end()) {
             TB_LOG_WARN("script", "light: unknown id {}", id);
@@ -539,10 +548,13 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
             }
         }
     };
-    tb.set_function("light_on", [set_light](const std::string& id) { set_light(id, true); });
-    tb.set_function("light_off", [set_light](const std::string& id) { set_light(id, false); });
+    tb.set_function("light_on", [set_light](const char* id) { set_light(id, true); });
+    tb.set_function("light_off", [set_light](const char* id) { set_light(id, false); });
     tb.set_function("light_blink",
-                    [set_light](sol::this_state s, const std::string& id, const char* pattern) {
+                    [set_light](sol::this_state s, const char* id, const char* pattern) {
+                        if (id == nullptr) {
+                            luaL_error(s, "tb.light_blink: id must be a string");
+                        }
                         pattern_blink_code(pattern, s); // validates; unknown raises
                         set_light(id, true);            // blink rendering is M13; state-wise on
                     });

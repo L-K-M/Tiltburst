@@ -74,7 +74,9 @@ end)
 
 -- Scoring ----------------------------------------------------------------
 tb.on("switch_hit", function(ev)
-  if ev.tags[1] == "button" then return end     -- buttons never score (§4.1)
+  for _, tag in ipairs(ev.tags or {}) do  -- buttons never score (§4.1)
+    if tag == "button" then return end
+  end
   -- Frenzy rides on top of all normal scoring below.
   if tb.state.frenzy then tb.score(CONFIG.SCORE_FRENZY_HIT) end
 
@@ -84,6 +86,9 @@ tb.on("switch_hit", function(ev)
     tb.score(CONFIG.SCORE_POP)
     tb.add_bonus(CONFIG.BONUS_POP)
   elseif ev.id == "target_left" or ev.id == "target_right" then
+    -- Guard: a switch can land before the first ball_start initialized
+    -- the per-player table (switch testing, attract play).
+    tb.state.targets = tb.state.targets or { left = false, right = false }
     local side = (ev.id == "target_left") and "left" or "right"
     tb.score(CONFIG.SCORE_TARGET)
     tb.add_bonus(CONFIG.BONUS_TARGET)

@@ -25,6 +25,13 @@ local CONFIG = {
 }
 
 -- Gears: the bank completes → shift up. Gear multiplies ramp + orbit.
+local function has_tag(ev, want)
+  for _, tag in ipairs(ev.tags or {}) do
+    if tag == want then return true end
+  end
+  return false
+end
+
 local function gear_mult()
   return 1 + (tb.state.gear or 1) * 0.5 - 0.5   -- 1.0, 1.5, 2.0, ...
 end
@@ -72,7 +79,9 @@ end)
 
 -- Scoring ------------------------------------------------------------------
 tb.on("switch_hit", function(ev)
-  if ev.tags[1] == "button" then return end
+  for _, tag in ipairs(ev.tags or {}) do  -- buttons never score (§4.1)
+    if tag == "button" then return end
+  end
 
   if ev.id == "loop_left_switch" or ev.id == "loop_right_switch" then
     local base = CONFIG.SCORE_ORBIT
@@ -89,7 +98,10 @@ tb.on("switch_hit", function(ev)
   elseif ev.id == "slings_left_sling" or ev.id == "slings_right_sling" then
     tb.score(CONFIG.SCORE_SLING)
 
-  elseif ev.tags[1] == "nos" then
+  elseif has_tag(ev, "nos") then
+    -- Guard: a switch can land before the first ball_start initialized
+    -- the per-player table (switch testing, attract play).
+    tb.state.nos = tb.state.nos or { left = false, mid = false, right = false }
     tb.score(CONFIG.SCORE_NOSE)
     local key = (ev.id == "nos_left" and "left")
         or (ev.id == "nos_mid" and "mid") or "right"

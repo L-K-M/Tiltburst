@@ -4,6 +4,7 @@
 #include "sim/script_host.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <cmath>
 
 namespace tb::sim {
@@ -55,7 +56,11 @@ void serve_ball(SimState& s) {
 // Per-tick emission-order log for the script host (§2.2 phase 2). Filled
 // only while a host is attached; the Collision audio event never records.
 void record_tick_event(SimState& s, const SimEvent& ev) {
-    if (s.script == nullptr || s.tick_event_n >= SimState::kTickEventCap) {
+    if (s.script == nullptr) {
+        return;
+    }
+    std::fprintf(stderr, "[tbdbg] record event type=%u n=%zu\n", ev.type, s.tick_event_n);
+    if (s.tick_event_n >= SimState::kTickEventCap) {
         return;
     }
     s.tick_events[s.tick_event_n++] = ev;
@@ -661,6 +666,8 @@ void Solver::step_body(SimState& s, const TickInput* input) {
     // latched during tick n−1's handlers; physics state stays immutable
     // while scripts run.
     if (s.script != nullptr) {
+        std::fprintf(stderr, "[tbdbg] step: apply actions (%zu)\n",
+                     s.script->pending_actions().size());
         apply_script_actions(s, s.script->pending_actions());
         s.script->pending_actions().clear();
         s.tick_event_n = 0;
@@ -982,6 +989,7 @@ void Solver::step_body(SimState& s, const TickInput* input) {
     // Phase 2 (10-scripting.md §2.2): dispatch this tick's sim events to
     // Lua in emission order; phase 4 timers + GC after.
     if (s.script != nullptr && s.script->scripting_active()) {
+        std::fprintf(stderr, "[tbdbg] step: dispatch %zu events\n", s.tick_event_n);
         s.script->begin_tick(s.tick);
         for (size_t i = 0; i < s.tick_event_n; ++i) {
             s.script->dispatch(s.tick_events[i]);

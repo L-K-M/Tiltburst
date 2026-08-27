@@ -442,8 +442,12 @@ int run(const CliOptions& cli) {
         // Bounded display-less probe (journal note): boot with no video/
         // GPU/audio, run the sim loop, report the tick rate, exit 0.
         tb::SnapshotBuffer snapshots;
-        tb::sim::SimState sim_state;
+        // Declaration order is load-bearing: loaded_table (which owns the
+        // ScriptHost that sim_state.script points at) must be destroyed
+        // AFTER sim_state, so it is declared first (as in the windowed
+        // path above).
         LoadedTable loaded_table;
+        tb::sim::SimState sim_state;
         if (!cli.table.empty()) {
             if (!load_table_pack(loaded_table, resolve_table_dir(cli.table), sim_state)) {
                 log::flush_now();

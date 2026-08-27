@@ -14,13 +14,6 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
   BackglassModel; tables/test-lab/rules.lua ships and Neon Drift gains
   its M9 element roster + rules v1.
 
-### Fixed
-
-- M09: §3.8 push-out now depenetrates arcs (a 7 m/s orbit ball could
-  tunnel through the corner-arc wall band; det_golden regenerated).
-- M09: inlane_outlane_pair outlane mouth widened to 32.8 mm passable
-  (ADR-024; the old default wedged balls in §6's jam band).
-
 - M08: ramps as constrained 1-D paths with derived seam layers and
   bidirectional layer transfer, layer masks, and magnets with the §6.12
   field — completing the R7 element set (ramp, magnet, toy parse; FT-09
@@ -57,6 +50,10 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Fixed
 
+- M09: §3.8 push-out now depenetrates arcs (a 7 m/s orbit ball could
+  tunnel through the corner-arc wall band; det_golden regenerated).
+- M09: inlane_outlane_pair outlane mouth widened to 32.8 mm passable
+  (ADR-024; the old default wedged balls in §6's jam band).
 - M05: live-catch window restored to the documented 50 ms default
   (merged M4 carried 70 ms; ADR-021 text and code now agree).
 - M04: resting/tangential contacts within kSkin now resolve as persistent

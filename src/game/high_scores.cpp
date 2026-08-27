@@ -30,8 +30,7 @@ bool write_crash_safe(const std::filesystem::path& path, const std::string& text
             TB_LOG_ERROR("game", "scores save: cannot open {}", tmp.string());
             return false;
         }
-        bool ok =
-            std::fwrite(text.data(), 1, text.size(), f) == text.size() && std::fflush(f) == 0;
+        bool ok = std::fwrite(text.data(), 1, text.size(), f) == text.size() && std::fflush(f) == 0;
 #if defined(_WIN32)
         if (ok && _commit(_fileno(f)) != 0) {
             ok = false; // durability is the whole point (05 §11.2)

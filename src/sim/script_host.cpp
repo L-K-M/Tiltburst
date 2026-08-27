@@ -538,7 +538,11 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
             return; // §6: after ball_end, after tilt — discard, log debug
         }
         auto& ps = player_scores(impl_->current_player);
-        ps.score = std::min(ps.score + uint64_t(points), kScoreCap);
+        // Clamp the double BEFORE conversion: points near 2^64 pass the
+        // validation above (double(uint64_max) rounds to 2^64) and would
+        // wrap the unsigned sum — min could then pick a value BELOW the
+        // current score. points == 2^64 would also be UB to convert.
+        ps.score = std::min(ps.score + uint64_t(std::min(points, double(kScoreCap))), kScoreCap);
     });
     tb.set_function("add_bonus", [this](double points) {
         if (!(points >= 0.0) || points > double(std::numeric_limits<uint64_t>::max())) {
@@ -549,7 +553,9 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
             return; // §6
         }
         auto& ps = player_scores(impl_->current_player);
-        ps.bonus = std::min<uint64_t>(ps.bonus + uint64_t(points), kScoreCap);
+        // Same pre-conversion clamp as tb.score (see above).
+        ps.bonus =
+            std::min<uint64_t>(ps.bonus + uint64_t(std::min(points, double(kScoreCap))), kScoreCap);
     });
     tb.set_function("set_multiplier", [this](double n) {
         const int clamped = int(std::clamp(std::isfinite(n) ? n : 1.0, 1.0, 10.0));

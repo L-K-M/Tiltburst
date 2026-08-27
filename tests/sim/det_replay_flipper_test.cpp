@@ -137,6 +137,7 @@ TEST(det_replay, flipper_tape_hash_stable) {
             out << tick << " " << std::hex << std::setw(16) << std::setfill('0') << hash << std::dec
                 << "\n";
         }
+        out.flush();
         ASSERT_TRUE(out.good()) << "golden write failed to " << record;
         SUCCEED() << "golden recorded";
         return;

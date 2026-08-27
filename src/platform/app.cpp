@@ -832,9 +832,20 @@ int run(const CliOptions& cli) {
                 // keep a .bad copy (settings.json pattern) so a
                 // transient read error can never silently eat a top 10.
                 if (std::filesystem::exists(score_path)) {
+                    const std::filesystem::path bad = score_path.string() + ".bad";
                     std::error_code bad_ec;
-                    std::filesystem::rename(score_path, score_path.string() + ".bad", bad_ec);
-                    TB_LOG_WARN("main", "score file corrupt; moved to {}.bad", score_path.string());
+                    std::filesystem::rename(score_path, bad, bad_ec);
+                    if (bad_ec) {
+                        // Keep-copy failed: remove the corrupt file so
+                        // the seeded save below still lands, and log
+                        // what actually happened.
+                        std::error_code rm_ec;
+                        std::filesystem::remove(score_path, rm_ec);
+                        TB_LOG_WARN(
+                            "main", "score file corrupt; keep-copy failed: {}", bad_ec.message());
+                    } else {
+                        TB_LOG_WARN("main", "score file corrupt; moved to {}", bad.string());
+                    }
                 }
                 high_scores.seed_defaults(loaded_table->def.default_scores, fcfg.date_stamp);
                 high_scores.save(score_path, score_slug);

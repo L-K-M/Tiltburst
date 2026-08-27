@@ -149,10 +149,11 @@ void GameMachine::enter_game_starting() {
     p1_bonus_seen_ = false;
     fire_player_up_ = false;
     host_.set_current_player(1);
-    host_.begin_game(1);
-    // A fresh game lifts the Attract freeze (§6: freezes cover
-    // BonusCount-after-ball_end and tilt only).
+    // Lift any residual freeze BEFORE begin_game: game_start fires
+    // synchronously and its handlers may score (§6). On a back-to-back
+    // game the previous session's ball_end/tilt freeze is still set.
     host_.set_ledger_frozen(false);
+    host_.begin_game(1);
     host_.set_timers_frozen(true);
     command_flipper_coil_restore();
 }

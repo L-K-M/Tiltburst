@@ -162,10 +162,15 @@ TEST(det_replay, flipper_tape_hash_stable) {
     ASSERT_EQ(hashes.size(), 30u);
     for (size_t gi = 0; gi < golden.size(); ++gi) {
         ASSERT_LT(gi, hashes.size());
-        ASSERT_EQ(hashes[size_t(golden[gi].first / 100 - 1)].first, golden[gi].first)
-            << "sample cadence mismatch";
-        ASSERT_EQ(hashes[size_t(golden[gi].first / 100 - 1)].second, golden[gi].second)
-            << "hash divergence at tick " << golden[gi].first << " (replay machinery or sim drift)";
+        const uint64_t tick = golden[gi].first;
+        ASSERT_GT(tick, 0u);
+        ASSERT_EQ(tick % 100u, 0u) << "sample cadence mismatch";
+        const size_t idx = static_cast<size_t>(tick / 100u - 1);
+        ASSERT_LT(idx, hashes.size()) << "golden tick beyond replay range";
+        ASSERT_EQ(idx, gi) << "golden entries must be ordered, unique 100-tick samples";
+        ASSERT_EQ(hashes[idx].first, tick);
+        ASSERT_EQ(hashes[idx].second, golden[gi].second)
+            << "hash divergence at tick " << tick << " (replay machinery or sim drift)";
     }
 #endif
 }

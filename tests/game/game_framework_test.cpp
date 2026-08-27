@@ -39,6 +39,12 @@ struct Rig {
         state = std::make_unique<sim::SimState>();
         make_rig(*state);
         state->script = &host;
+        // "Framework attached" from construction (solver.h: fsm_step !=
+        // nullptr is the single source): a no-op phase-3 stub keeps the
+        // M5 auto-serve loop out of these tests exactly as in
+        // production; each test's attach() replaces it with the real
+        // machine before the first step.
+        state->fsm_step = [](void*, sim::SimState&, const sim::TickInput&) {};
         host.load(rules, *state);
     }
 
@@ -46,10 +52,7 @@ struct Rig {
     // phase 3 via the same hook the app installs.
     template <typename F>
     void step(F&& attach, uint32_t buttons) {
-        if (state->fsm_step == nullptr) {
-            state->fsm_ctx = nullptr; // set by attach below
-            attach();
-        }
+        attach(); // overwrites the construction-time no-op stub
         solver.step(*state, sim::TickInput{buttons});
     }
 

@@ -1,5 +1,7 @@
 #include "platform/app.h"
 
+#include "audio/audio_engine.h"
+#include "audio/audio_json.h"
 #include "core/config.h"
 #include "core/log.h"
 #include "core/time.h"
@@ -238,6 +240,14 @@ CliOptions parse_cli(int argc, char** argv) {
 
         if (arg == "--headless") {
             cli.headless = true;
+            continue;
+        }
+        if (arg == "--audio-null") {
+            cli.audio_null = true;
+            continue;
+        }
+        if (arg == "--audio-latency-test") {
+            cli.audio_latency_test = true;
             continue;
         }
         if (arg == "--dev") {
@@ -902,6 +912,60 @@ int run(const CliOptions& cli) {
             TB_LOG_INFO("main", "game framework attached: table '{}'", loaded_table->def.slug);
         }
 
+        // Audio (12-audio.md, M11): device ladder (or null backend),
+        // bank + purpose map + intern table published at table load.
+        tb::audio::AudioSystem audio;
+        {
+            tb::audio::AudioConfig acfg;
+            acfg.master = settings.audio_master;
+            acfg.sfx = settings.audio_sfx;
+            acfg.music = settings.audio_music;
+            acfg.ui = settings.audio_ui;
+            acfg.period_frames = settings.audio_period_frames;
+            acfg.null_backend = cli.audio_null;
+            acfg.latency_probe = cli.audio_latency_test;
+            if (!audio.init(acfg) && !cli.audio_null) {
+                TB_LOG_WARN("main", "continuing without audio");
+            }
+        }
+        std::vector<tb::sim::PatchIntern> patch_intern;
+        if (loaded_table) {
+            tb::audio::TableAudio table_audio;
+            bool have_audio_json = false;
+            try {
+                have_audio_json = tb::audio::load_audio_json(table_dir, table_audio);
+            } catch (const tb::audio::AudioLoadError& e) {
+                TB_LOG_ERROR("main", "audio load failed: {} ({})", e.what(), e.json_pointer);
+                log::flush_now();
+                return 1;
+            }
+            int purpose_patch[tb::sim::SimState::kSoundPurposeCount] = {};
+            for (int& p : purpose_patch) {
+                p = -1; // no audio until the bank resolves defaults
+            }
+            std::unique_ptr<tb::audio::PatchBank> bank;
+            try {
+                bank = tb::audio::build_bank(table_audio, table_dir, purpose_patch);
+            } catch (const tb::audio::AudioLoadError& e) {
+                TB_LOG_ERROR("main", "bank build failed: {} ({})", e.what(), e.json_pointer);
+                log::flush_now();
+                return 1;
+            }
+            if (have_audio_json) {
+                patch_intern.reserve(bank->entries.size());
+                for (size_t i = 0; i < bank->entries.size(); ++i) {
+                    patch_intern.push_back({bank->entries[i].name.c_str(), uint16_t(i)});
+                }
+            }
+            audio.publish_bank(std::move(bank));
+            for (int i = 0; i < tb::sim::SimState::kSoundPurposeCount; ++i) {
+                sim_state.sound_purpose_patch[i] = purpose_patch[i];
+            }
+        }
+        sim_state.sound_queue = &audio.sound_queue();
+        sim_state.patch_intern = patch_intern.data();
+        sim_state.patch_intern_n = uint32_t(patch_intern.size());
+
         InputPipeline input;
         input.start(settings);
 
@@ -914,7 +978,8 @@ int run(const CliOptions& cli) {
                         &score_path,
                         &score_slug,
                         &score_retry_ticks,
-                        &loaded_table](uint64_t tick) {
+                        &loaded_table,
+                        &audio](uint64_t tick) {
             // §2.1 step 1: late-latch the freshest input exactly once.
             const uint64_t latch_ts = tb_now_ns();
             const uint32_t buttons = tb::input::latch_input(input.sources.data(),
@@ -931,6 +996,7 @@ int run(const CliOptions& cli) {
             } else {
                 solver.step(sim_state, tick_input); // fsm runs in phase 3
             }
+            audio.publish_tick(tick); // 12 §4.2: newest completed tick
             if (machine && machine->scores_dirty()) {
                 // Clear only after a successful write; a failing save
                 // retries at 1 Hz rather than every tick (a full JSON
@@ -1012,6 +1078,7 @@ int run(const CliOptions& cli) {
         bool show_overlay = true;
 
         while (!g_quit.load(std::memory_order_acquire)) {
+            audio.pump(); // reclaim retired patch banks (12 §2.3)
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
                 switch (event.type) {

@@ -8,6 +8,15 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Added
 
+- M11: audio engine (12-audio.md) — miniaudio device with the period
+  ladder and §2.2 startup log, allocation-free 32-voice mixer with
+  priority/age stealing + per-patch cap, the sfxr-style SFX synth
+  (44.1 kHz generation, −1 dBFS normalization, 48 kHz output), the
+  drift-corrected tick→sample clock with sample-accurate scheduling,
+  audio.json patches/wav/map with the 24-patch built-in bank, all 19
+  automatic §7.2 purposes fired from the sim with impact velocity and
+  position pan, tb.play_sound, framework sounds, and --audio-null /
+  --audio-latency-test. tables/test-lab ships its §6.1 audio.json.
 - M10: game framework (11-game-framework.md §2–§7) — the GameState
   machine running in phase 3 of the sim tick, 1–4 player rotation with
   per-player tb.state swap, extra balls/replay, nudge physics with the

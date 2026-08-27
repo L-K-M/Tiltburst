@@ -124,7 +124,8 @@ private:
     void on_ball_launched();
     void evaluate_t10();
     void command_serve(bool autolaunch);
-    bool try_add_player(bool start_edge); // §3.1 join window
+    bool try_add_player(bool start_edge);          // §3.1 join window
+    void play_named(const char* patch_name) const; // 12 §7.2 framework sounds
     void command_flipper_coil_restore();
     void do_tilt();
     void finish_bonus();

@@ -59,6 +59,75 @@ uint8_t serve_ball(SimState& s) {
 
 // Per-tick emission-order log for the script host (§2.2 phase 2). Filled
 // only while a host is attached; the Collision audio event never records.
+// 12-audio.md §7.2: emit a purpose-mapped SoundEvent. Velocity is
+// impact-derived (impact_speed / 8 m/s) for impact purposes, 1.0 for
+// state purposes; pan derives from the ball's x position (§4.1).
+// No queue, a disabled purpose, or a full ring (drop-NEW, §4.1) means
+// silence — audio never feeds back into simulation state.
+// SoundPurpose indices (audio_bank.h owns the order; mirrored here as
+// plain ints so the solver stays header-light).
+namespace {
+enum SoundPurposeIdx {
+    SP_FLIPPER = 0,
+    SP_SLING,
+    SP_POP,
+    SP_STANDUP,
+    SP_DROP,
+    SP_SPINNER,
+    SP_ROLLOVER,
+    SP_RAMP,
+    SP_MAGNET,
+    SP_KICKER,
+    SP_LAUNCH,
+    SP_DRAIN,
+    SP_TILT_WARN,
+    SP_TILT,
+    SP_BALL_LOCK,
+    SP_WALL_HIT,
+    SP_BALL_BALL,
+    SP_MENU_MOVE,
+    SP_MENU_SELECT,
+};
+} // namespace
+
+void emit_sound(SimState& s, int purpose, const Ball* ball, float impact_speed) {
+    if (s.sound_queue == nullptr || purpose < 0 || purpose >= SimState::kSoundPurposeCount) {
+        return;
+    }
+    const int patch = s.sound_purpose_patch[purpose];
+    if (patch < 0) {
+        return; // disabled ("none") or unmapped
+    }
+    SoundEvent ev;
+    ev.tick = uint32_t(s.tick);
+    ev.patch = uint16_t(patch);
+    ev.flags = 0;
+    ev.velocity = std::clamp(impact_speed / 8.0f, 0.0f, 1.0f);
+    ev.pan = ball != nullptr ? std::clamp(2.0f * ball->pos.x / s.width - 1.0f, -1.0f, 1.0f) * 0.6f
+                             : 0.0f;
+    (void)s.sound_queue->push(ev); // full ring: dropped (§4.1 policy)
+}
+
+// Position variant for element-sited sounds with no ball in hand
+// (kicker eject, lock capture): pan derives from the element x.
+void emit_sound_x(SimState& s, int purpose, float x, float impact_speed) {
+    if (s.sound_queue == nullptr) {
+        return;
+    }
+    const int patch = purpose >= 0 && purpose < SimState::kSoundPurposeCount
+                          ? s.sound_purpose_patch[purpose]
+                          : -1;
+    if (patch < 0) {
+        return;
+    }
+    SoundEvent ev;
+    ev.tick = uint32_t(s.tick);
+    ev.patch = uint16_t(patch);
+    ev.velocity = std::clamp(impact_speed / 8.0f, 0.0f, 1.0f);
+    ev.pan = std::clamp(2.0f * x / s.width - 1.0f, -1.0f, 1.0f) * 0.6f;
+    (void)s.sound_queue->push(ev);
+}
+
 void record_tick_event(SimState& s, const SimEvent& ev) {
     if (s.script == nullptr && s.fsm_step == nullptr) {
         return;
@@ -293,6 +362,7 @@ void emit_bank_event(SimState& s, SimEventType type, uint16_t element) {
 }
 
 void emit_lock_event(SimState& s, const BallLockElem& lock) {
+    emit_sound_x(s, SP_BALL_LOCK, lock.pos.x, 8.0f);
     absorb(s, s.tick, SimEventType::BallLockCapture, lock.common.table_id);
     SimEvent ev;
     ev.tick = s.tick;
@@ -382,6 +452,12 @@ void Solver::resolve_pair(SimState& s, Ball& a, Ball& b, Vec2 n) {
     const Vec2 impulse = (j_n * n + j_t * t) * (1.0f / kBallMass);
     a.vel += impulse;
     b.vel -= impulse;
+
+    // ball_ball purpose (12 §7.2): 30 ms rate limit.
+    if (-u_n > 0.5f && s.tick - s.ball_sound_tick >= 30) {
+        s.ball_sound_tick = uint32_t(s.tick);
+        emit_sound(s, SP_BALL_BALL, &a, -u_n);
+    }
 
     constexpr float kappa = 0.20f;
     const float d_omega = kappa * (-kBallRadius * j_t) / kBallInertia;
@@ -816,6 +892,10 @@ void Solver::step_body(SimState& s, const TickInput* input) {
     for (Flipper& f : s.flippers) {
         bool pressed = f.enabled && s.flippers_enabled && input != nullptr &&
                        ((input->buttons >> f.params.action) & 1u) != 0u;
+        if (pressed && !f.sound_prev_pressed && f.enabled && s.flippers_enabled) {
+            emit_sound_x(s, SP_FLIPPER, f.params.pivot.x, 8.0f); // press edge (§7.2)
+        }
+        f.sound_prev_pressed = pressed;
         FlipperSim::tick(f, pressed);
     }
 
@@ -891,10 +971,15 @@ void Solver::step_body(SimState& s, const TickInput* input) {
         // (11 §5): magnets do not energize — damping persists (eddy
         // drains kinetic energy whether or not the coil is driven).
         if (s.coils_enabled) {
-            for (const MagnetSim& mag : s.magnets) {
+            for (MagnetSim& mag : s.magnets) {
                 if (mag.layer == ball.layer) {
                     acc += mag.accel(ball);
                     mag.damp(ball);
+                    // §7.2: the hum retriggers every 500 ms while held.
+                    if (mag.on && s.tick - mag.hum_tick >= 500) {
+                        mag.hum_tick = uint32_t(s.tick);
+                        emit_sound_x(s, SP_MAGNET, mag.pos.x, 8.0f);
+                    }
                 }
             }
         } else {
@@ -972,6 +1057,7 @@ void Solver::step_body(SimState& s, const TickInput* input) {
                 ramp->drop_exit ? 0 : (ramp->seam_layer[1] == 0xFF ? 0 : ramp->seam_layer[1]);
             emit_element_event(
                 s, SimEventType::SwitchHit, ramp->element_id, ball, std::abs(ball.s_dot));
+            emit_sound(s, SP_RAMP, &ball, std::abs(ball.s_dot));
             absorb(s, s.tick, SimEventType::RampMade, ramp->element_id);
             SimEvent ev;
             ev.tick = s.tick;
@@ -1112,6 +1198,11 @@ void Solver::step_body(SimState& s, const TickInput* input) {
                 contact_log_[contact_log_n_++] = {best.ball, best.collider->element_id, approach};
             }
 
+            // wall_hit purpose (12 §7.2): >1.5 m/s, 30 ms/ball.
+            if (approach > 1.5f && s.tick - s.wall_sound_tick[best.ball] >= 30) {
+                s.wall_sound_tick[best.ball] = uint32_t(s.tick);
+                emit_sound(s, SP_WALL_HIT, &ball, approach);
+            }
             // Collision event for audio/particles (§4.1): emit at speed.
             // Absorb into the sequence hash first (dispatch order).
             absorb(s, s.tick, SimEventType::Collision, best.collider->element_id);
@@ -1222,6 +1313,7 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
                     ? 1.0f
                     : std::min(1.0f, float(s.plunger.held_ticks) / s.plunger.charge_ticks);
             const float v_launch = s.plunger.max_speed * (0.2f + 0.8f * q);
+            emit_sound(s, SP_LAUNCH, &b, v_launch);
             b.vel += s.plunger.lane_dir * v_launch;
             b.vel = clamp_speed(b.vel);
 
@@ -1324,6 +1416,7 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
                 }
             }
 
+            emit_sound(s, SP_DRAIN, nullptr, 8.0f);
             absorb(s, s.tick, SimEventType::Drain, 0xFFFE);
             SimEvent ev;
             ev.tick = s.tick;
@@ -1430,6 +1523,7 @@ void Solver::step_elements(SimState& s) {
             ball->vel = clamp_speed(ball->vel);
             sl.common.cooldown_left = sl.common.cooldown_ticks;
             sl.kick_visual_ticks = kSlingArmVisualTicks;
+            emit_sound(s, SP_SLING, ball, c.approach);
             emit_element_event(s, SimEventType::SwitchHit, sl.common.table_id, *ball, c.approach);
             break;
         }
@@ -1481,6 +1575,7 @@ void Solver::step_elements(SimState& s) {
             ball->vel = clamp_speed(ball->vel);
             pop.common.cooldown_left = pop.common.cooldown_ticks;
             pop.flash_ticks = kPopFlashTicks;
+            emit_sound(s, SP_POP, ball, length(ball->vel));
             emit_element_event(
                 s, SimEventType::SwitchHit, pop.common.table_id, *ball, length(ball->vel));
             break;
@@ -1514,6 +1609,7 @@ void Solver::step_elements(SimState& s) {
                 continue; // back-side contact never triggers (§6.4)
             }
             st.common.cooldown_left = st.common.cooldown_ticks;
+            emit_sound(s, SP_STANDUP, ball, c.approach);
             emit_element_event(s, SimEventType::SwitchHit, st.common.table_id, *ball, c.approach);
             break;
         }
@@ -1561,6 +1657,7 @@ void Solver::step_elements(SimState& s) {
             t.state = DropTargetState::Dropping;
             t.anim_ticks = 120;
             emit_element_event(s, SimEventType::SwitchHit, bank.common.table_id, *ball, c.approach);
+            emit_sound(s, SP_DROP, ball, c.approach);
             absorb(s, s.tick, SimEventType::TargetDown, bank.common.table_id);
             SimEvent ev;
             ev.tick = s.tick;
@@ -1586,6 +1683,7 @@ void Solver::step_elements(SimState& s) {
                     ro.armed = false;
                     emit_element_event(
                         s, SimEventType::SwitchHit, ro.common.table_id, b, length(b.vel));
+                    emit_sound(s, SP_ROLLOVER, &b, length(b.vel));
                     emit_element_event(s, SimEventType::RolloverEvent, ro.common.table_id, b, 0.0f);
                 }
             } else if (d > 0.016f) {
@@ -1666,6 +1764,7 @@ void Solver::step_elements(SimState& s) {
                 sp.rev_angle_acc -= 2.0f * float(kPiF);
                 for (Ball& b : s.balls) {
                     if (b.live) {
+                        emit_sound(s, SP_SPINNER, &b, 8.0f);
                         emit_element_event(s, SimEventType::SwitchHit, sp.common.table_id, b, 0.0f);
                         emit_element_event(s,
                                            SimEventType::SpinnerSpin,
@@ -1688,6 +1787,7 @@ void eject_kicker(SimState& s, KickerElem& k) {
     if (k.held_ball == 0xFF) {
         return;
     }
+    emit_sound_x(s, SP_KICKER, k.pos.x, k.eject_speed);
     for (Ball& b : s.balls) {
         if (b.live && b.index == k.held_ball) {
             const float phi = k.eject_angle_deg * float(3.14159265358979 / 180.0);
@@ -2078,10 +2178,14 @@ void Solver::apply_script_actions(SimState& s, const std::vector<ScriptAction>& 
                 }
                 if (a.kind == ScriptAction::Kind::MagnetOn) {
                     mag.set_active(true);
+                    mag.hum_tick = uint32_t(s.tick);
+                    emit_sound_x(s, SP_MAGNET, mag.pos.x, 8.0f); // §7.2
                 } else if (a.kind == ScriptAction::Kind::MagnetOff) {
                     mag.set_active(false);
                 } else {
                     mag.pulse(uint32_t(a.speed));
+                    mag.hum_tick = uint32_t(s.tick);
+                    emit_sound_x(s, SP_MAGNET, mag.pos.x, 8.0f);
                 }
             }
             break;

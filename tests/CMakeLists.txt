@@ -1,6 +1,7 @@
 find_package(GTest CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+find_path(miniaudio_INCLUDE_DIR NAMES miniaudio.h REQUIRED)
 
 add_executable(tb_tests
     core/config_test.cpp
@@ -8,6 +9,7 @@ add_executable(tb_tests
     core/rng_test.cpp
     core/scaffold_test.cpp
     core/time_test.cpp
+    audio/audio_test.cpp
     game/game_framework_test.cpp
     sim/det_replay_flipper_test.cpp
     platform/input_test.cpp
@@ -38,8 +40,8 @@ target_include_directories(tb_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party
     ${Stb_INCLUDE_DIR})
 target_link_libraries(tb_tests PRIVATE
-    tb_core tb_sim tb_platform tb_render tb_table tb_game nlohmann_json::nlohmann_json
-    GTest::gtest GTest::gtest_main)
+    tb_core tb_sim tb_platform tb_render tb_table tb_game tb_audio
+    nlohmann_json::nlohmann_json GTest::gtest GTest::gtest_main)
 
 include(GoogleTest)
 # Repo-relative test data: tests resolve paths through tb::test::data_path(),

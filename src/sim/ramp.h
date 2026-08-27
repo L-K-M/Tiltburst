@@ -45,6 +45,8 @@ struct MagnetSim {
     uint8_t layer = 0;
     uint16_t table_id = 0xFFFF; // TableDef element index (script lookup)
     bool on = false;
+    uint32_t hum_tick = 0;         // last magnet_hum sound tick (12 §7.2:
+                                   // retrigger every 500 ms while held)
     uint32_t pulse_ticks_left = 0; // pulse envelope remaining
     uint32_t pulse_total = 0;      // pulse duration (for the 0.6/0.4 envelope)
 

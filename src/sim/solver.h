@@ -11,6 +11,7 @@
 #include "sim/math.h"
 #include "sim/ramp.h"
 #include "sim/script_host.h"
+#include "sim/sound_out.h"
 #include "sim/types.h"
 
 #include <vector>
@@ -102,6 +103,19 @@ struct SimState {
         bool hard_armed = true;
         bool abuse_armed = true;
     } tilt{};
+
+    // Audio plumbing (12-audio.md §4.1, M11): purpose->patch map
+    // (-1 = disabled/absent: emit nothing), the sim->audio queue
+    // producer (owned by the app's AudioSystem), the patch name intern
+    // table for tb.play_sound, and per-ball rate-limit stamps for
+    // wall_hit/ball_ball (30 ms, §7.2). All default to "no audio".
+    static constexpr int kSoundPurposeCount = 19;
+    int sound_purpose_patch[kSoundPurposeCount] = {};
+    SoundProducer* sound_queue = nullptr;
+    const PatchIntern* patch_intern = nullptr;
+    uint32_t patch_intern_n = 0;
+    uint32_t wall_sound_tick[kMaxBalls] = {}; // last wall_hit tick per ball
+    uint32_t ball_sound_tick = 0;             // last ball_ball tick (global)
 
     // Framework gates (11-game-framework.md §5): on tilt the framework
     // clears both; coils cover slings/pops/kicker+lock captures/magnet

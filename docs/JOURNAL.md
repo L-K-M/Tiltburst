@@ -442,3 +442,42 @@ corrections are new entries. Format: 03-process.md §3.1.
   be backed by a diff check; (2) grep-based build gating treats matched
   error lines as success and let a broken build get pushed (cycle 9) —
   gate on emptiness of the error output, not its presence.
+
+## M11 — Audio engine & SFX synth (2026-08-27)
+
+- Scope per 04 §M11: miniaudio device with the 128→256→512 ladder +
+  §2.2 startup log, lock-free 32-voice mixer (steal lowest-priority/
+  oldest with the 64-sample fade, per-patch cap 4), sfxr synth at
+  44100 Hz with the classic constants (§5.2/§5.3 verbatim) +
+  normalization to −1 dBFS + linear resample to 48 kHz, the drift-
+  corrected tick→sample clock with the D = P+64 scheduling lead,
+  audio.json (patches/wav/map; songs shape-validated and deferred to
+  M14), the 19 §7.2 automatic purposes emitted from the sim with
+  impact velocity + position pan, tb.play_sound wired (velocity 1,
+  pan 0), framework sounds (add_player/knocker/bonus_tick), and the
+  §12 latency probe plumbing (p50/p95; wall-clock needs hardware, CI
+  null backend asserts the scheduling math).
+- Layering decision (Layout.SimIncludesNothingForbidden caught it
+  first try): canon §5.1 keeps tb_sim linking only tb_core, so the
+  SoundEvent payload + SoundProducer port + the SoundPurpose enum
+  live in sim/sound_out.h and audio consumes them — the emission
+  vocabulary is sim-owned, the bank/policy audio-owned.
+- Bug hunts: (1) the flanger delay buffer was thread_local static —
+  consecutive renders of the same patch leaked the previous render's
+  tail (non-deterministic PCM caught by the golden-hash test); now
+  per-render state. (2) nlohmann::json's default object iterates
+  alphabetically — patch ids 24+ must follow JSON KEY order (§5.5);
+  switched to ordered_json. (3) The CLI edit swallowed --headless's
+  continue; every headless run died as "unknown flag" until restored.
+- Two silent premise errors found by my own tests before review could:
+  the §3.3 tanh shaper's hot-input ceiling is invK ≈ 1.105 (not 1.0)
+  while the attack envelope is still rising — the test asserts the
+  true bound; and the synth's env-vol branch for zero-length stages
+  is dead code by construction (the while-skip advances them first).
+- tests/audio: 10 tests — deterministic PCM golden hashes (5
+  reference patches + all 24 built-ins bounded), exact 5-tick spacing
+  via a debug start log (240 samples ± the ±1 ms gate), steal/drop/
+  cap rules, callback allocation-free (the M10 alloc hook), clock
+  drift convergence + single re-anchor, limiter bound, audio.json
+  load/validate (bad map key, "none" patch, sustain+decay=0, unknown
+  param, "none" disables). 112/112 total.

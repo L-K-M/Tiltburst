@@ -134,7 +134,7 @@ void launch_ball(Rig& rig, GameMachine& m) {
             b.vel = {0.0f, 0.0f};
         }
     }
-    sim::SimEvent launched;
+    sim::SimEvent launched{};
     launched.type = uint16_t(sim::SimEventType::BallLaunched);
     m.inject_sim_event(launched);
 }

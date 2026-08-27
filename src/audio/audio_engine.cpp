@@ -286,6 +286,8 @@ AudioSystem::AudioSystem() : impl_(new AudioEngineImpl()) {
 
 AudioSystem::~AudioSystem() {
     shutdown();
+    delete impl_;
+    impl_ = nullptr;
 }
 
 void AudioSystem::publish_tick(uint64_t tick) {

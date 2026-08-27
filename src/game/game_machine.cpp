@@ -303,7 +303,10 @@ const PlayerState& GameMachine::player(int i) const {
 bool GameMachine::try_add_player(bool start_edge) {
     // §3.1: joins are legal only while player 1 is on ball 1, before
     // the first BonusCount (states GameStarting/BallReady/BallInPlay).
-    if (!start_edge || player_count() >= 4 || current_player_ != 0 ||
+    // players_.empty(): the machine exists before any session (Attract
+    // never calls this today, but the guard keeps the index safe
+    // against future call sites).
+    if (!start_edge || players_.empty() || player_count() >= 4 || current_player_ != 0 ||
         players_[0].ball_number != 1 || p1_bonus_seen_) {
         return false;
     }
@@ -373,8 +376,12 @@ void GameMachine::on_drain(const sim::SimEvent&) {
     // T12 applies to a ball-ENDING drain: a multiball drain that
     // leaves a ball up is T11 — drain event only, no serve (the
     // 3-ball multiball done-when, 16 §2).
-    const bool ball_ending =
-        free_balls() == 0 && lane_balls() == 0 && !serve_pending() && !lock_release_owed();
+    // Mirrors evaluate_t10's keep-open set exactly: a held (kicker/
+    // magnet) or locked ball keeps the ball open, so that drain is T11
+    // — no save, no serve (an extra free ball would appear when the
+    // hold releases).
+    const bool ball_ending = free_balls() == 0 && lane_balls() == 0 && held_balls() == 0 &&
+                             locked_balls() == 0 && !serve_pending() && !lock_release_owed();
     if (save_uses_left_ > 0 && save_ticks_left_ > 0 && !tilted_ && ball_ending) {
         --save_uses_left_;
         save_ticks_left_ = 0;

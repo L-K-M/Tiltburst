@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
 #include <cstring>
 #include <memory>
 #include <unordered_map>
@@ -107,12 +106,14 @@ struct ScriptHostImpl {
     std::vector<std::vector<std::string>> element_tags;
 
     ~ScriptHostImpl() {
-        std::fprintf(stderr, "[tbdbg] dtor enter\n");
         if (L != nullptr) {
+            // Member sol references (handlers/timers) must unref BEFORE
+            // the state dies: clear them here, manually, so the implicit
+            // member destruction never touches the closed lua_State.
+            handlers.clear();
+            timers.clear();
             lua_sethook(L, nullptr, 0, 0); // no hooks during teardown
-            std::fprintf(stderr, "[tbdbg] dtor: hook cleared, closing\n");
             lua_close(L);
-            std::fprintf(stderr, "[tbdbg] dtor: closed\n");
         }
     }
 };
@@ -352,7 +353,6 @@ bool ScriptHost::scripting_active() const {
 }
 
 bool ScriptHost::state_read_int(int player, const char* key, int64_t& out) const {
-    std::fprintf(stderr, "[tbdbg] state_read_int %s\n", key);
     if (impl_->lua == nullptr || !impl_->loaded) {
         return false;
     }
@@ -374,7 +374,6 @@ bool ScriptHost::state_read_int(int player, const char* key, int64_t& out) const
 }
 
 void ScriptHost::set_current_player(int index) {
-    std::fprintf(stderr, "[tbdbg] set_current_player\n");
     impl_->current_player = std::clamp(index, 1, 4);
     if (impl_->lua == nullptr || !impl_->loaded) {
         return;
@@ -402,7 +401,6 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
         impl_->element_index[state.element_ids[i]] = i;
     }
 
-    std::fprintf(stderr, "[tbdbg] load: begin\n");
     impl_->L = lua_newstate(capped_alloc, &impl_->heap_used, kLuaHashSeed);
     if (impl_->L == nullptr) {
         throw std::runtime_error("cannot create the Lua state (heap cap?)");
@@ -412,7 +410,6 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
         lua_pushlightuserdata(impl_->L, impl_);
         lua_settable(impl_->L, LUA_REGISTRYINDEX);
     }
-    std::fprintf(stderr, "[tbdbg] load: state created\n");
     impl_->lua = std::make_unique<sol::state_view>(impl_->L);
 
     sol::state_view& lua = *impl_->lua;
@@ -439,13 +436,11 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
         return 0;
     };
 
-    std::fprintf(stderr, "[tbdbg] load: whitelist done\n");
     // §2.4: the watchdog hook on the main state + hooked coroutine.create
     // (§1.2); coroutine.wrap is redefined in Lua below.
     lua_sethook(impl_->L, watchdog_hook, LUA_MASKCOUNT, kHookGranularity);
     lua["coroutine"]["create"] = hooked_co_create;
 
-    std::fprintf(stderr, "[tbdbg] load: hook set\n");
     sol::table tb = lua.create_named_table("tb");
 
     // ---- events (§2.3) ----
@@ -668,7 +663,6 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
     });
     bg.set_function("animate", [](const std::string&) {});
 
-    std::fprintf(stderr, "[tbdbg] load: bindings done\n");
     // ---- tb.state proxy + swap seam + coroutine.wrap (§1.2, §3.8) ----
     lua.safe_script(R"lua(
         local states = { {}, {}, {}, {} }
@@ -691,7 +685,6 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
         end
     )lua");
 
-    std::fprintf(stderr, "[tbdbg] load: proxy script done\n");
     // ---- tb.game: read-only, always fresh via a C closure (§3.8) ----
     lua.set_function("__game_get", [this](const char* key) -> sol::object {
         sol::state_view lv(impl_->L);
@@ -726,7 +719,6 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
         rawset(tb, "__tags", setmetatable({}, { __index = function() return {} end }))
     )lua");
 
-    std::fprintf(stderr, "[tbdbg] load: game/info tables done\n");
     // ---- randomness (§3.9): rng_script stream ----
     tb.set_function("rng", [this]() { return impl_->sim->rng_script.next_float(); });
     tb.set_function("rng_range", [this](sol::this_state s, double a, double b) -> int {
@@ -738,7 +730,6 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
         return int(int64_t(a) + std::min<double>(double(span - 1), std::floor(u * double(span))));
     });
 
-    std::fprintf(stderr, "[tbdbg] load: rng bound, running rules\n");
     // ---- run the rules (§2.1) ----
     impl_->instruction_budget = kTickInstructionBudget;
     sol::protected_function_result result =
@@ -748,7 +739,6 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
         throw std::runtime_error(std::string("rules.lua: ") + err.what());
     }
 
-    std::fprintf(stderr, "[tbdbg] load: rules ok\n");
     // Prebuild the per-element tag tables (dispatch reuses them).
     {
         sol::state_view lv(impl_->L);
@@ -770,19 +760,16 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
             throw std::runtime_error(std::string("on_init: ") + err.what());
         }
     }
-    std::fprintf(stderr, "[tbdbg] load: complete\n");
     impl_->loaded = true;
 }
 
 void ScriptHost::begin_tick(uint64_t tick) {
-    std::fprintf(stderr, "[tbdbg] begin_tick\n");
     impl_->game_tick = tick;
     impl_->instruction_budget = kTickInstructionBudget;
     impl_->budget_exhausted_this_tick = false;
 }
 
 void ScriptHost::dispatch(const SimEvent& event) {
-    std::fprintf(stderr, "[tbdbg] dispatch enter\n");
     if (!scripting_active()) {
         return;
     }
@@ -795,11 +782,9 @@ void ScriptHost::dispatch(const SimEvent& event) {
         return;
     }
     sol::state_view lua(*impl_->lua);
-    std::fprintf(stderr, "[tbdbg] dispatch: payload built, calling handlers\n");
     sol::table ev = lua.create_table();
     ev.set("name", std::string(name));
     fill_event_payload(*impl_, event, ev);
-    std::fprintf(stderr, "[tbdbg] dispatch: calling %zu handlers\n", it->second.size());
     for (HandlerEntry& h : it->second) {
         if (h.disabled) {
             continue;
@@ -811,7 +796,6 @@ void ScriptHost::dispatch(const SimEvent& event) {
 }
 
 void ScriptHost::end_tick(uint64_t tick) {
-    std::fprintf(stderr, "[tbdbg] end_tick enter\n");
     if (!scripting_active()) {
         return;
     }
@@ -859,9 +843,7 @@ void ScriptHost::end_tick(uint64_t tick) {
         --impl_->backglass_model.message_ticks_left;
     }
 
-    std::fprintf(stderr, "[tbdbg] end_tick: gc step\n");
     lua_gc(impl_->L, LUA_GCSTEP, 0); // §1.1 incremental step
-    std::fprintf(stderr, "[tbdbg] end_tick done\n");
 }
 
 void ScriptHost::fire_event(const char* name,

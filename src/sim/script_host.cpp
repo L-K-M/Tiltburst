@@ -33,8 +33,6 @@ constexpr int kTickInstructionBudget = 10000;
 constexpr int kHookGranularity = 1000;
 // §2.5: 10 consecutive failures disable a handler.
 constexpr int kDisableAfterConsecutiveErrors = 10;
-// §1.4: fixed hash seed (pairs() order stable per build).
-constexpr unsigned kLuaHashSeed = 0x74696C74u;
 // §3.7: message length cap.
 constexpr uint32_t kMessageMaxLen = 64;
 
@@ -115,11 +113,14 @@ struct ScriptHostImpl {
 
     ~ScriptHostImpl() {
         if (L != nullptr) {
-            // Member sol references (handlers/timers) must unref BEFORE
-            // the state dies: clear them here, manually, so the implicit
-            // member destruction never touches the closed lua_State.
+            // Member sol objects (handlers/timers/state_view) unref from
+            // the state in their destructors — which would run AFTER the
+            // body's lua_close on a freed state (the arm64-macOS and
+            // Linux/5.4 segfault; x86 5.5 survived by heap luck). Release
+            // every sol-holding member manually BEFORE the close.
             handlers.clear();
             timers.clear();
+            lua.reset();
             lua_sethook(L, nullptr, 0, 0); // no hooks during teardown
             lua_close(L);
             if (t_active_impl == this) {
@@ -400,7 +401,7 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
         impl_->element_index[state.element_ids[i]] = i;
     }
 
-    impl_->L = lua_newstate(capped_alloc, &impl_->heap_used, kLuaHashSeed);
+    impl_->L = lua_newstate(capped_alloc, &impl_->heap_used);
     if (impl_->L == nullptr) {
         throw std::runtime_error("cannot create the Lua state (heap cap?)");
     }

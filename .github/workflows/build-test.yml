@@ -75,17 +75,6 @@ jobs:
       - name: Build
         run: cmake --build --preset ${{ matrix.build_preset }}
 
-      # TEMP triage: crash backtrace for the script tests on macOS (revert
-      # with the fix). Runs the one test under lldb and prints the stack.
-      - name: macOS crash triage
-        if: runner.os == 'macOS'
-        run: |
-          lldb -b \
-            -o "settings set target.env-vars DYLD_PRINT_LIBRARIES=0" \
-            -o "run --gtest_filter=Sandbox.IoOsRequireLoadAreNil" \
-            -o "thread backtrace --count 20" \
-            -o "register read" \
-            -- ./build/release/bin/tb_tests 2>&1 | grep -vE "^\(lldb\) (settings|register)" | tail -90 || true
 
       - name: Test (flake-retried; excludes det/fuzz/perf/bounds)
         shell: bash

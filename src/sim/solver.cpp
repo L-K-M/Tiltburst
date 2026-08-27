@@ -1,5 +1,6 @@
 #include "sim/solver.h"
 
+#include "core/log.h"
 #include "sim/ramp.h"
 #include "sim/script_host.h"
 
@@ -56,7 +57,18 @@ void serve_ball(SimState& s) {
 // Per-tick emission-order log for the script host (§2.2 phase 2). Filled
 // only while a host is attached; the Collision audio event never records.
 void record_tick_event(SimState& s, const SimEvent& ev) {
-    if (s.script == nullptr || s.tick_event_n >= SimState::kTickEventCap) {
+    if (s.script == nullptr) {
+        return;
+    }
+    if (s.tick_event_n >= SimState::kTickEventCap) {
+        ++s.tick_events_dropped;
+        if (!s.tick_event_drop_warned) {
+            s.tick_event_drop_warned = true;
+            TB_LOG_WARN("script",
+                        "tick event log overflowed (cap {}): further events "
+                        "dropped this session — rules/goldens may diverge",
+                        SimState::kTickEventCap);
+        }
         return;
     }
     s.tick_events[s.tick_event_n++] = ev;

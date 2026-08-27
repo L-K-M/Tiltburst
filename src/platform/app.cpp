@@ -442,12 +442,14 @@ int run(const CliOptions& cli) {
         // Bounded display-less probe (journal note): boot with no video/
         // GPU/audio, run the sim loop, report the tick rate, exit 0.
         tb::SnapshotBuffer snapshots;
-        // Declaration order is load-bearing: loaded_table (which owns the
-        // ScriptHost that sim_state.script points at) must be destroyed
-        // AFTER sim_state, so it is declared first (as in the windowed
-        // path above).
-        LoadedTable loaded_table;
+        // Declaration order is load-bearing: the ScriptHost owned by
+        // loaded_table keeps a SimState& (script_host.h: "state must
+        // outlive the host"; solver.h: "the owner must destroy it before
+        // the state"), so sim_state is declared first and the host is
+        // destroyed before it — same order as the test rig and the
+        // windowed path below.
         tb::sim::SimState sim_state;
+        LoadedTable loaded_table;
         if (!cli.table.empty()) {
             if (!load_table_pack(loaded_table, resolve_table_dir(cli.table), sim_state)) {
                 log::flush_now();
@@ -741,11 +743,13 @@ int run(const CliOptions& cli) {
         }
 
         tb::SnapshotBuffer snapshots;
-        // Declaration order is load-bearing: loaded_table (which owns the
-        // ScriptHost that sim_state.script points at) must be destroyed
-        // AFTER sim_state, so it is declared first.
-        std::unique_ptr<LoadedTable> loaded_table;
+        // Declaration order is load-bearing: the ScriptHost owned by
+        // *loaded_table keeps a SimState& (script_host.h: "state must
+        // outlive the host"; solver.h: "the owner must destroy it before
+        // the state"), so sim_state is declared first and the host is
+        // destroyed before it.
         tb::sim::SimState sim_state;
+        std::unique_ptr<LoadedTable> loaded_table;
         std::filesystem::path table_dir;
         if (!cli.table.empty()) {
             table_dir = resolve_table_dir(cli.table);

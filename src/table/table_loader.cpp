@@ -923,8 +923,11 @@ std::vector<Element> expand_prefab(const TableDef& partial, const PrefabInstance
 
         // ADR-024: divider top moved (0.062,0.268)→(0.074,0.262) so the
         // outlane mouth (side wall → divider post) is 32.8 mm passable —
-        // §5.4's own numbers left 23 mm (§6 jam band).
-        std::vector<PathNode> div_path = {point(mirror(0.074f), 0.262f),
+        // §5.4's own numbers left 23 mm (§6 jam band). The post must sit
+        // exactly on the wall's top end, so both use these constants.
+        constexpr float kDivTopX = 0.074f;
+        constexpr float kDivTopY = 0.262f;
+        std::vector<PathNode> div_path = {point(mirror(kDivTopX), kDivTopY),
                                           point(mirror(0.122f), 0.138f)};
         out.push_back(Element{make_wall(
             pid + "_divider", inst.layer, inst.tags, std::move(div_path), MaterialId::Wood)});
@@ -933,8 +936,8 @@ std::vector<Element> expand_prefab(const TableDef& partial, const PrefabInstance
         post.id = pid + "_top_post";
         post.layer = inst.layer;
         post.tags = inst.tags;
-        post.pos[0] = mirror(0.074f);
-        post.pos[1] = 0.262f;
+        post.pos[0] = mirror(kDivTopX);
+        post.pos[1] = kDivTopY;
         post.radius = 0.008f;
         post.material = MaterialId::Rubber;
         out.push_back(Element{std::move(post)});

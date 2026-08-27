@@ -86,6 +86,11 @@ struct SimState {
     static constexpr size_t kTickEventCap = 128;
     SimEvent tick_events[kTickEventCap]{};
     size_t tick_event_n = 0;
+    // Overflow diagnostics (§2.2): events past the cap are dropped; the
+    // count and one-shot flag make the truncation diagnosable instead of
+    // silently diverging rules.lua / golden replays.
+    size_t tick_events_dropped = 0;
+    bool tick_event_drop_warned = false;
 
     // Balls.
     Ball balls[kMaxBalls]{};

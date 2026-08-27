@@ -597,3 +597,19 @@ TEST(Prefab, LaneOrbitMergeIsOrderIndependent) {
     std::filesystem::remove_all(dir, ec);
     EXPECT_FALSE(has_top_post) << "lane declared before orbit must still merge";
 }
+
+// Every shipped pack parses on EVERY build (the perf gate's gate_tables
+// covers Release only; this one runs under asan/debug too — a malformed
+// table.json, JSONC included, fails CI everywhere).
+TEST(TableLoader, EveryShippedPackParses) {
+    for (const char* slug : {"test-lab", "neon-drift"}) {
+        try {
+            const tb::table::TableDef def =
+                tb::table::load_table(tb::test::data_path(std::string("tables/") + slug));
+            EXPECT_FALSE(def.slug.empty()) << slug;
+            EXPECT_FALSE(def.elements.empty()) << slug;
+        } catch (const tb::table::TableLoadError& e) {
+            FAIL() << slug << ": " << e.what() << " (" << e.json_pointer << ")";
+        }
+    }
+}

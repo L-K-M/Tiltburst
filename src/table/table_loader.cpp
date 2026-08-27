@@ -1236,9 +1236,19 @@ TableDef load_table(const std::filesystem::path& table_dir) {
             if (def.physics.tilt_abuse_mps < 0.60f || def.physics.tilt_abuse_mps > 3.00f) {
                 fail("physics.tilt.abuse outside 0.60-3.00", "/physics/tilt/abuse", file);
             }
-            // Cross-check only when the author wrote BOTH keys:
-            // comparing an authored warn against the default hard
-            // rejects legal single-key tables (the ranges overlap).
+            // Single-key tables can arrive unordered (warn 0.110
+            // authored, hard default 0.085): the ranges overlap, so the
+            // un-authored partner is clamped to keep the effective pair
+            // ordered (08 §7.2: hard fires above warn, always) rather
+            // than rejecting a legal single-key table.
+            constexpr float kHardPerWarn = 1.2f;
+            if (!t.contains("hard") && def.physics.tilt_hard_m <= def.physics.tilt_warn_m) {
+                def.physics.tilt_hard_m = std::min(def.physics.tilt_warn_m * kHardPerWarn, 0.150f);
+            }
+            if (!t.contains("warn") && def.physics.tilt_warn_m >= def.physics.tilt_hard_m) {
+                def.physics.tilt_warn_m = std::max(def.physics.tilt_hard_m / kHardPerWarn, 0.030f);
+            }
+            // Both keys authored: the author owns the ordering outright.
             if (t.contains("hard") && t.contains("warn") &&
                 def.physics.tilt_hard_m <= def.physics.tilt_warn_m) {
                 fail("physics.tilt.hard must exceed tilt.warn when both are set",

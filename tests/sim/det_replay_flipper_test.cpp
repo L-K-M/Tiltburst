@@ -124,7 +124,7 @@ TEST(det_replay, flipper_tape_hash_stable) {
         tb::test::Tape tape;
         ASSERT_TRUE(tb::test::load_tape(
             tb::test::data_path("tests/fixtures/tapes/flipper_tap.replay.json"), tape));
-        ASSERT_NE(record, "");
+        ASSERT_STRNE(record, "") << "TB_RECORD_GOLDEN must be a non-empty path";
         const auto hashes = run_flipper_tape(tape);
         std::ofstream out(record);
         ASSERT_TRUE(out.is_open()) << "cannot write golden to " << record;

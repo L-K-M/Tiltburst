@@ -548,7 +548,8 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
         if (impl_->ledger_frozen) {
             return; // §6
         }
-        player_scores(impl_->current_player).bonus += uint64_t(points);
+        auto& ps = player_scores(impl_->current_player);
+        ps.bonus = std::min<uint64_t>(ps.bonus + uint64_t(points), kScoreCap);
     });
     tb.set_function("set_multiplier", [this](double n) {
         const int clamped = int(std::clamp(std::isfinite(n) ? n : 1.0, 1.0, 10.0));
@@ -964,7 +965,9 @@ void ScriptHost::fire_event(const char* name,
                             const EventInts& ints,
                             const EventStrings& strings,
                             const EventIntArrays& arrays) {
-    if (name == nullptr) {
+    // impl_ is allocated in the constructor and never null; the null
+    // check keeps that contract local instead of trusting every caller.
+    if (name == nullptr || impl_ == nullptr) {
         return;
     }
     // Framework events are part of the deterministic replay record

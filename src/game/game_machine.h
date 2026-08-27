@@ -5,6 +5,7 @@
 #include "sim/solver.h"
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace tb::game {
@@ -76,7 +77,7 @@ public:
 
     const std::vector<PlayerState>& players() const { return players_; }
 
-    const PlayerState& player(int i) const { return players_[size_t(i - 1)]; }
+    const PlayerState& player(int i) const; // 1-based; asserts in range
 
     bool tilted() const { return tilted_; }
 
@@ -123,6 +124,7 @@ private:
     void on_ball_launched();
     void evaluate_t10();
     void command_serve(bool autolaunch);
+    bool try_add_player(bool start_edge); // §3.1 join window
     void command_flipper_coil_restore();
     void do_tilt();
     void finish_bonus();

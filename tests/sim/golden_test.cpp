@@ -53,7 +53,8 @@ TEST(det_golden, m2_bounce) {
         std::ofstream out(record);
         out << "# tiltburst determinism golden v1\n";
         out << "# regenerated M10: state_hash now folds tilt-bob/abuse/nudge"
-               " envelope state (hash-scope change, JOURNAL M10; 16 §2.4.4)\n";
+               " envelope state, arm latches and coil gates (hash-scope"
+               " change, JOURNAL M10; 16 §2.4.4)\n";
         out << "# table: test-lab(m2 synthetic) tape: m2_bounce.replay.json"
                " seed: 424242\n";
         char prev_fill = out.fill('0');

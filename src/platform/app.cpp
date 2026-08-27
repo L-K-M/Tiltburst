@@ -789,6 +789,7 @@ int run(const CliOptions& cli) {
         std::unique_ptr<tb::game::GameMachine> machine;
         tb::game::HighScoreTable high_scores;
         std::filesystem::path score_path;
+        std::string score_slug;
         if (loaded_table && loaded_table->script_loaded) {
             tb::game::FrameworkConfig fcfg;
             fcfg.balls_per_game = settings.balls_per_game;
@@ -809,12 +810,34 @@ int run(const CliOptions& cli) {
             }
             std::error_code mk_ec;
             std::filesystem::create_directories(paths::pref() / "scores", mk_ec);
-            score_path = paths::pref() / "scores" / (loaded_table->def.slug + std::string(".json"));
+            // The slug is third-party metadata and names a file we
+            // read AND write: strip anything outside [A-Za-z0-9._-] so
+            // no pack can escape the scores/ directory.
+            std::string safe_slug;
+            for (char c : loaded_table->def.slug) {
+                if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                    c == '.' || c == '_' || c == '-') {
+                    safe_slug.push_back(c);
+                }
+            }
+            if (safe_slug.empty() || safe_slug == "." || safe_slug == "..") {
+                safe_slug = "table";
+            }
+            score_slug = safe_slug;
+            score_path = paths::pref() / "scores" / (safe_slug + ".json");
             if (!high_scores.load(score_path)) {
                 // §7: seed from meta.default_scores when the pack
                 // declares it; otherwise the list simply starts empty.
+                // A file that EXISTS but failed to load is corrupt —
+                // keep a .bad copy (settings.json pattern) so a
+                // transient read error can never silently eat a top 10.
+                if (std::filesystem::exists(score_path)) {
+                    std::error_code bad_ec;
+                    std::filesystem::rename(score_path, score_path.string() + ".bad", bad_ec);
+                    TB_LOG_WARN("main", "score file corrupt; moved to {}.bad", score_path.string());
+                }
                 high_scores.seed_defaults(loaded_table->def.default_scores, fcfg.date_stamp);
-                high_scores.save(score_path, loaded_table->def.slug);
+                high_scores.save(score_path, score_slug);
             }
             machine = std::make_unique<tb::game::GameMachine>(
                 loaded_table->script, sim_state, high_scores, fcfg);
@@ -855,8 +878,11 @@ int run(const CliOptions& cli) {
                 solver.step(sim_state, tick_input); // fsm runs in phase 3
             }
             if (machine && machine->scores_dirty()) {
-                machine->clear_scores_dirty();
-                high_scores.save(score_path, loaded_table->def.slug); // §7
+                // Clear only after a successful write: a failed persist
+                // retries next tick (§7: immediately after each commit).
+                if (high_scores.save(score_path, score_slug)) {
+                    machine->clear_scores_dirty();
+                }
             }
 
             tb::SimSnapshot snap;

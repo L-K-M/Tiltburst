@@ -171,6 +171,14 @@ void serve_ball_notified(SimState& s) {
         ev.tick = s.tick;
         ev.type = uint16_t(SimEventType::BallServed);
         ev.element = 0xFFFD;
+        for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
+            if (s.balls[bi].live) {
+                ev.x = s.balls[bi].pos.x;
+                ev.y = s.balls[bi].pos.y;
+                ev.data = s.balls[bi].index;
+                break;
+            }
+        }
         s.render_ring.push(s.tick, ev);
         s.game_ring.push(s.tick, ev);
         record_tick_event(s, ev);
@@ -1142,7 +1150,7 @@ void Solver::step_body(SimState& s, const TickInput* input) {
         for (size_t i = 0; i < s.tick_event_n; ++i) {
             s.script->dispatch(s.tick_events[i]); // phase 2
         }
-        if (s.fsm_step != nullptr) {
+        if (s.fsm_step != nullptr && input != nullptr) {
             s.fsm_step(s.fsm_ctx, s, *input); // phase 3 (11 §1): GameFsm
         }
         s.script->end_tick(s.tick); // phase 4: timers + GC step
@@ -2196,8 +2204,13 @@ void absorb_framework_event(SimState& s, const char* name) {
 
 void reset_danger(SimState& s) {
     // 08 §7.3: the framework commands this at every end of ball;
-    // danger is strictly per ball.
+    // danger is strictly per ball. The physics.tilt thresholds are
+    // TABLE tuning (09 §2), not per-ball state — preserve them.
+    const float warn = s.tilt.warn_m, hard = s.tilt.hard_m, abuse = s.tilt.abuse_mps;
     s.tilt = SimState::TiltState{};
+    s.tilt.warn_m = warn;
+    s.tilt.hard_m = hard;
+    s.tilt.abuse_mps = abuse;
     for (SimState::NudgeEnvelope& e : s.nudge_envelopes) {
         e = SimState::NudgeEnvelope{};
     }
@@ -2232,6 +2245,16 @@ uint64_t state_hash(const SimState& s) {
     mix(&s.tilt.v.y, 4);
     mix(&s.tilt.abuse_acc, 4);
     mix(&s.tilt.crossings, sizeof(s.tilt.crossings));
+    // Arm latches and the framework gates gate future emission and
+    // physics — genuine replayed state.
+    const auto u8c = [](uint64_t v, int shift) {
+        return static_cast<unsigned char>((v >> shift) & 0xFFu);
+    };
+    const uint64_t armed = (s.tilt.warn_armed ? 1u : 0u) | (s.tilt.hard_armed ? 2u : 0u) |
+                           (s.tilt.abuse_armed ? 4u : 0u);
+    const uint64_t gates = (s.flippers_enabled ? 1u : 0u) | (s.coils_enabled ? 2u : 0u);
+    const unsigned char bytes[2] = {u8c(armed, 0), u8c(gates, 0)};
+    mix(bytes, sizeof(bytes));
     for (const SimState::NudgeEnvelope& e : s.nudge_envelopes) {
         mix(&e.ax, 4);
         mix(&e.ay, 4);

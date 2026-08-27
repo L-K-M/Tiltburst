@@ -19,6 +19,7 @@ public:
 
     void begin() {
         slots_ = {'A', 'A', 'A'};
+        ring_pos_ = 0;
         cursor_ = 0;
         idle_ticks_ = 0;
         done_ = false;
@@ -76,7 +77,18 @@ public:
 
     int cursor() const { return cursor_; }
 
-    std::array<char, 3> initials() const { return slots_; }
+    // Committable initials: '<' is a control glyph — a slot resting on
+    // it at the 60 s timeout commits as a space (§7: committed glyphs
+    // are A–Z 0–9 space only).
+    std::array<char, 3> initials() const {
+        std::array<char, 3> out = slots_;
+        for (char& c : out) {
+            if (c == '<') {
+                c = ' ';
+            }
+        }
+        return out;
+    }
 
     static char glyph_at(int ring_pos) {
         if (ring_pos < 26) {

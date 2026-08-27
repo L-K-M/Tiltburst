@@ -1129,8 +1129,9 @@ TableDef load_table(const std::filesystem::path& table_dir) {
     }
 
     // Optional meta extras (09 §2). replay_score: replay award threshold
-    // (11 §3.3). default_scores: exactly 10 non-increasing rows, initials
-    // 3 glyphs from A-Z 0-9 space (V028) — else absent/empty stays empty.
+    // (11 §3.3). default_scores: when the KEY is present it must hold
+    // exactly 10 non-increasing rows with 3-glyph initials from
+    // A-Z 0-9 space (V028); an absent key means an empty list.
     if (meta.contains("replay_score")) {
         const json& rs = meta.at("replay_score");
         if (!rs.is_number_unsigned() || rs.get<uint64_t>() == 0) {
@@ -1235,8 +1236,14 @@ TableDef load_table(const std::filesystem::path& table_dir) {
             if (def.physics.tilt_abuse_mps < 0.60f || def.physics.tilt_abuse_mps > 3.00f) {
                 fail("physics.tilt.abuse outside 0.60-3.00", "/physics/tilt/abuse", file);
             }
-            if (def.physics.tilt_hard_m < def.physics.tilt_warn_m) {
-                fail("physics.tilt.hard below warn", "/physics/tilt/hard", file);
+            // Cross-check only when the author wrote BOTH keys:
+            // comparing an authored warn against the default hard
+            // rejects legal single-key tables (the ranges overlap).
+            if (t.contains("hard") && t.contains("warn") &&
+                def.physics.tilt_hard_m <= def.physics.tilt_warn_m) {
+                fail("physics.tilt.hard must exceed tilt.warn when both are set",
+                     "/physics/tilt/hard",
+                     file);
             }
         }
     }

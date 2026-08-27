@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <filesystem>
+#include <string>
 #include <vector>
 
 namespace tb::game {
@@ -46,7 +47,9 @@ public:
     int insert(const HighScoreEntry& entry);
 
     // Crash-safe write: temp file + fsync + rename + dir fsync.
-    void save(const std::filesystem::path& path, const std::string& slug) const;
+    // Returns false when the write failed (logged); callers keep
+    // their dirty flags so a failed persist retries.
+    bool save(const std::filesystem::path& path, const std::string& slug) const;
 
     const std::vector<HighScoreEntry>& entries() const { return entries_; }
 

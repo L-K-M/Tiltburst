@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <string>
 #include <utility>
 #include <vector>
@@ -96,6 +97,25 @@ struct FlipperRig {
     }
 };
 
+// Replays the tape for 3000 ticks and collects (tick, state_hash) at
+// every 100-tick sample. The compare and record paths share it so the
+// loop can never drift between them.
+std::vector<std::pair<uint64_t, uint64_t>> run_flipper_tape(const tb::test::Tape& tape) {
+    FlipperRig rig(tape.seed);
+    tb::sim::Solver solver;
+    std::vector<std::pair<uint64_t, uint64_t>> out;
+    for (uint64_t tick = 1; tick <= 3000; ++tick) {
+        tb::sim::TickInput in;
+        in.buttons = tick - 1 < tape.buttons_by_tick.size() ? tape.buttons_by_tick[size_t(tick - 1)]
+                                                            : tape.buttons_by_tick.back();
+        solver.step(rig.state, in);
+        if (tick % 100 == 0) {
+            out.emplace_back(tick, tb::sim::state_hash(rig.state));
+        }
+    }
+    return out;
+}
+
 } // namespace
 
 TEST(det_replay, flipper_tape_hash_stable) {
@@ -104,23 +124,20 @@ TEST(det_replay, flipper_tape_hash_stable) {
         tb::test::Tape tape;
         ASSERT_TRUE(tb::test::load_tape(
             tb::test::data_path("tests/fixtures/tapes/flipper_tap.replay.json"), tape));
-        FlipperRig rig(tape.seed);
-        tb::sim::Solver solver;
+        ASSERT_NE(record, "");
+        const auto hashes = run_flipper_tape(tape);
         std::ofstream out(record);
+        ASSERT_TRUE(out.is_open()) << "cannot write golden to " << record;
         out << "# tiltburst determinism golden v1\n";
         out << "# regenerated M10: state_hash now folds tilt-bob/abuse/nudge"
-            << " envelope state (hash-scope change, JOURNAL M10; 16 §2.4.4)\n";
-        for (uint64_t tick = 1; tick <= 3000; ++tick) {
-            tb::sim::TickInput in;
-            in.buttons = tick - 1 < tape.buttons_by_tick.size()
-                             ? tape.buttons_by_tick[size_t(tick - 1)]
-                             : tape.buttons_by_tick.back();
-            solver.step(rig.state, in);
-            if (tick % 100 == 0) {
-                out << tick << " " << std::hex << tb::sim::state_hash(rig.state) << std::dec
-                    << "\n";
-            }
+            << " envelope state, arm latches and coil gates (hash-scope"
+               " change, JOURNAL M10; 16 §2.4.4)\n";
+        out << "# table: rig(flipper) tape: flipper_tap.replay.json seed: " << tape.seed << "\n";
+        for (const auto& [tick, hash] : hashes) {
+            out << tick << " " << std::hex << std::setw(16) << std::setfill('0') << hash << std::dec
+                << "\n";
         }
+        ASSERT_TRUE(out.good()) << "golden write failed to " << record;
         SUCCEED() << "golden recorded";
         return;
     }
@@ -139,24 +156,15 @@ TEST(det_replay, flipper_tape_hash_stable) {
         load_golden(tb::test::data_path("tests/golden/determinism/linux/flipper_tap.hashes"));
     ASSERT_GE(golden.size(), 6u);
 
-    constexpr uint64_t kTotalTicks = 3000;
-    FlipperRig rig(tape.seed);
-    tb::sim::Solver solver;
-
-    size_t gi = 0;
-    for (uint64_t tick = 1; tick <= kTotalTicks; ++tick) {
-        tb::sim::TickInput in;
-        in.buttons = tick - 1 < tape.buttons_by_tick.size() ? tape.buttons_by_tick[size_t(tick - 1)]
-                                                            : tape.buttons_by_tick.back();
-        solver.step(rig.state, in);
-
-        if (gi < golden.size() && tick == golden[gi].first) {
-            const uint64_t got = tb::sim::state_hash(rig.state);
-            ASSERT_EQ(got, golden[gi].second)
-                << "hash divergence at tick " << tick << " (replay machinery or sim drift)";
-            ++gi;
-        }
+    const auto hashes = run_flipper_tape(tape);
+    ASSERT_GE(golden.size(), 6u);
+    ASSERT_EQ(hashes.size(), 30u);
+    for (size_t gi = 0; gi < golden.size(); ++gi) {
+        ASSERT_LT(gi, hashes.size());
+        ASSERT_EQ(hashes[size_t(golden[gi].first / 100 - 1)].first, golden[gi].first)
+            << "sample cadence mismatch";
+        ASSERT_EQ(hashes[size_t(golden[gi].first / 100 - 1)].second, golden[gi].second)
+            << "hash divergence at tick " << golden[gi].first << " (replay machinery or sim drift)";
     }
-    EXPECT_EQ(gi, golden.size());
 #endif
 }

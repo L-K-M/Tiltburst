@@ -239,9 +239,11 @@ void build_sim(const TableDef& def, tb::sim::SimState& out) {
     out.width = def.width;
     out.height = def.height;
     out.slope_deg = def.slope_deg;
-    out.tilt.warn_m = def.physics.tilt_warn_m;
-    out.tilt.hard_m = def.physics.tilt_hard_m;
-    out.tilt.abuse_mps = def.physics.tilt_abuse_mps;
+    if (def.physics.present) {
+        out.tilt.warn_m = def.physics.tilt_warn_m;
+        out.tilt.hard_m = def.physics.tilt_hard_m;
+        out.tilt.abuse_mps = def.physics.tilt_abuse_mps;
+    }
     out.mu_rr = def.physics.present ? def.physics.rolling_resistance : tb::sim::kRollMu;
     out.restitution_falloff = def.physics.present ? def.physics.restitution_falloff : 0.12f;
     out.restitution_soft = def.physics.present ? def.physics.restitution_soft : 0.5f;

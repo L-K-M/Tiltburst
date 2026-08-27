@@ -5,6 +5,7 @@
 #include "sim/script_host.h"
 
 #include <algorithm>
+#include <cassert>
 
 namespace tb::game {
 
@@ -135,21 +136,31 @@ void GameMachine::enter_table_select() {
 
 void GameMachine::enter_game_starting() {
     // Fresh session (§3.1): one player; Start presses during P1 ball 1
-    // add players (§3.1). begin_game fires game_start synchronously.
-    host_.begin_game(1);
+    // add players (§3.1). ALL machine + host state is initialized
+    // BEFORE begin_game — it fires game_start synchronously, and the
+    // same ScriptHost persists across games (the handlers must not see
+    // the previous session's player).
     players_.assign(1, PlayerState{});
     current_player_ = 0;
     prev_player_up_ = 0;
-    host_.set_current_player(1);
     tilted_ = false;
     danger_count_ = 0;
     serve_pending_ = false;
     p1_bonus_seen_ = false;
+    fire_player_up_ = false;
+    host_.set_current_player(1);
+    host_.begin_game(1);
+    // A fresh game lifts the Attract freeze (§6: freezes cover
+    // BonusCount-after-ball_end and tilt only).
+    host_.set_ledger_frozen(false);
     host_.set_timers_frozen(true);
     command_flipper_coil_restore();
 }
 
 void GameMachine::enter_ball_ready(bool new_ball) {
+    // Lift any residual freeze (§6 symmetry: the ball_end freeze
+    // bracketed the PREVIOUS ball; ball_start handlers may score).
+    host_.set_ledger_frozen(false);
     // Fire ball_start for new balls only (not saves/adds — §2.3).
     if (new_ball && !ball_start_fired_) {
         PlayerState& p = players_[size_t(current_player_)];
@@ -283,6 +294,23 @@ bool GameMachine::lock_release_owed() const {
     return false;
 }
 
+const PlayerState& GameMachine::player(int i) const {
+    assert(i >= 1 && i <= player_count());
+    return players_[size_t(i - 1)];
+}
+
+bool GameMachine::try_add_player(bool start_edge) {
+    // §3.1: joins are legal only while player 1 is on ball 1, before
+    // the first BonusCount (states GameStarting/BallReady/BallInPlay).
+    if (!start_edge || player_count() >= 4 || current_player_ != 0 ||
+        players_[0].ball_number != 1 || p1_bonus_seen_) {
+        return false;
+    }
+    host_.add_player();
+    players_.push_back(PlayerState{});
+    return true;
+}
+
 void GameMachine::command_serve(bool autolaunch) {
     ScriptAction a;
     a.kind = ScriptAction::Kind::AddBall;
@@ -341,9 +369,12 @@ void GameMachine::on_ball_launched() {
 void GameMachine::on_drain(const sim::SimEvent&) {
     // Accounting only here (T11); the T10/T12 decisions are
     // re-evaluated every drain in evaluate_t10().
-    if (save_uses_left_ > 0 && save_ticks_left_ > 0 && !tilted_) {
-        // T12: drain with an active save stays in BallInPlay; auto-serve
-        // with autolaunch, no ball_start.
+    // T12 applies to a ball-ENDING drain: a multiball drain that
+    // leaves a ball up is T11 — drain event only, no serve (the
+    // 3-ball multiball done-when, 16 §2).
+    const bool ball_ending =
+        free_balls() == 0 && lane_balls() == 0 && !serve_pending() && !lock_release_owed();
+    if (save_uses_left_ > 0 && save_ticks_left_ > 0 && !tilted_ && ball_ending) {
         --save_uses_left_;
         save_ticks_left_ = 0;
         command_serve(true);
@@ -378,7 +409,9 @@ void GameMachine::check_multiball_edges() {
     const int active = free_balls() + held_balls();
     if (active > 1 && balls_in_play_at_mb_check_ <= 1) {
         host_.fire_event("multiball_start", {{"ball_count", active}});
-    } else if (active == 1 && balls_in_play_at_mb_check_ > 1) {
+    } else if (active <= 1 && balls_in_play_at_mb_check_ > 1) {
+        // <= 1, not == 1: a same-tick 2→0 double drain still fires the
+        // end edge before T10 (§2.5).
         host_.fire_event("multiball_end");
     }
     balls_in_play_at_mb_check_ = active;
@@ -424,6 +457,11 @@ void GameMachine::inject_sim_event(const sim::SimEvent& ev) {
         break;
     case SimEventType::BallServed:
         serve_pending_ = false; // serve window closed (§2.5)
+        // The autolaunch arm served exactly this ball (§4.2); a normal
+        // player plunge owns the lane from here on.
+        if (s_.has_plunger) {
+            s_.plunger.auto_launch = false;
+        }
         break;
     default:
         break; // element events are script domain (phase 2)
@@ -482,6 +520,10 @@ void GameMachine::finish_bonus() {
     save_ticks_left_ = 0;
     ball_start_fired_ = false;
 
+    // §3.3: bonus collection can cross the replay threshold — check
+    // before the session decision, so the last ball's extra ball still
+    // replays (advance_rotation consumes it below).
+    check_replay(current_player());
     // Count the finished ball FIRST: the finishing player's number
     // must include it before the session check; the player pointer
     // only advances when the game continues (GameOver keeps the last
@@ -578,11 +620,7 @@ void GameMachine::step(const sim::TickInput& input) {
 
     case GameState::GameStarting: {
         // Start during P1 ball 1 adds a player (§3.1).
-        if (start_edge && player_count() < 4 && current_player_ == 0 &&
-            players_[0].ball_number == 1 && !p1_bonus_seen_) {
-            host_.add_player();
-            players_.push_back(PlayerState{});
-        }
+        try_add_player(start_edge);
         if (state_ticks_ >= kIntroTicks) {
             command_serve(false); // T8: trough serve commanded
             enter(GameState::BallReady);
@@ -591,11 +629,7 @@ void GameMachine::step(const sim::TickInput& input) {
     }
 
     case GameState::BallReady: {
-        if (start_edge && player_count() < 4 && current_player_ == 0 &&
-            players_[0].ball_number == 1 && !p1_bonus_seen_) {
-            host_.add_player();
-            players_.push_back(PlayerState{});
-        }
+        try_add_player(start_edge);
         if (pause_held && !pause_latched_) {
             pause_latched_ = true;
             paused_return_ = GameState::BallReady;
@@ -610,11 +644,7 @@ void GameMachine::step(const sim::TickInput& input) {
     }
 
     case GameState::BallInPlay: {
-        if (start_edge && player_count() < 4 && current_player_ == 0 &&
-            players_[0].ball_number == 1 && !p1_bonus_seen_) {
-            host_.add_player();
-            players_.push_back(PlayerState{});
-        }
+        try_add_player(start_edge);
         if (pause_held && !pause_latched_) {
             pause_latched_ = true;
             paused_return_ = GameState::BallInPlay;

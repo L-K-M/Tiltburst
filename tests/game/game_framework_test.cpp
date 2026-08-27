@@ -2,6 +2,7 @@
 // The rig mirrors script_test.cpp's: a minimal SimState + loaded host,
 // with the FSM attached exactly as the app attaches it.
 #include "core/rng.h"
+#include "core/time.h"
 #include "game/game_machine.h"
 #include "game/high_scores.h"
 #include "game/score_format.h"
@@ -11,9 +12,14 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <cstdint>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
+#include <memory>
 #include <string>
+#include <system_error>
+#include <vector>
 
 namespace {
 
@@ -450,8 +456,9 @@ TEST(Tilt, FlippersDeadAfterTilt) {
 // ---- HighScores.PersistRoundTripAndOrdering ----
 TEST(HighScores, PersistRoundTripAndOrdering) {
     HighScoreTable t;
-    const std::filesystem::path dir = std::filesystem::temp_directory_path() /
-                                      ("tb_scores_test_" + std::to_string(++temp_dir_counter));
+    const std::filesystem::path dir =
+        std::filesystem::temp_directory_path() / ("tb_scores_test_" + std::to_string(tb_now_ns()) +
+                                                  "_" + std::to_string(++temp_dir_counter));
     std::filesystem::create_directories(dir);
     const auto path = dir / "test-table.json";
 
@@ -488,8 +495,9 @@ TEST(HighScores, PersistRoundTripAndOrdering) {
 
 // ---- HighScores.SeedsDeclaredDefaultsElseStartsEmpty ----
 TEST(HighScores, SeedsDeclaredDefaultsElseStartsEmpty) {
-    const std::filesystem::path dir = std::filesystem::temp_directory_path() /
-                                      ("tb_seed_test_" + std::to_string(++temp_dir_counter));
+    const std::filesystem::path dir =
+        std::filesystem::temp_directory_path() /
+        ("tb_seed_test_" + std::to_string(tb_now_ns()) + "_" + std::to_string(++temp_dir_counter));
     std::filesystem::create_directories(dir);
     const auto path = dir / "seeded.json";
 

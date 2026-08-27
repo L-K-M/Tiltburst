@@ -156,7 +156,7 @@ int HighScoreTable::insert(const HighScoreEntry& entry) {
     return int(at) + 1;
 }
 
-void HighScoreTable::save(const std::filesystem::path& path, const std::string& slug) const {
+bool HighScoreTable::save(const std::filesystem::path& path, const std::string& slug) const {
     json doc;
     doc["version"] = 1;
     doc["table"] = slug;
@@ -169,7 +169,7 @@ void HighScoreTable::save(const std::filesystem::path& path, const std::string& 
         });
     }
     doc["entries"] = std::move(rows);
-    write_crash_safe(path, doc.dump(2) + "\n");
+    return write_crash_safe(path, doc.dump(2) + "\n");
 }
 
 } // namespace tb::game

@@ -20,3 +20,10 @@ add_library(tb_sim STATIC
 
 target_include_directories(tb_sim PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(tb_sim PUBLIC tb_core unofficial::lua::lua sol2::sol2)
+
+# Determinism rule 08 §2.2: no fast math, no FMA contraction drift.
+if(MSVC)
+    target_compile_options(tb_sim PRIVATE /fp:precise)
+else()
+    target_compile_options(tb_sim PRIVATE -ffp-contract=off)
+endif()

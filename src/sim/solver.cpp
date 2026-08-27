@@ -1,6 +1,7 @@
 #include "sim/solver.h"
 
 #include "sim/ramp.h"
+#include "sim/script_host.h"
 
 #include <algorithm>
 #include <cmath>
@@ -24,6 +25,42 @@ static_assert(kSpinnerDecayPerTick > 0.999402f && kSpinnerDecayPerTick < 0.99940
 void emit_bank_event(SimState& s, SimEventType type, uint16_t element);
 void emit_lock_event(SimState& s, const BallLockElem& lock);
 void request_bank_reset(SimState& s, DropBankElem& bank);
+void serve_ball(SimState& s);
+void record_tick_event(SimState& s, const SimEvent& ev);
+
+// Serve one trough ball onto the plunger (§6.15 kinematics). No event:
+// callers decide whether BallServed applies (§3.5 fires none).
+void serve_ball(SimState& s) {
+    if (s.trough_balls <= 0 || !s.has_plunger) {
+        return;
+    }
+    for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
+        Ball& b = s.balls[bi];
+        if (b.live) {
+            continue;
+        }
+        --s.trough_balls;
+        b.index = bi;
+        b.live = true;
+        b.mode = BallMode::Free;
+        b.layer = 0;
+        b.pos = s.plunger.pos + s.plunger.lane_dir * (kBallRadius + 0.002f);
+        b.vel = {0.0f, 0.0f};
+        b.omega_z = 0.0f;
+        b.last_safe_pos = b.pos;
+        return;
+    }
+}
+
+// Per-tick emission-order log for the script host (§2.2 phase 2). Filled
+// only while a host is attached; the Collision audio event never records.
+void record_tick_event(SimState& s, const SimEvent& ev) {
+    if (s.script == nullptr || s.tick_event_n >= SimState::kTickEventCap) {
+        return;
+    }
+    s.tick_events[s.tick_event_n++] = ev;
+}
+
 void emit_element_event(
     SimState& s, SimEventType type, uint16_t element, const Ball& ball, float payload);
 
@@ -204,6 +241,7 @@ void emit_element_event(
     ev.data = ball.index;
     s.render_ring.push(s.tick, ev);
     s.game_ring.push(s.tick, ev);
+    record_tick_event(s, ev);
 }
 
 void emit_bank_event(SimState& s, SimEventType type, uint16_t element) {
@@ -214,6 +252,7 @@ void emit_bank_event(SimState& s, SimEventType type, uint16_t element) {
     ev.element = element;
     s.render_ring.push(s.tick, ev);
     s.game_ring.push(s.tick, ev);
+    record_tick_event(s, ev);
 }
 
 void emit_lock_event(SimState& s, const BallLockElem& lock) {
@@ -225,6 +264,7 @@ void emit_lock_event(SimState& s, const BallLockElem& lock) {
     ev.a = float(lock.held); // payload {lock_id, count}: count = held
     s.render_ring.push(s.tick, ev);
     s.game_ring.push(s.tick, ev);
+    record_tick_event(s, ev);
 }
 
 void request_bank_reset(SimState& s, DropBankElem& bank) {
@@ -617,6 +657,15 @@ void Solver::step(SimState& s, const TickInput* input) {
 void Solver::step_body(SimState& s, const TickInput* input) {
     contact_log_n_ = 0;
 
+    // Phase 1 pre (10-scripting.md §2.2): apply the physical actions
+    // latched during tick n−1's handlers; physics state stays immutable
+    // while scripts run.
+    if (s.script != nullptr) {
+        apply_script_actions(s, s.script->pending_actions());
+        s.script->pending_actions().clear();
+        s.tick_event_n = 0;
+    }
+
     // Step 2 — flipper state update (§5.2), id order; (theta_start,
     // omega) held constant for CCD this tick.
     for (Flipper& f : s.flippers) {
@@ -762,6 +811,7 @@ void Solver::step_body(SimState& s, const TickInput* input) {
             ev.data = ball.index;
             s.render_ring.push(s.tick, ev);
             s.game_ring.push(s.tick, ev);
+            record_tick_event(s, ev);
             continue;
         }
         if (ball.s < 0.0f) {
@@ -903,6 +953,7 @@ void Solver::step_body(SimState& s, const TickInput* input) {
             ev.a = approach;
             s.render_ring.push(s.tick, ev);
             s.game_ring.push(s.tick, ev);
+            record_tick_event(s, ev);
 
             resolved_[best.ball]++;
         } else if (best.kind == Contact::Captive) {
@@ -927,6 +978,17 @@ void Solver::step_body(SimState& s, const TickInput* input) {
     step_regions(s, input);
     step_elements(s);
     step_lifecycle(s, input);
+
+    // Phase 2 (10-scripting.md §2.2): dispatch this tick's sim events to
+    // Lua in emission order; phase 4 timers + GC after.
+    if (s.script != nullptr && s.script->scripting_active()) {
+        s.script->begin_tick(s.tick);
+        for (size_t i = 0; i < s.tick_event_n; ++i) {
+            s.script->dispatch(s.tick_events[i]);
+        }
+        s.script->end_tick(s.tick);
+    }
+    s.tick_event_n = 0;
 
     // Step 7c — last_safe_pos for balls that ended penetration-free.
     for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
@@ -998,6 +1060,7 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
             ev.data = b.index;
             s.render_ring.push(s.tick, ev);
             s.game_ring.push(s.tick, ev);
+            record_tick_event(s, ev);
 
             s.plunger.held_ticks = 0;
             s.plunger.auto_timer = 0;
@@ -1041,6 +1104,7 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
             ev.data = b.index;
             s.render_ring.push(s.tick, ev);
             s.game_ring.push(s.tick, ev);
+            record_tick_event(s, ev);
             break;
         }
     }
@@ -1073,6 +1137,14 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
                 ++s.trough_balls;
             }
 
+            // §4.2 payload: balls still in play after this drain.
+            int remaining = 0;
+            for (const Ball& other : s.balls) {
+                if (other.live && other.mode == BallMode::Free) {
+                    ++remaining;
+                }
+            }
+
             absorb(s, s.tick, SimEventType::Drain, 0xFFFE);
             SimEvent ev;
             ev.tick = s.tick;
@@ -1080,10 +1152,11 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
             ev.element = 0xFFFE;
             ev.x = b.pos.x;
             ev.y = b.pos.y;
-            ev.a = 0.0f;
+            ev.a = float(remaining);
             ev.data = b.index;
             s.render_ring.push(s.tick, ev);
             s.game_ring.push(s.tick, ev);
+            record_tick_event(s, ev);
         }
     }
 
@@ -1127,6 +1200,7 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
                 ev.data = b.index;
                 s.render_ring.push(s.tick, ev);
                 s.game_ring.push(s.tick, ev);
+                record_tick_event(s, ev);
                 break;
             }
         }
@@ -1305,6 +1379,7 @@ void Solver::step_elements(SimState& s) {
             ev.data = ball->index;
             s.render_ring.push(s.tick, ev);
             s.game_ring.push(s.tick, ev);
+            record_tick_event(s, ev);
         }
     }
 
@@ -1663,6 +1738,102 @@ void Solver::resolve_captive(SimState& s, Ball& ball, CaptiveBallElem& cap, Vec2
     }
 }
 
+void Solver::apply_script_actions(SimState& s, const std::vector<ScriptAction>& actions) {
+    for (const ScriptAction& a : actions) {
+        switch (a.kind) {
+        case ScriptAction::Kind::Kick: {
+            for (KickerElem& k : s.kickers) {
+                if (k.common.table_id != a.element || k.held_ball == 0xFF) {
+                    continue;
+                }
+                Ball* ball = nullptr;
+                for (Ball& b : s.balls) {
+                    if (b.live && b.index == k.held_ball) {
+                        ball = &b;
+                        break;
+                    }
+                }
+                if (ball == nullptr) {
+                    break;
+                }
+                const float speed = a.use_speed ? a.speed : k.eject_speed;
+                const float phi = (a.use_angle ? a.angle_deg : k.eject_angle_deg) *
+                                  float(3.14159265358979 / 180.0);
+                ball->pos = k.pos;
+                ball->vel = {speed * float(std::cos(phi)), speed * float(std::sin(phi))};
+                ball->omega_z = 0.0f;
+                ball->mode = BallMode::Free;
+                ball->last_safe_pos = ball->pos;
+                k.held_ball = 0xFF;
+                k.has_hold = false;
+                k.hold_ticks = 0;
+            }
+            break;
+        }
+        case ScriptAction::Kind::KickHold:
+            for (KickerElem& k : s.kickers) {
+                if (k.common.table_id == a.element && k.held_ball != 0xFF) {
+                    k.has_hold = true;
+                    k.hold_ticks = 0; // §6.9 script-held: auto-eject off
+                }
+            }
+            break;
+        case ScriptAction::Kind::ReleaseLock:
+            for (BallLockElem& lock : s.ball_locks) {
+                if (lock.common.table_id == a.element) {
+                    lock.release_pending += a.count;
+                }
+            }
+            break;
+        case ScriptAction::Kind::MagnetOn:
+        case ScriptAction::Kind::MagnetOff:
+        case ScriptAction::Kind::MagnetPulse:
+            for (MagnetSim& mag : s.magnets) {
+                if (mag.table_id != a.element) {
+                    continue;
+                }
+                if (a.kind == ScriptAction::Kind::MagnetOn) {
+                    mag.set_active(true);
+                } else if (a.kind == ScriptAction::Kind::MagnetOff) {
+                    mag.set_active(false);
+                } else {
+                    mag.pulse(uint32_t(a.speed));
+                }
+            }
+            break;
+        case ScriptAction::Kind::SetFlipperEnabled:
+            for (Flipper& f : s.flippers) {
+                if (f.table_id == a.element) {
+                    f.enabled = a.flag;
+                }
+            }
+            break;
+        case ScriptAction::Kind::AddBall:
+            for (int i = 0; i < a.count && s.trough_balls > 0; ++i) {
+                serve_ball(s);
+            }
+            break;
+        case ScriptAction::Kind::DropBankReset:
+            for (DropBankElem& bank : s.drop_banks) {
+                if (bank.common.table_id == a.element) {
+                    request_bank_reset(s, bank);
+                }
+            }
+            break;
+        case ScriptAction::Kind::GateOpen:
+        case ScriptAction::Kind::GateClose:
+            for (GateElem& g : s.gates) {
+                if (g.common.table_id != a.element || g.mechanical) {
+                    continue; // §6.7: one-way gates ignore script control
+                }
+                g.state =
+                    a.kind == ScriptAction::Kind::GateOpen ? GateState::Open : GateState::Closed;
+            }
+            break;
+        }
+    }
+}
+
 void Solver::pushout(SimState& s) {
     // §3.8 fallback depenetration: deepest-overlap position correction,
     // never touching velocity or spin.
@@ -1702,9 +1873,20 @@ void Solver::pushout(SimState& s) {
                     n = sn >= 0.0f ? dn : dn * -1.0f;
                     break;
                 }
-                case Collider::Kind::Arc:
-                default:
-                    continue; // arc tips carry point colliders already
+                case Collider::Kind::Arc: {
+                    // Distance to the circle surface, gated to the arc's
+                    // angular span (endpoint caps own the tips).
+                    const Vec2 d = ball.pos - c.a;
+                    const float dist = length(d);
+                    const float phi = wrap_ccw(std::atan2(d.y, d.x) - c.a0);
+                    if (phi > wrap_ccw(c.a1 - c.a0)) {
+                        break;
+                    }
+                    sep = std::fabs(dist - c.radius) - kBallRadius;
+                    const Vec2 radial = dist > 1e-9f ? d * (1.0f / dist) : Vec2{0.0f, 1.0f};
+                    n = dist > c.radius ? radial : radial * -1.0f;
+                    break;
+                }
                 }
                 if (sep < 0.0f && -sep > depth) {
                     depth = -sep;

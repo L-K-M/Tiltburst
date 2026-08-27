@@ -324,3 +324,52 @@ corrections are new entries. Format: 03-process.md §3.1.
   (no admin); fallback continues per §3.2.
 - (Carried from M07 merge aftermath:) the M07 review-cycle history is
   recorded under the M07 entry above; this entry adds nothing further.
+
+## M09 — Lua scripting & Neon Drift rules v1 (2026-08-27)
+
+- Shipped: sandboxed Lua 5.4 + sol2 script host (10-scripting.md §1–§4):
+  64 MiB capped allocator, fixed hash seed 0x74696C74, library whitelist
+  (io/os/require/load/dump stripped, math.random raises, print → log,
+  collectgarbage count-only), coroutine.create hooked to carry the §2.4
+  watchdog (10k instructions/tick at 1k granularity; overrun disables the
+  handler permanently and skips the tick's remaining invocations; §2.5
+  10-consecutive-errors disable); the complete canon §5.7 surface — all
+  22 events via tb.on, all 31 actions (4 tables: state/game/table_info/
+  backglass; the rest functions), tb.state per-player proxy with swap,
+  tb.timer/cancel_timer with freeze seam, BackglassModel with fixed
+  buffers, tb.rng/rng_range on rng_script; physical actions latch to the
+  next tick's phase 1 via ScriptAction + the solver's
+  apply_script_actions; phase 2 dispatch from a per-tick emission-order
+  event log + phase 4 timers/GC inside Solver::step; element-id string
+  resolution over SimState::element_ids/element_tags. tables/test-lab/
+  rules.lua ships verbatim per §6; neon-drift gains the full M9 element
+  roster (speedo_spinner, drift_lock, gear_bank, pit_scoop, nos standups
+  per 15 §1.3) + rules v1 (gears, drift mode, NOS, lock/multiball with
+  the mandatory unlit-lock release, drain counting). App windowed +
+  headless paths load rules.lua and begin_game. Tests: the six M9 suites
+  + Determinism.ScriptRngReplayStable + NeonDrift.ScriptedGameReachesGame
+  End (real table, real rules, 3 drains → game_end, score > 0) — 89/89.
+  gate_tables now loads rules.lua (D16): test-lab mean 3.30 µs, neon-drift
+  3.87 µs vs the 100/200 µs limits.
+- Deviations / new ADRs:
+  - ADR-024: inlane_outlane_pair divider top moved (0.062,0.268)→
+    (0.074,0.262). The §5.4 numbers left a 23 mm outlane mouth (its own
+    §6 jam band); a ball fed down the side wall wedged forever at
+    (0.041,0.274) — observed live. Spec + prefab amended in-PR.
+  - Arc push-out (§3.8): the M2 implementation skipped arcs in
+    depenetration ("arc tips carry point colliders"); a 7 m/s orbit ball
+    entering the corner-arc wall band (R−r < d < R+r) fell through BOTH
+    §3.4 sweep gates and tunneled off-table (observed at
+    (−18, −1216) m). Arcs now depenetrate with the angular-window check.
+    Physics change → det_golden.m2_bounce regenerated per §2.4.4.
+  - Ball-save uses/extra-ball caps, ball lifecycle events (ball_start/
+    ball_end sequencing) are driven by tests through the fire_event
+    framework seam; the real GameFsm owns them from M10.
+  - tb.backglass.animate/play_sound/play_music record nothing yet —
+    rendering/audio consumers arrive M11/M12; the calls validate args and
+    no-op per spec ("a missing id means silence").
+- Mid-milestone: branch protection retry at M09 open: PUT still 404
+  (no admin); fallback continues per §3.2. CMakeLists clang-format
+  incident: the WIP commit let clang-format run over CMake files AND
+  dropped tb_sim's -ffp-contract=off determinism flag — caught by
+  det_golden going red in a clean build; both repaired before the PR.

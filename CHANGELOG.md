@@ -8,6 +8,19 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Added
 
+- M09: sandboxed Lua script host (10-scripting.md §1–§4) with the complete
+  canon §5.7 event + action surface, instruction watchdog, per-player
+  tb.state, tick-granular timers, latched physical actions, and the
+  BackglassModel; tables/test-lab/rules.lua ships and Neon Drift gains
+  its M9 element roster + rules v1.
+
+### Fixed
+
+- M09: §3.8 push-out now depenetrates arcs (a 7 m/s orbit ball could
+  tunnel through the corner-arc wall band; det_golden regenerated).
+- M09: inlane_outlane_pair outlane mouth widened to 34.6 mm passable
+  (ADR-024; the old default wedged balls in §6's jam band).
+
 - M08: ramps as constrained 1-D paths with derived seam layers and
   bidirectional layer transfer, layer masks, and magnets with the §6.12
   field — completing the R7 element set (ramp, magnet, toy parse; FT-09

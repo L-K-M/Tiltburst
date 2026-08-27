@@ -628,6 +628,34 @@ currents in the ball are aggressive). The §4.4 energy property is
 unaffected (magnets are active elements). FT-09 green with bands
 unmodified; the throw phase is unchanged (release still adds no impulse).
 
+## ADR-024 — inlane_outlane_pair divider top moved to clear the outlane mouth
+
+**Status:** Accepted (M9). Amends 09-table-format.md §5.4 defaults.
+
+### Context
+
+The prefab's documented divider top `[0.062, 0.268]` puts its rubber post
+0.0312 m from the side-wall line; subtracting the 0.008 post radius leaves
+23 mm of passable channel — inside §6's 25–32 mm jam band and far below
+the 33 mm minimum the same §5.4 text claims ("≈ 0.038 m wide at the top").
+Any ball fed down the side wall (e.g. off the left orbit leg on the
+Neon Drift greybox) wedges between wall and post with static friction
+holding it forever — observed live as a parked ball at (0.041, 0.274)
+through 100k+ ticks.
+
+### Decision
+
+`divider_top` default moves to `[0.074, 0.262]`: perpendicular distance
+0.0426 − 0.008 post = **34.6 mm** passable, above the 33 mm floor.
+`divider_bottom` is unchanged. 09 §5.4's table and width note amended in
+the same PR (§3.3).
+
+### Consequences
+
+Outlane mouths built from the prefab drain reliably; the inlane feeding
+geometry is untouched (divider bottom unchanged). Tables that overrode
+`divider_top` explicitly are unaffected.
+
 ## Amendments to ARCHITECTURE.md (authoritative table)
 
 Where ARCHITECTURE.md disagrees with a row below, the amendment wins (canon

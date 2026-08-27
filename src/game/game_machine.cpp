@@ -148,6 +148,8 @@ void GameMachine::enter_game_starting() {
     serve_pending_ = false;
     p1_bonus_seen_ = false;
     fire_player_up_ = false;
+    ball_start_fired_ = false;
+    balls_in_play_at_mb_check_ = 0;
     host_.set_current_player(1);
     // Lift any residual freeze BEFORE begin_game: game_start fires
     // synchronously and its handlers may score (§6). On a back-to-back
@@ -336,6 +338,10 @@ void GameMachine::command_flipper_coil_restore() {
 void GameMachine::do_tilt() {
     tilted_ = true;
     host_.fire_event("tilt");
+    // §5: multiball edges are suspended for the tilted ball — freeze
+    // the tracker so the suspension cannot fire a phantom end edge
+    // next ball.
+    balls_in_play_at_mb_check_ = free_balls() + held_balls();
     // §5 consequences: flippers + coils dead, ledger frozen, save
     // cancelled, every captured ball force-ejected (the sim staggers
     // lock emptying; T10's fifth condition holds the ball open until
@@ -434,13 +440,16 @@ void GameMachine::check_replay(int player) {
         return;
     }
     if (host_.player_scores(player).score >= cfg_.replay_score) {
-        p.replay_awarded = true;
         auto& ps = host_.player_scores(player);
         if (ps.extra_balls < 3) {
+            p.replay_awarded = true; // one replay per player per game
             ++ps.extra_balls;
         } else if (!tilted_) {
+            p.replay_awarded = true;
             ps.score = std::min<uint64_t>(ps.score + 100'000ull, kScoreCap); // §3.3
         }
+        // Tilted AND at the cap: nothing granted, the threshold
+        // crossing is NOT consumed (checked again next tick).
     }
 }
 
@@ -493,23 +502,42 @@ bool GameMachine::session_over() const {
 }
 
 void GameMachine::count_finished_ball() {
-    // §3.1's accounting half: an extra ball replays the same player and
-    // number ("SHOOT AGAIN"); otherwise the finishing player's own
-    // ball_number advances. The extra-ball count is the host's (award
-    // path = tb.award_extra_ball).
-    auto& ps = host_.player_scores(current_player());
-    if (ps.extra_balls > 0) {
-        --ps.extra_balls; // same player, same ball_number
-        return;
+    // §3.1's accounting half: a PENDING extra ball replays the same
+    // player and number ("SHOOT AGAIN") — the extra ball itself is
+    // consumed by advance_rotation, which keeps the player current;
+    // otherwise the finishing player's own ball_number advances. The
+    // extra-ball count is the host's (award path = tb.award_extra_ball).
+    if (host_.player_scores(current_player()).extra_balls > 0) {
+        return; // SHOOT AGAIN: same player, same number
     }
     players_[size_t(current_player_)].ball_number += 1;
 }
 
 void GameMachine::advance_rotation() {
-    // §3.1's pointer half: next player is p % N + 1, using that
-    // player's OWN ball_number. Only called when the game continues —
-    // a finishing game keeps the last player current for game_end.
-    current_player_ = (current_player_ + 1) % int(players_.size());
+    // §3.1's pointer half. A pending extra ball keeps the SAME player
+    // (consumed here — the decrement must live with the pointer
+    // decision or the SHOOT AGAIN signal is destroyed before it is
+    // read, cycle-16 blocker). Otherwise next player is p % N + 1,
+    // skipping players who finished all their balls with no extras
+    // pending (their own ball_number is what counts — mid-game joins
+    // included). Only called when the game continues; a finishing game
+    // keeps the last player current for game_end.
+    auto& ps = host_.player_scores(current_player());
+    if (ps.extra_balls > 0) {
+        --ps.extra_balls;
+        return; // SHOOT AGAIN
+    }
+    const int n = int(players_.size());
+    for (int i = 0; i < n; ++i) {
+        current_player_ = (current_player_ + 1) % n;
+        const PlayerState& cand = players_[size_t(current_player_)];
+        if (cand.ball_number <= cfg_.balls_per_game ||
+            host_.player_scores(current_player()).extra_balls > 0) {
+            return; // this player still owes a ball
+        }
+    }
+    // Unreachable when !session_over(): at least one candidate exists.
+    TB_LOG_WARN("game", "rotation found no unfinished player");
 }
 
 void GameMachine::finish_bonus() {
@@ -527,6 +555,7 @@ void GameMachine::finish_bonus() {
     save_uses_left_ = 0;
     save_ticks_left_ = 0;
     ball_start_fired_ = false;
+    balls_in_play_at_mb_check_ = 0;
 
     // §3.3: bonus collection can cross the replay threshold — check
     // before the session decision, so the last ball's extra ball still

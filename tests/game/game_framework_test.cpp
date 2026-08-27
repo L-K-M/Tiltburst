@@ -568,10 +568,15 @@ TEST(ExtraBall, SamePlayerShootsAgain) {
         };
     };
 
-    // Start, reach BallInPlay for P1 ball 1.
+    // Start, add a SECOND player (the single-player form of this test
+    // masked the cycle-16 blocker: (0+1) % 1 == 0 keeps the player
+    // current either way), reach BallInPlay for P1 ball 1.
     rig.step(attach, 1u << 8);
     rig.step(attach, 0);
     rig.step(attach, 1u << 8);
+    rig.step(attach, 0);
+    rig.step(attach, 1u << 8); // P2 joins during P1 ball 1 (§3.1)
+    ASSERT_EQ(m.player_count(), 2);
     for (int t = 0; t < 2'100 && m.state() != GameState::BallReady; ++t) {
         rig.step(attach, 0);
     }

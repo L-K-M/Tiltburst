@@ -19,6 +19,8 @@
 // helper namespace → ScriptHost methods. Sol types never cross the header.
 namespace tb::sim {
 
+// §6 ledger cap: 9,999,999,999 (10 digits).
+constexpr uint64_t kScoreCap = 9'999'999'999ull;
 // The impl pointer for the watchdog hook. Debug hooks run during arbitrary
 // VM execution where free Lua stack slots are NOT guaranteed, so the hook
 // must not push anything — it reads this thread-local pointer instead.
@@ -90,6 +92,7 @@ struct ScriptHostImpl {
     bool loaded = false;
     bool scripting_disabled = false; // panic path (§1.3)
     int player_count = 1;
+    bool ledger_frozen = false; // §6: BonusCount-after-ball_end / tilt / Duel timeout
     int current_player = 1;
     int ball_number = 1; // framework-owned (M10); default for tb.game
     int balls_per_game = 3;
@@ -531,12 +534,19 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
             TB_LOG_WARN("script", "tb.score(negative/NaN) ignored");
             return;
         }
-        player_scores(impl_->current_player).score += uint64_t(points);
+        if (impl_->ledger_frozen) {
+            return; // §6: after ball_end, after tilt — discard, log debug
+        }
+        auto& ps = player_scores(impl_->current_player);
+        ps.score = std::min(ps.score + uint64_t(points), kScoreCap);
     });
     tb.set_function("add_bonus", [this](double points) {
         if (!(points >= 0.0) || points > double(std::numeric_limits<uint64_t>::max())) {
             TB_LOG_WARN("script", "tb.add_bonus(negative/NaN) ignored");
             return;
+        }
+        if (impl_->ledger_frozen) {
+            return; // §6
         }
         player_scores(impl_->current_player).bonus += uint64_t(points);
     });
@@ -685,8 +695,8 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
         PlayerScoreState& ps = player_scores(impl_->current_player);
         if (ps.extra_balls < 3) {
             ++ps.extra_balls;
-        } else {
-            ps.score += 100000; // §3.5: past the cap posts points
+        } else if (!impl_->ledger_frozen) {
+            ps.score = std::min<uint64_t>(ps.score + 100000ull, kScoreCap); // past cap
         }
     });
 
@@ -858,6 +868,11 @@ void ScriptHost::begin_tick(uint64_t tick) {
 }
 
 void ScriptHost::dispatch(const SimEvent& event) {
+    // danger_threshold is neutral sim state for the framework
+    // (10-scripting.md §4.3: not a script event) — never dispatched.
+    if (SimEventType(event.type) == SimEventType::DangerThreshold) {
+        return;
+    }
     if (!scripting_active()) {
         return;
     }
@@ -949,7 +964,15 @@ void ScriptHost::fire_event(const char* name,
                             const EventInts& ints,
                             const EventStrings& strings,
                             const EventIntArrays& arrays) {
-    if (!scripting_active() || name == nullptr) {
+    if (name == nullptr) {
+        return;
+    }
+    // Framework events are part of the deterministic replay record
+    // (11-game-framework.md §1): fold even when no handler listens.
+    if (impl_->sim != nullptr) {
+        absorb_framework_event(*impl_->sim, name);
+    }
+    if (!scripting_active()) {
         return;
     }
     const auto it = impl_->handlers.find(name);
@@ -991,6 +1014,33 @@ void ScriptHost::begin_game(int player_count) {
     }
     set_current_player(1);
     fire_event("game_start", {{"player_count", impl_->player_count}});
+}
+
+void ScriptHost::add_player() {
+    // §3.1: joins are only legal during P1 ball 1; the framework checks
+    // that, this just does the bookkeeping. The newcomer's tb.state is a
+    // fresh empty table (set_current_player re-points tb.state).
+    if (impl_->player_count >= 4) {
+        return;
+    }
+    ++impl_->player_count;
+    impl_->scores[impl_->player_count - 1] = PlayerScoreState{};
+    sol::state_view lua(*impl_->lua);
+    lua["tb"]["__states"][impl_->player_count] = lua.create_table();
+}
+
+void ScriptHost::set_ball_number(int ball) {
+    impl_->ball_number = ball;
+}
+
+void ScriptHost::cancel_all_timers() {
+    // §4.5 step 4. Releasing the sol::protected_function members here is
+    // safe: the lua_State is alive (load-time teardown ordering).
+    impl_->timers.clear();
+}
+
+void ScriptHost::set_ledger_frozen(bool frozen) {
+    impl_->ledger_frozen = frozen;
 }
 
 void ScriptHost::end_game() {

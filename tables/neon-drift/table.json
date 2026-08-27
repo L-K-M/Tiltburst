@@ -11,7 +11,22 @@
     "theme": "synthwave night-street racing",
     "author": "Tiltburst",
     "description": "Momentum table: shift up through five gears, chain ramps like drifting through corners, and let the drift corner magnet bend your orbit shots sideways. Greybox milestone 5 layout.",
-    "rules_card": "Shift up through the gears on the drop bank. Chain ramps to hold the multiplier. Drift the corner."
+    "rules_card": "Shift up through the gears on the drop bank. Chain ramps to hold the multiplier. Drift the corner.",
+    "replay_score": 12000000,
+    // Themed top-10 defaults (15-launch-tables.md §1.5; exactly 10,
+    // non-increasing — V028).
+    "default_scores": [
+      { "initials": "AXL", "score": 40000000 },
+      { "initials": "VNS", "score": 32000000 },
+      { "initials": "RGE", "score": 26000000 },
+      { "initials": "MPH", "score": 20000000 },
+      { "initials": "NEO", "score": 15000000 },
+      { "initials": "RPM", "score": 13000000 },
+      { "initials": "GTO", "score": 11500000 },
+      { "initials": "DRV", "score": 10000000 },
+      { "initials": "LAP", "score": 9000000 },
+      { "initials": "KMH", "score": 8000000 }
+    ]
   },
 
   "playfield": {

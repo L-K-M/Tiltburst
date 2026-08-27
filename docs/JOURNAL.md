@@ -384,3 +384,44 @@ corrections are new entries. Format: 03-process.md §3.1.
   (with handlers/timers) before closing. The 5.4 pin itself could not
   ship (vcpkg historical-port checkout fails on Windows) — reverted;
   baseline 5.5.1 accepted via ADR-025.
+
+## M10 — Game framework: players, tilt, high scores (2026-08-27)
+
+- Scope per 04 §M10: full GameState enum (TableSelect/Settings/Paused as
+  placeholders until M18), 1–4 player rotation with per-player tb.state
+  swap, ball count + extra balls, nudge → sim impulse + tilt bob with
+  warnings/tilt, high scores (per-table top-10 under SDL_GetPrefPath,
+  meta.default_scores seeding, initials entry), Start adds players.
+- New `tb_game` (src/game): GameMachine (phase 3, driven by the solver
+  hook between script dispatch and timers per 11 §1), HighScoreTable
+  (crash-safe writes), InitialsEntry ring model, score formatter.
+- Sim side: nudge half-sine envelopes (08 §7.1), damped tilt bob +
+  leaky abuse accumulator with independent threshold re-arming
+  (§7.2/§7.3), DangerThreshold sim events (framework-only, filtered
+  from script dispatch), flippers/coils gates + ForceEjectAll /
+  ResetDanger / LocksToTrough framework commands, framework-owned
+  serving (M5 auto-serve loop steps aside when attached).
+- state_hash now folds tilt-bob/abuse/envelope state (replayed state —
+  nudges are inputs); flipper_tap + m2_bounce goldens regenerated per
+  16 §2.4.4 (hash-scope change only, zero physics delta on nudge-free
+  tapes).
+- Spec reading documented in code: T10's five §2.5 conditions plus
+  held/locked == 0 — §4.6 case B's 30 s watchdog only makes sense if
+  captured balls hold BallInPlay open, so T10 cannot fire under a hold.
+- Bug hunts this milestone: (1) serve_ball spawned without BallServed
+  by design ("callers decide") — the framework's serve window never
+  closed and re-commanded every 9 s; AddBall now serves via
+  serve_ball_notified. (2) Phase-1 ordering: tick_event_n reset AFTER
+  apply_script_actions wiped the serve's own event the same tick; the
+  reset now precedes action application. (3) finish_bonus evaluated
+  session_over BEFORE counting the finished player's ball — 4-player
+  games played a 13th ball; counting split from the pointer advance,
+  and the pointer only moves when the game continues so game_end fires
+  with the last player current. (4) Extra balls unified on the host's
+  PlayerScoreState (tb.award_extra_ball is the only award path; the
+  machine's PlayerState kept a second, drifting copy).
+- neon-drift ships its themed default_scores (15 §1.5: AXL 40M … KMH
+  8M, exactly 10, V028-validated); test-lab declares none and starts
+  empty by design (11 §7: no built-in ladder).
+- Branch protection PUT retried once at M10 open: 404 again (no
+  admin); journaled fallback per §3.2.

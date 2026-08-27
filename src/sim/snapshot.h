@@ -31,6 +31,13 @@ struct SimSnapshot {
     uint32_t ball_count = 0;
     uint32_t _pad = 0;
     BallSnap balls[kMaxBalls]{};
+
+    // Tilt-danger telemetry (08 §7.2/§7.3), published for overlays.
+    float tilt_px = 0.0f, tilt_py = 0.0f; // bob position (m)
+    float tilt_vx = 0.0f, tilt_vy = 0.0f; // bob velocity (m/s)
+    float tilt_abuse = 0.0f;              // abuse accumulator (m/s)
+    uint16_t tilt_crossings = 0;          // per-ball crossing count
+    uint8_t tilt_armed = 0x7;             // warn|hard|abuse arm bits
 };
 
 // Triple buffer (§7.2, binding). Single writer (sim), single reader

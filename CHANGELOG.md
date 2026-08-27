@@ -8,6 +8,15 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Added
 
+- M10: game framework (11-game-framework.md §2–§7) — the GameState
+  machine running in phase 3 of the sim tick, 1–4 player rotation with
+  per-player tb.state swap, extra balls/replay, nudge physics with the
+  tilt bob + abuse accumulator (two warnings then tilt), framework
+  tilt consequences (flippers/coils dead, ledger frozen, every held
+  ball force-ejected), ball save, multiball edges, bonus collection,
+  and per-table top-10 high scores with initials entry and
+  meta.default_scores seeding (neon-drift ships themed defaults;
+  tables without them start empty).
 - M09: sandboxed Lua script host (10-scripting.md §1–§4) with the complete
   canon §5.7 event + action surface, instruction watchdog, per-player
   tb.state, tick-granular timers, latched physical actions, and the

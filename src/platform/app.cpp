@@ -4,6 +4,8 @@
 #include "core/log.h"
 #include "core/time.h"
 #include "core/version.h"
+#include "game/game_machine.h"
+#include "game/high_scores.h"
 #include "platform/gpu_device.h"
 #include "platform/input.h"
 #include "platform/latency.h"
@@ -456,9 +458,10 @@ int run(const CliOptions& cli) {
                 SDL_Quit();
                 return 1;
             }
-            if (loaded_table.script_loaded) {
-                loaded_table.script.begin_game(1);
-            }
+            // The M10 GameMachine owns the game lifecycle in the
+            // windowed path: game_start fires from GameStarting on a
+            // Start press, not at load. Scripts stay loaded-but-idle in
+            // Attract (timers + ledger frozen, 11 §8.2).
         } else {
             tb::sim::make_synthetic_scene(sim_state, 424242);
         }
@@ -486,6 +489,15 @@ int run(const CliOptions& cli) {
                 ++n;
             }
             snap.ball_count = n;
+            snap.tilt_px = sim_state.tilt.p.x;
+            snap.tilt_py = sim_state.tilt.p.y;
+            snap.tilt_vx = sim_state.tilt.v.x;
+            snap.tilt_vy = sim_state.tilt.v.y;
+            snap.tilt_abuse = sim_state.tilt.abuse_acc;
+            snap.tilt_crossings = sim_state.tilt.crossings;
+            snap.tilt_armed = uint8_t((sim_state.tilt.warn_armed ? 1u : 0u) |
+                                      (sim_state.tilt.hard_armed ? 2u : 0u) |
+                                      (sim_state.tilt.abuse_armed ? 4u : 0u));
             snapshots.publish(snap);
         });
         const uint64_t start = tb_now_ns();
@@ -772,10 +784,60 @@ int run(const CliOptions& cli) {
         }
         tb::sim::Solver solver;
 
+        // M10 game framework (11-game-framework.md): only for a loaded
+        // table with rules; synthetic scenes run bare.
+        std::unique_ptr<tb::game::GameMachine> machine;
+        tb::game::HighScoreTable high_scores;
+        std::filesystem::path score_path;
+        if (loaded_table && loaded_table->script_loaded) {
+            tb::game::FrameworkConfig fcfg;
+            fcfg.balls_per_game = settings.balls_per_game;
+            fcfg.tilt_warnings = settings.tilt_warnings;
+            fcfg.ball_save_ticks = uint32_t(std::clamp(settings.ball_save_seconds, 0, 15)) * 1000;
+            fcfg.replay_score = loaded_table->def.replay_score;
+            {
+                const time_t now = ::time(nullptr);
+                tm lt{};
+#if defined(_WIN32)
+                localtime_s(&lt, &now);
+#else
+                localtime_r(&now, &lt);
+#endif
+                char stamp[16];
+                strftime(stamp, sizeof(stamp), "%Y-%m-%d", &lt);
+                fcfg.date_stamp = stamp;
+            }
+            std::error_code mk_ec;
+            std::filesystem::create_directories(paths::pref() / "scores", mk_ec);
+            score_path = paths::pref() / "scores" / (loaded_table->def.slug + std::string(".json"));
+            if (!high_scores.load(score_path)) {
+                // §7: seed from meta.default_scores when the pack
+                // declares it; otherwise the list simply starts empty.
+                high_scores.seed_defaults(loaded_table->def.default_scores, fcfg.date_stamp);
+                high_scores.save(score_path, loaded_table->def.slug);
+            }
+            machine = std::make_unique<tb::game::GameMachine>(
+                loaded_table->script, sim_state, high_scores, fcfg);
+            sim_state.framework_attached = true;
+            sim_state.nudge_level = std::clamp(settings.nudge_level, 1, 3);
+            sim_state.fsm_ctx = machine.get();
+            sim_state.fsm_step = [](void* ctx, tb::sim::SimState& s, const tb::sim::TickInput& in) {
+                static_cast<tb::game::GameMachine*>(ctx)->step(in);
+            };
+            TB_LOG_INFO("main", "game framework attached: table '{}'", loaded_table->def.slug);
+        }
+
         InputPipeline input;
         input.start(settings);
 
-        auto tick_fn = [&snapshots, &solver, &sim_state, &input](uint64_t tick) {
+        auto tick_fn = [&snapshots,
+                        &solver,
+                        &sim_state,
+                        &input,
+                        &machine,
+                        &high_scores,
+                        &score_path,
+                        &loaded_table](uint64_t tick) {
             // §2.1 step 1: late-latch the freshest input exactly once.
             const uint64_t latch_ts = tb_now_ns();
             const uint32_t buttons = tb::input::latch_input(input.sources.data(),
@@ -783,7 +845,19 @@ int run(const CliOptions& cli) {
                                                             input.state,
                                                             latch_ts,
                                                             &input.histogram);
-            solver.step(sim_state, tb::sim::TickInput{buttons});
+            const tb::sim::TickInput tick_input{buttons};
+            const bool paused = machine && machine->state() == tb::game::GameState::Paused;
+            if (paused) {
+                // §8.5: physics + script ticks freeze; the FSM itself
+                // keeps consuming commands.
+                machine->step(tick_input);
+            } else {
+                solver.step(sim_state, tick_input); // fsm runs in phase 3
+            }
+            if (machine && machine->scores_dirty()) {
+                machine->clear_scores_dirty();
+                high_scores.save(score_path, loaded_table->def.slug); // §7
+            }
 
             tb::SimSnapshot snap;
             snap.tick = tick;
@@ -803,6 +877,15 @@ int run(const CliOptions& cli) {
                 ++n;
             }
             snap.ball_count = n;
+            snap.tilt_px = sim_state.tilt.p.x;
+            snap.tilt_py = sim_state.tilt.p.y;
+            snap.tilt_vx = sim_state.tilt.v.x;
+            snap.tilt_vy = sim_state.tilt.v.y;
+            snap.tilt_abuse = sim_state.tilt.abuse_acc;
+            snap.tilt_crossings = sim_state.tilt.crossings;
+            snap.tilt_armed = uint8_t((sim_state.tilt.warn_armed ? 1u : 0u) |
+                                      (sim_state.tilt.hard_armed ? 2u : 0u) |
+                                      (sim_state.tilt.abuse_armed ? 4u : 0u));
             snapshots.publish(snap);
 
             // §14.1 stages 1–3 of this tick's latency record.

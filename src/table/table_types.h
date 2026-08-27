@@ -296,6 +296,16 @@ struct PhysicsOverrides {
     float restitution_soft = 0.5f;
     float live_catch_window_ms = 50.0f;
     float live_catch_factor = 0.15f;
+    // physics.tilt sub-object (09 §2; thresholds of 08 §7.2/§7.3).
+    float tilt_warn_m = 0.055f;
+    float tilt_hard_m = 0.085f;
+    float tilt_abuse_mps = 1.2f;
+};
+
+// meta.default_scores row (09 §2; exactly 10 when present — V028).
+struct DefaultScore {
+    char initials[4] = {0, 0, 0, 0};
+    uint64_t score = 0;
 };
 
 struct MaterialOverride {
@@ -314,6 +324,8 @@ struct TableDef {
     std::string author;
     std::string description;
     std::string rules_card;
+    uint64_t replay_score = 5000000;          // meta.replay_score (11 §3.3 default)
+    std::vector<DefaultScore> default_scores; // optional; V028 validates
 
     // playfield
     float width = 0.52f;

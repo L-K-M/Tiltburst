@@ -1128,6 +1128,62 @@ TableDef load_table(const std::filesystem::path& table_dir) {
         }
     }
 
+    // Optional meta extras (09 §2). replay_score: replay award threshold
+    // (11 §3.3). default_scores: exactly 10 non-increasing rows, initials
+    // 3 glyphs from A-Z 0-9 space (V028) — else absent/empty stays empty.
+    if (meta.contains("replay_score")) {
+        const json& rs = meta.at("replay_score");
+        if (!rs.is_number_unsigned() || rs.get<uint64_t>() == 0) {
+            fail("meta.replay_score must be a positive integer", "/meta/replay_score", file);
+        }
+        def.replay_score = rs.get<uint64_t>();
+    }
+    if (meta.contains("default_scores")) {
+        const json& ds = meta.at("default_scores");
+        if (!ds.is_array() || ds.size() != 10) {
+            fail("meta.default_scores invalid: exactly 10 entries required",
+                 "/meta/default_scores",
+                 file);
+        }
+        uint64_t prev = UINT64_MAX;
+        for (size_t i = 0; i < ds.size(); ++i) {
+            const json& row = ds[i];
+            if (!row.is_object() || !row.contains("initials") || !row.contains("score") ||
+                !row.at("initials").is_string() || !row.at("score").is_number_unsigned()) {
+                fail("meta.default_scores invalid: row needs string initials + integer score",
+                     "/meta/default_scores/" + std::to_string(i),
+                     file);
+            }
+            const std::string ini = row.at("initials").get<std::string>();
+            auto glyph_ok = [](char c) {
+                return (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == ' ';
+            };
+            if (ini.size() != 3 || !glyph_ok(ini[0]) || !glyph_ok(ini[1]) || !glyph_ok(ini[2])) {
+                fail("meta.default_scores invalid: initials must be 3 glyphs from A-Z 0-9 space",
+                     "/meta/default_scores/" + std::to_string(i) + "/initials",
+                     file);
+            }
+            const uint64_t score = row.at("score").get<uint64_t>();
+            if (score == 0) {
+                fail("meta.default_scores invalid: scores must be positive",
+                     "/meta/default_scores/" + std::to_string(i) + "/score",
+                     file);
+            }
+            if (score > prev) {
+                fail("meta.default_scores invalid: scores must be non-increasing",
+                     "/meta/default_scores/" + std::to_string(i) + "/score",
+                     file);
+            }
+            prev = score;
+            DefaultScore d;
+            d.initials[0] = ini[0];
+            d.initials[1] = ini[1];
+            d.initials[2] = ini[2];
+            d.score = score;
+            def.default_scores.push_back(d);
+        }
+    }
+
     if (doc.contains("playfield")) {
         const json& pf = doc.at("playfield");
         if (pf.contains("size")) {
@@ -1158,6 +1214,31 @@ TableDef load_table(const std::filesystem::path& table_dir) {
             ph, "live_catch_window_ms", def.physics.live_catch_window_ms, "/physics", file);
         def.physics.live_catch_factor =
             get_number(ph, "live_catch_factor", def.physics.live_catch_factor, "/physics", file);
+        if (ph.contains("tilt")) {
+            // 09 §2: a sub-object, never dotted keys.
+            const json& t = ph.at("tilt");
+            if (!t.is_object()) {
+                fail("physics.tilt must be an object", "/physics/tilt", file);
+            }
+            def.physics.tilt_warn_m =
+                get_number(t, "warn", def.physics.tilt_warn_m, "/physics/tilt", file);
+            def.physics.tilt_hard_m =
+                get_number(t, "hard", def.physics.tilt_hard_m, "/physics/tilt", file);
+            def.physics.tilt_abuse_mps =
+                get_number(t, "abuse", def.physics.tilt_abuse_mps, "/physics/tilt", file);
+            if (def.physics.tilt_warn_m < 0.030f || def.physics.tilt_warn_m > 0.120f) {
+                fail("physics.tilt.warn outside 0.030-0.120", "/physics/tilt/warn", file);
+            }
+            if (def.physics.tilt_hard_m < 0.045f || def.physics.tilt_hard_m > 0.150f) {
+                fail("physics.tilt.hard outside 0.045-0.150", "/physics/tilt/hard", file);
+            }
+            if (def.physics.tilt_abuse_mps < 0.60f || def.physics.tilt_abuse_mps > 3.00f) {
+                fail("physics.tilt.abuse outside 0.60-3.00", "/physics/tilt/abuse", file);
+            }
+            if (def.physics.tilt_hard_m < def.physics.tilt_warn_m) {
+                fail("physics.tilt.hard below warn", "/physics/tilt/hard", file);
+            }
+        }
     }
 
     if (doc.contains("materials")) {

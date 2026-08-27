@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -98,6 +99,31 @@ struct FlipperRig {
 } // namespace
 
 TEST(det_replay, flipper_tape_hash_stable) {
+    // TB_RECORD_GOLDEN=<path> regenerates instead of comparing (§2.4.4).
+    if (const char* record = std::getenv("TB_RECORD_GOLDEN")) {
+        tb::test::Tape tape;
+        ASSERT_TRUE(tb::test::load_tape(
+            tb::test::data_path("tests/fixtures/tapes/flipper_tap.replay.json"), tape));
+        FlipperRig rig(tape.seed);
+        tb::sim::Solver solver;
+        std::ofstream out(record);
+        out << "# tiltburst determinism golden v1\n";
+        out << "# regenerated M10: state_hash now folds tilt-bob/abuse/nudge"
+            << " envelope state (hash-scope change, JOURNAL M10; 16 §2.4.4)\n";
+        for (uint64_t tick = 1; tick <= 3000; ++tick) {
+            tb::sim::TickInput in;
+            in.buttons = tick - 1 < tape.buttons_by_tick.size()
+                             ? tape.buttons_by_tick[size_t(tick - 1)]
+                             : tape.buttons_by_tick.back();
+            solver.step(rig.state, in);
+            if (tick % 100 == 0) {
+                out << tick << " " << std::hex << tb::sim::state_hash(rig.state) << std::dec
+                    << "\n";
+            }
+        }
+        SUCCEED() << "golden recorded";
+        return;
+    }
 #if !defined(__linux__)
     // ADR-013: goldens are compared same-OS only; other platforms skip
     // until their goldens land via CI artifacts.

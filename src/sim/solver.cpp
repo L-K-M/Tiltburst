@@ -779,6 +779,12 @@ void Solver::step_body(SimState& s, const TickInput* input) {
             ev.a = magnitude;
             ev.data = uint32_t(source) | (uint32_t(s.tilt.crossings) << 16);
             absorb(s, s.tick, SimEventType::DangerThreshold, 0xFFFF);
+            // Rings too — the full emission pattern (serve_ball_notified,
+            // emit_bank_event): tilt-warning audio/HUD consumers read the
+            // rings, not the script log. absorb() already ran, so the
+            // event-sequence hash is unchanged.
+            s.render_ring.push(s.tick, ev);
+            s.game_ring.push(s.tick, ev);
             record_tick_event(s, ev);
         };
         SimEvent ev;

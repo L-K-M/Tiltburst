@@ -236,7 +236,7 @@ bool event_carries_ball_id(uint16_t type) {
     }
 }
 
-int pattern_blink_code(const char* pattern) {
+int pattern_blink_code(const char* pattern, lua_State* L) {
     const std::string p = pattern != nullptr ? pattern : "";
     const int code = p == "slow_blink"   ? 1
                      : p == "fast_blink" ? 2
@@ -245,7 +245,7 @@ int pattern_blink_code(const char* pattern) {
                      : p == "breathe"    ? 5
                                          : -1;
     if (code < 0) {
-        throw sol::error("unknown blink pattern: " + p);
+        luaL_error(L, "unknown blink pattern: %s", p.c_str());
     }
     return code;
 }
@@ -415,18 +415,19 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
         lua[g] = sol::lua_nil;
     }
     lua["string"]["dump"] = sol::lua_nil;
-    lua["math"]["random"] = []() -> int {
-        throw sol::error("math.random is disabled; use tb.rng()");
+    lua["math"]["random"] = [](sol::this_state s) -> int {
+        luaL_error(s, "math.random is disabled; use tb.rng()");
     };
-    lua["math"]["randomseed"] = []() -> int {
-        throw sol::error("math.randomseed is disabled; use tb.rng()");
+    lua["math"]["randomseed"] = [](sol::this_state s) -> int {
+        luaL_error(s, "math.randomseed is disabled; use tb.rng()");
     };
     lua["print"] = [](const char* msg) { TB_LOG_INFO("[lua]", "{}", msg); };
     lua["collectgarbage"] = [](sol::this_state s, const char* what) {
         if (what != nullptr && std::strcmp(what, "count") == 0) {
             return lua_gc(s, LUA_GCCOUNT, 0);
         }
-        throw sol::error("collectgarbage: only \"count\" is permitted");
+        luaL_error(s, "collectgarbage: only \"count\" is permitted");
+        return 0;
     };
 
     // §2.4: the watchdog hook on the main state + hooked coroutine.create
@@ -437,9 +438,9 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
     sol::table tb = lua.create_named_table("tb");
 
     // ---- events (§2.3) ----
-    tb.set_function("on", [this](const std::string& name, sol::function fn) {
+    tb.set_function("on", [this](sol::this_state s, const std::string& name, sol::function fn) {
         if (!is_canon_event(name)) {
-            throw sol::error("unknown event name: " + name);
+            luaL_error(s, "unknown event name: %s", name.c_str());
         }
         impl_->handlers[name].push_back(HandlerEntry{sol::protected_function(fn), 0, false});
     });
@@ -478,10 +479,11 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
     };
     tb.set_function("light_on", [set_light](const std::string& id) { set_light(id, true); });
     tb.set_function("light_off", [set_light](const std::string& id) { set_light(id, false); });
-    tb.set_function("light_blink", [set_light](const std::string& id, const char* pattern) {
-        pattern_blink_code(pattern); // validates; unknown raises
-        set_light(id, true);         // blink rendering is M13; state-wise on
-    });
+    tb.set_function("light_blink",
+                    [set_light](sol::this_state s, const std::string& id, const char* pattern) {
+                        pattern_blink_code(pattern, s); // validates; unknown raises
+                        set_light(id, true);            // blink rendering is M13; state-wise on
+                    });
 
     // ---- sound/music (§3.3): request emission only; playback is M11 ----
     tb.set_function("play_sound", [](const std::string&, sol::object) {});
@@ -713,9 +715,9 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
 
     // ---- randomness (§3.9): rng_script stream ----
     tb.set_function("rng", [this]() { return impl_->sim->rng_script.next_float(); });
-    tb.set_function("rng_range", [this](double a, double b) -> int {
+    tb.set_function("rng_range", [this](sol::this_state s, double a, double b) -> int {
         if (a != std::floor(a) || b != std::floor(b) || a > b) {
-            throw sol::error("tb.rng_range: need integers a <= b");
+            luaL_error(s, "tb.rng_range: need integers a <= b");
         }
         const int64_t span = int64_t(b) - int64_t(a) + 1;
         const double u = impl_->sim->rng_script.next_float();

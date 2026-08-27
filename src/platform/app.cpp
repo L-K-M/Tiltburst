@@ -843,7 +843,9 @@ int run(const CliOptions& cli) {
                      (stem.compare(0, 3, "com") == 0 || stem.compare(0, 3, "lpt") == 0) &&
                      stem[3] >= '1' && stem[3] <= '9');
                 if (reserved) {
-                    safe_slug = "table";
+                    // Prefix, do not replace: a constant fallback would
+                    // merge distinct reserved-slug tables into one file.
+                    safe_slug = "t-" + safe_slug;
                 }
             }
             score_slug = safe_slug;

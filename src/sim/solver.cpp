@@ -4,8 +4,8 @@
 #include "sim/script_host.h"
 
 #include <algorithm>
-#include <cstdio>
 #include <cmath>
+#include <cstdio>
 
 namespace tb::sim {
 
@@ -666,8 +666,8 @@ void Solver::step_body(SimState& s, const TickInput* input) {
     // latched during tick n−1's handlers; physics state stays immutable
     // while scripts run.
     if (s.script != nullptr) {
-        std::fprintf(stderr, "[tbdbg] step: apply actions (%zu)\n",
-                     s.script->pending_actions().size());
+        std::fprintf(
+            stderr, "[tbdbg] step: apply actions (%zu)\n", s.script->pending_actions().size());
         apply_script_actions(s, s.script->pending_actions());
         s.script->pending_actions().clear();
         s.tick_event_n = 0;

@@ -836,13 +836,21 @@ int run(const CliOptions& cli) {
                     std::error_code bad_ec;
                     std::filesystem::rename(score_path, bad, bad_ec);
                     if (bad_ec) {
-                        // Keep-copy failed: remove the corrupt file so
-                        // the seeded save below still lands, and log
-                        // what actually happened.
+                        // A stale or locked .bad is the usual reason
+                        // the rename failed; clear it and retry before
+                        // giving up on the keep-copy.
                         std::error_code rm_ec;
-                        std::filesystem::remove(score_path, rm_ec);
-                        TB_LOG_WARN(
-                            "main", "score file corrupt; keep-copy failed: {}", bad_ec.message());
+                        std::filesystem::remove(bad, rm_ec);
+                        std::filesystem::rename(score_path, bad, bad_ec);
+                    }
+                    if (bad_ec) {
+                        std::error_code rm_ec;
+                        const bool removed = std::filesystem::remove(score_path, rm_ec);
+                        TB_LOG_WARN("main",
+                                    "score file corrupt; keep-copy failed: {} (original "
+                                    "removed: {})",
+                                    bad_ec.message(),
+                                    removed);
                     } else {
                         TB_LOG_WARN("main", "score file corrupt; moved to {}", bad.string());
                     }

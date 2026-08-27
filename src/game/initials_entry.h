@@ -48,11 +48,16 @@ public:
         slots_[size_t(cursor_)] = glyph_at(ring_pos_);
     }
 
-    // Start: confirm the slot and advance. Confirming slot 3 commits
-    // (the ring never rests on backspace — selecting '<' + Start is
-    // backspace, handled by try_confirm below).
+    // Start: confirm the slot and advance. Confirming slot 3 commits.
+    // The ring CAN rest on '<' (index 37): '<' + Start is BACKSPACE
+    // (§7) — confirm() intercepts it here, before the advance/commit;
+    // initials() sanitizing '<' to ' ' is only the timeout safety net.
     void confirm() {
         touch();
+        if (ring_pos_ == kBackspaceIndex) {
+            backspace(); // '<' + Start = backspace (§7)
+            return;
+        }
         if (cursor_ < kSlots - 1) {
             ++cursor_;
             ring_pos_ = ring_of(slots_[size_t(cursor_)]);

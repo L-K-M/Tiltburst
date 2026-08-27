@@ -18,6 +18,14 @@
 // helper namespace → ScriptHost methods. Sol types never cross the header.
 namespace tb::sim {
 
+// The impl pointer for the watchdog hook. Debug hooks run during arbitrary
+// VM execution where free Lua stack slots are NOT guaranteed, so the hook
+// must not push anything — it reads this thread-local pointer instead.
+// Safe by the §1.1 invariant: exactly one live host (and one lua_State)
+// per thread at a time; load() sets it before any hook can fire and the
+// destructor clears it after lua_close.
+thread_local ScriptHostImpl* t_active_impl = nullptr;
+
 // §1.1: 64 MiB Lua heap cap.
 constexpr size_t kLuaHeapCap = 64u * 1024u * 1024u;
 // §2.4: 10,000 instructions per tick at 1,000-instruction hook granularity.
@@ -114,26 +122,17 @@ struct ScriptHostImpl {
             timers.clear();
             lua_sethook(L, nullptr, 0, 0); // no hooks during teardown
             lua_close(L);
+            if (t_active_impl == this) {
+                t_active_impl = nullptr;
+            }
         }
     }
 };
 
 namespace {
 
-// The impl pointer rides the Lua registry under this lightuserdata key
-// (the watchdog hook needs it from a raw lua_State*).
-inline void* kImplRegistryKey = const_cast<char*>("tb.impl");
-
-ScriptHostImpl* impl_from_state(lua_State* L) {
-    lua_pushlightuserdata(L, kImplRegistryKey);
-    lua_gettable(L, LUA_REGISTRYINDEX);
-    if (!lua_islightuserdata(L, -1)) {
-        lua_pop(L, 1);
-        return nullptr;
-    }
-    auto* impl = static_cast<ScriptHostImpl*>(lua_touserdata(L, -1));
-    lua_pop(L, 1);
-    return impl;
+ScriptHostImpl* impl_from_state(lua_State*) {
+    return t_active_impl;
 }
 
 // §2.4 watchdog: fires every kHookGranularity instructions, decrements the
@@ -405,11 +404,7 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
     if (impl_->L == nullptr) {
         throw std::runtime_error("cannot create the Lua state (heap cap?)");
     }
-    {
-        lua_pushlightuserdata(impl_->L, kImplRegistryKey);
-        lua_pushlightuserdata(impl_->L, impl_);
-        lua_settable(impl_->L, LUA_REGISTRYINDEX);
-    }
+    t_active_impl = impl_;
     impl_->lua = std::make_unique<sol::state_view>(impl_->L);
 
     sol::state_view& lua = *impl_->lua;

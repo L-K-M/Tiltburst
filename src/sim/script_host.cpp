@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <memory>
 #include <unordered_map>
@@ -106,6 +107,7 @@ struct ScriptHostImpl {
     std::vector<std::vector<std::string>> element_tags;
 
     ~ScriptHostImpl() {
+        std::fprintf(stderr, "[tbdbg] dtor enter\n");
         if (L != nullptr) {
             // Member sol references (handlers/timers) must unref BEFORE
             // the state dies: clear them here, manually, so the implicit

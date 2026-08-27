@@ -715,7 +715,9 @@ void Solver::step_body(SimState& s, const TickInput* input) {
         constexpr uint32_t kNudgeRightBit = 6;
         constexpr uint32_t kNudgeUpBit = 7;
         const uint32_t rising = input->buttons & ~s.input_prev_buttons;
-        const int level = s.nudge_level; // 1..3 (settings; replay header)
+        // 1..3 (settings; replay header). Anything out of range clamps
+        // to the MIDDLE level, never silently the strongest.
+        const int level = std::clamp(s.nudge_level, 1, 3);
         auto nudge_dv = [level](uint32_t bit) -> std::pair<Vec2, Vec2> {
             // Returns {ball d_hat·dv, cab d_hat·dv}: the button names the
             // direction the cabinet is shoved; balls accelerate the
@@ -1958,6 +1960,13 @@ void Solver::apply_script_actions(SimState& s, const std::vector<ScriptAction>& 
             continue;
         case ScriptAction::Kind::CoilsEnabled:
             s.coils_enabled = a.flag;
+            if (!a.flag) {
+                // §5: de-energized magnets are RELEASED, not merely
+                // forbidden to re-energize (same as the tilt path).
+                for (MagnetSim& mag : s.magnets) {
+                    mag.set_active(false);
+                }
+            }
             continue;
         case ScriptAction::Kind::ResetDanger:
             reset_danger(s);
@@ -1981,7 +1990,8 @@ void Solver::apply_script_actions(SimState& s, const std::vector<ScriptAction>& 
             // 11-game-framework.md §5: every captured ball ejects at its
             // element defaults; locks empty one ball per 500 ms via the
             // ordinary release cadence; magnets released; script holds
-            // (capture_ticks) cleared.
+            // (has_hold + its hold_ticks countdown) cleared —
+            // capture_ticks itself is element config and stays.
             for (KickerElem& k : s.kickers) {
                 eject_kicker(s, k);
             }

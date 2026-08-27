@@ -425,3 +425,20 @@ corrections are new entries. Format: 03-process.md §3.1.
   empty by design (11 §7: no built-in ladder).
 - Branch protection PUT retried once at M10 open: 404 again (no
   admin); journaled fallback per §3.2.
+- Review saga: 22 cycles to steady state. The late cycles were dominated
+  by repeated premise errors that citations rebutted (SimEvent NSDMI
+  zero-init raised five times; JSONC comments four times despite canon
+  §5.5 and the every-pack parse test), but the middle cycles caught real
+  bugs worth recording: the cycle-2 ledger-unfreeze ordering and the
+  cycle-16 multiplayer SHOOT AGAIN blocker (extra ball consumed by the
+  counting half of the split rotation, destroying the pointer signal —
+  single-player rotation masked it exactly as the reviewer argued), the
+  score-0 insert that would have wiped top-10 files on the next boot's
+  re-seed, and reset_danger reverting table-tuned tilt thresholds. Two
+  process lessons: (1) silent python string-replace misses behind later
+  failed asserts produced TWO commits whose messages claimed fixes that
+  had not landed (cycle-3 initials intercept, cycle-6 golden validation)
+  — every replace must assert, and claim-words in commit messages must
+  be backed by a diff check; (2) grep-based build gating treats matched
+  error lines as success and let a broken build get pushed (cycle 9) —
+  gate on emptiness of the error output, not its presence.

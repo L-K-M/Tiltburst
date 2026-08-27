@@ -59,6 +59,15 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Fixed
 
+- M10 (post-review hardening): multiplayer SHOOT AGAIN rotation (the
+  extra ball is consumed where the pointer decision is made), tilt
+  force-ejects energized magnets on de-energize, score-0 games never
+  qualify for initials (a persisted 0 would have wiped the file on the
+  next boot), corrupt score files keep a .bad copy and never lose the
+  only copy on a failed keep, single-key physics.tilt tables keep the
+  warn/hard pair ordered, out-of-range nudge levels fall back to the
+  middle strength, and the golden recorder/compare paths share one
+  replay helper with provenance and full 30-sample coverage.
 - M09: §3.8 push-out now depenetrates arcs (a 7 m/s orbit ball could
   tunnel through the corner-arc wall band; det_golden regenerated).
 - M09: inlane_outlane_pair outlane mouth widened to 32.8 mm passable

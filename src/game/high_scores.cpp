@@ -33,12 +33,12 @@ bool write_crash_safe(const std::filesystem::path& path, const std::string& text
         const bool ok =
             std::fwrite(text.data(), 1, text.size(), f) == text.size() && std::fflush(f) == 0;
 #if defined(_WIN32)
-        if (ok) {
-            _commit(_fileno(f));
+        if (ok && _commit(_fileno(f)) != 0) {
+            ok = false; // durability is the whole point (05 §11.2)
         }
 #else
-        if (ok) {
-            fsync(fileno(f));
+        if (ok && fsync(fileno(f)) != 0) {
+            ok = false;
         }
 #endif
         std::fclose(f);
@@ -121,6 +121,10 @@ void HighScoreTable::seed_defaults(const std::vector<table::DefaultScore>& defau
                                    const std::string& date) {
     entries_.clear();
     for (const table::DefaultScore& d : defaults) {
+        if (entries_.size() >= kMaxEntries) {
+            break; // loader validates exactly 10 (V028); the cap keeps
+                   // this side unloadable-file-proof regardless
+        }
         HighScoreEntry e;
         e.initials = {d.initials[0], d.initials[1], d.initials[2]};
         e.score = d.score;
@@ -139,7 +143,11 @@ bool HighScoreTable::qualifies(uint64_t score) const {
 }
 
 int HighScoreTable::insert(const HighScoreEntry& entry) {
-    if (!qualifies(entry.score)) {
+    // A 0 score never inserts: load() rejects score-0 rows as corrupt,
+    // so persisting one would wipe the table on the next boot (the
+    // re-seed path) — a tilt-out game that scores nothing simply does
+    // not qualify.
+    if (entry.score == 0 || !qualifies(entry.score)) {
         return 0;
     }
     size_t at = entries_.size();

@@ -790,6 +790,7 @@ int run(const CliOptions& cli) {
         tb::game::HighScoreTable high_scores;
         std::filesystem::path score_path;
         std::string score_slug;
+        uint32_t score_retry_ticks = 0; // failed-save backoff (1 Hz)
         if (loaded_table && loaded_table->script_loaded) {
             tb::game::FrameworkConfig fcfg;
             fcfg.balls_per_game = settings.balls_per_game;
@@ -822,6 +823,28 @@ int run(const CliOptions& cli) {
             }
             if (safe_slug.empty() || safe_slug == "." || safe_slug == "..") {
                 safe_slug = "table";
+            }
+            // Windows DOS device names resolve even with an extension
+            // (con.json etc.); a slug that reduces to one is not usable
+            // as a file name there.
+            {
+                std::string low = safe_slug;
+                for (char& c : low) {
+                    c = char(std::tolower(static_cast<unsigned char>(c)));
+                }
+                std::string stem = low;
+                const size_t dot = stem.find('.');
+                if (dot != std::string::npos) {
+                    stem = stem.substr(0, dot);
+                }
+                const bool reserved =
+                    stem == "con" || stem == "prn" || stem == "aux" || stem == "nul" ||
+                    (stem.size() == 4 &&
+                     (stem.compare(0, 3, "com") == 0 || stem.compare(0, 3, "lpt") == 0) &&
+                     stem[3] >= '1' && stem[3] <= '9');
+                if (reserved) {
+                    safe_slug = "table";
+                }
             }
             score_slug = safe_slug;
             score_path = paths::pref() / "scores" / (safe_slug + ".json");
@@ -879,6 +902,7 @@ int run(const CliOptions& cli) {
                         &high_scores,
                         &score_path,
                         &score_slug,
+                        &score_retry_ticks,
                         &loaded_table](uint64_t tick) {
             // §2.1 step 1: late-latch the freshest input exactly once.
             const uint64_t latch_ts = tb_now_ns();
@@ -897,10 +921,16 @@ int run(const CliOptions& cli) {
                 solver.step(sim_state, tick_input); // fsm runs in phase 3
             }
             if (machine && machine->scores_dirty()) {
-                // Clear only after a successful write: a failed persist
-                // retries next tick (§7: immediately after each commit).
-                if (high_scores.save(score_path, score_slug)) {
+                // Clear only after a successful write; a failing save
+                // retries at 1 Hz rather than every tick (a full JSON
+                // serialize per 1 kHz tick against a dead directory is
+                // its own hazard).
+                if (score_retry_ticks > 0) {
+                    --score_retry_ticks;
+                } else if (high_scores.save(score_path, score_slug)) {
                     machine->clear_scores_dirty();
+                } else {
+                    score_retry_ticks = 1'000;
                 }
             }
 

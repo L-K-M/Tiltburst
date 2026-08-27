@@ -30,7 +30,8 @@ public:
         if (done_) {
             return;
         }
-        if (++idle_ticks_ >= 60'000) {
+        if (++idle_ticks_ >= 60'000) { // 60 s at the canon 1 kHz tick
+                                       // (canon §5.3: 1 tick = 1 ms)
             // §7: 60 s without input commits the displayed glyphs.
             done_ = true;
         }

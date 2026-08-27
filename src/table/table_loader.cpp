@@ -325,6 +325,7 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
     }
     if (type == "gate") {
         GateDef g;
+        g.tags = tags;
         g.id = id;
         g.layer = layer;
         get_xy(obj, "pos", g.pos, pointer, file);
@@ -342,6 +343,7 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
     }
     if (type == "rollover") {
         RolloverDef r;
+        r.tags = tags;
         r.id = id;
         r.layer = layer;
         get_xy(obj, "pos", r.pos, pointer, file);
@@ -380,6 +382,7 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
     }
     if (type == "spinner") {
         SpinnerDef sp;
+        sp.tags = tags;
         sp.id = id;
         sp.layer = layer;
         get_xy(obj, "pos", sp.pos, pointer, file);
@@ -388,6 +391,7 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
     }
     if (type == "ramp") {
         RampDef r;
+        r.tags = tags;
         r.id = id;
         r.layer = layer;
         r.path = parse_path(obj, pointer, file);
@@ -443,6 +447,7 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
     }
     if (type == "magnet") {
         MagnetDef m;
+        m.tags = tags;
         m.id = id;
         m.layer = layer;
         get_xy(obj, "pos", m.pos, pointer, file);
@@ -453,6 +458,7 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
     }
     if (type == "kicker") {
         KickerDef k;
+        k.tags = tags;
         k.id = id;
         k.layer = layer;
         get_xy(obj, "pos", k.pos, pointer, file);
@@ -477,6 +483,7 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
     }
     if (type == "drop_target_bank") {
         DropTargetBankDef bank;
+        bank.tags = tags;
         bank.id = id;
         bank.layer = layer;
         if (!obj.contains("targets") || !obj.at("targets").is_array()) {
@@ -511,6 +518,7 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
     }
     if (type == "captive_ball") {
         CaptiveBallDef cap;
+        cap.tags = tags;
         cap.id = id;
         cap.layer = layer;
         if (!obj.contains("slot") || !obj.at("slot").is_object()) {
@@ -530,6 +538,7 @@ Element parse_element(const json& obj, size_t index, const std::filesystem::path
     }
     if (type == "ball_lock") {
         BallLockDef lock;
+        lock.tags = tags;
         lock.id = id;
         lock.layer = layer;
         get_xy(obj, "pos", lock.pos, pointer, file);
@@ -709,6 +718,10 @@ PathNode arc(float to_x, float to_y, float radius, bool cw) {
 
 const std::string& Element::id() const {
     return std::visit([](const auto& d) -> const std::string& { return d.id; }, def);
+}
+
+const std::vector<std::string>& Element::tagsOf() const {
+    return std::visit([](const auto& d) -> const std::vector<std::string>& { return d.tags; }, def);
 }
 
 const char* Element::type_name() const {
@@ -908,7 +921,13 @@ std::vector<Element> expand_prefab(const TableDef& partial, const PrefabInstance
         out.push_back(Element{make_wall(
             pid + "_side_wall", inst.layer, inst.tags, std::move(side_path), MaterialId::Wood)});
 
-        std::vector<PathNode> div_path = {point(mirror(0.062f), 0.268f),
+        // ADR-024: divider top moved (0.062,0.268)→(0.074,0.262) so the
+        // outlane mouth (side wall → divider post) is 32.8 mm passable —
+        // §5.4's own numbers left 23 mm (§6 jam band). The post must sit
+        // exactly on the wall's top end, so both use these constants.
+        constexpr float kDivTopX = 0.074f;
+        constexpr float kDivTopY = 0.262f;
+        std::vector<PathNode> div_path = {point(mirror(kDivTopX), kDivTopY),
                                           point(mirror(0.122f), 0.138f)};
         out.push_back(Element{make_wall(
             pid + "_divider", inst.layer, inst.tags, std::move(div_path), MaterialId::Wood)});
@@ -917,8 +936,8 @@ std::vector<Element> expand_prefab(const TableDef& partial, const PrefabInstance
         post.id = pid + "_top_post";
         post.layer = inst.layer;
         post.tags = inst.tags;
-        post.pos[0] = mirror(0.062f);
-        post.pos[1] = 0.268f;
+        post.pos[0] = mirror(kDivTopX);
+        post.pos[1] = kDivTopY;
         post.radius = 0.008f;
         post.material = MaterialId::Rubber;
         out.push_back(Element{std::move(post)});

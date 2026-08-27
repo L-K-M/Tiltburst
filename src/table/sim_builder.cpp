@@ -271,6 +271,12 @@ void build_sim(const TableDef& def, tb::sim::SimState& out) {
     }
 
     uint16_t next_sub = 0;
+    out.element_ids.clear();
+    out.element_tags.clear();
+    for (size_t idx = 0; idx < def.elements.size(); ++idx) {
+        out.element_ids.push_back(def.elements[idx].id());
+        out.element_tags.push_back(def.elements[idx].tagsOf());
+    }
 
     for (size_t idx = 0; idx < def.elements.size(); ++idx) {
         const Element& e = def.elements[idx];
@@ -311,6 +317,7 @@ void build_sim(const TableDef& def, tb::sim::SimState& out) {
             }
             sim_flipper.theta = sim_flipper.params.rest_rad();
             sim_flipper.theta_start = sim_flipper.theta;
+            sim_flipper.table_id = element_id;
             out.flippers.push_back(sim_flipper);
         } else if (e.type_name() == std::string("plunger")) {
             const PlungerDef& p = std::get<PlungerDef>(e.def);
@@ -344,7 +351,7 @@ void build_sim(const TableDef& def, tb::sim::SimState& out) {
             (void)t;
         } else if (e.type_name() == std::string("light")) {
             const LightDef& l = std::get<LightDef>(e.def);
-            out.lights.push_back({{l.pos[0], l.pos[1]}, l.size, false});
+            out.lights.push_back({{l.pos[0], l.pos[1]}, l.size, false, element_id});
         } else if (std::holds_alternative<SlingshotDef>(e.def)) {
             const SlingshotDef& d = std::get<SlingshotDef>(e.def);
             // Face segment collider (rubber) — endpoints capped.

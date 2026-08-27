@@ -27,6 +27,8 @@
 #include <ctime>
 #include <deque>
 #include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <vector>
 
 #if defined(_WIN32)
@@ -103,7 +105,46 @@ std::filesystem::path resolve_table_dir(const std::string& arg) {
 
 struct LoadedTable {
     tb::table::TableDef def;
+    tb::sim::ScriptHost script;
+    bool script_loaded = false;
 };
+
+// Loads table.json + rules.lua (when present) into `loaded`; returns
+// false with the error logged. The ScriptHost is owned here and outlives
+// the SimState reference it holds (both die with the windowed session).
+bool load_table_pack(LoadedTable& loaded,
+                     const std::filesystem::path& dir,
+                     tb::sim::SimState& sim_state) {
+    try {
+        loaded.def = tb::table::load_table(dir);
+        tb::table::build_sim(loaded.def, sim_state);
+    } catch (const tb::table::TableLoadError& e) {
+        TB_LOG_ERROR("main", "table load failed: {} ({})", e.what(), e.json_pointer);
+        return false;
+    }
+    const std::filesystem::path rules = dir / "rules.lua";
+    std::error_code ec;
+    if (std::filesystem::exists(rules, ec)) {
+        std::ifstream in(rules);
+        if (!in) {
+            TB_LOG_ERROR("main",
+                         "rules.lua exists but is unreadable (continuing unscripted): {}",
+                         rules.string());
+            return true;
+        }
+        std::stringstream buf;
+        buf << in.rdbuf();
+        try {
+            loaded.script.load(buf.str(), sim_state);
+            sim_state.script = &loaded.script;
+            loaded.script_loaded = true;
+            TB_LOG_INFO("main", "rules.lua loaded for '{}'", loaded.def.slug);
+        } catch (const std::exception& e) {
+            TB_LOG_ERROR("main", "rules.lua failed (continuing unscripted): {}", e.what());
+        }
+    }
+    return true;
+}
 
 // §9/§14 input pipeline: producer sources in §9.8 priority order (raw
 // first, SDL last), the latched level state, the R2.1 cumulative
@@ -401,16 +442,22 @@ int run(const CliOptions& cli) {
         // Bounded display-less probe (journal note): boot with no video/
         // GPU/audio, run the sim loop, report the tick rate, exit 0.
         tb::SnapshotBuffer snapshots;
+        // Declaration order is load-bearing: the ScriptHost owned by
+        // loaded_table keeps a SimState& (script_host.h: "state must
+        // outlive the host"; solver.h: "the owner must destroy it before
+        // the state"), so sim_state is declared first and the host is
+        // destroyed before it — same order as the test rig and the
+        // windowed path below.
         tb::sim::SimState sim_state;
+        LoadedTable loaded_table;
         if (!cli.table.empty()) {
-            const std::filesystem::path dir = resolve_table_dir(cli.table);
-            try {
-                tb::table::build_sim(tb::table::load_table(dir), sim_state);
-            } catch (const tb::table::TableLoadError& e) {
-                TB_LOG_ERROR("main", "table load failed: {} ({})", e.what(), e.json_pointer);
+            if (!load_table_pack(loaded_table, resolve_table_dir(cli.table), sim_state)) {
                 log::flush_now();
                 SDL_Quit();
                 return 1;
+            }
+            if (loaded_table.script_loaded) {
+                loaded_table.script.begin_game(1);
             }
         } else {
             tb::sim::make_synthetic_scene(sim_state, 424242);
@@ -696,6 +743,11 @@ int run(const CliOptions& cli) {
         }
 
         tb::SnapshotBuffer snapshots;
+        // Declaration order is load-bearing: the ScriptHost owned by
+        // *loaded_table keeps a SimState& (script_host.h: "state must
+        // outlive the host"; solver.h: "the owner must destroy it before
+        // the state"), so sim_state is declared first and the host is
+        // destroyed before it.
         tb::sim::SimState sim_state;
         std::unique_ptr<LoadedTable> loaded_table;
         std::filesystem::path table_dir;

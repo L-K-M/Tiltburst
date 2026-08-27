@@ -187,6 +187,20 @@ TEST(perf_tick, gate_tables) {
         tb::sim::SimState s;
         tb::table::build_sim(def, s);
 
+        // D16 (16 §2.9): from M9 the gate loads each table's rules.lua and
+        // keeps script dispatch inside the measured tick.
+        tb::sim::ScriptHost host;
+        {
+            std::ifstream rules(tb::test::data_path(std::string("tables/") + slug + "/rules.lua"));
+            if (rules.good()) {
+                std::stringstream buf;
+                buf << rules.rdbuf();
+                host.load(buf.str(), s);
+                s.script = &host;
+                host.begin_game(1);
+            }
+        }
+
         tb::sim::Solver solver;
 
         // Put a ball in play and keep it there: spawn on the plunger and

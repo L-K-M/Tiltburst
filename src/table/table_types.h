@@ -62,6 +62,7 @@ struct FlipperDef {
 
 struct PlungerDef {
     std::string id;
+    std::vector<std::string> tags;
     float pos[2]{};
     float launch_angle_deg = 90.0f;
     float max_speed = 7.5f;
@@ -72,12 +73,14 @@ struct PlungerDef {
 
 struct OutholeDef {
     std::string id;
+    std::vector<std::string> tags;
     float a[2]{};
     float b[2]{};
 };
 
 struct TroughDef {
     std::string id;
+    std::vector<std::string> tags;
     int capacity = 4;
 };
 
@@ -96,6 +99,7 @@ struct LightDef {
 // physics yet (their element sims land in M6 per 04-milestones.md §M5).
 struct GateDef {
     std::string id;
+    std::vector<std::string> tags;
     int layer = 0;
     float pos[2]{};
     float width = 0.040f;
@@ -112,6 +116,7 @@ struct HeightKey {
 
 struct RampDef {
     std::string id;
+    std::vector<std::string> tags;
     int layer = 0;
     std::vector<PathNode> path;
     float width = 0.044f;
@@ -121,6 +126,7 @@ struct RampDef {
 
 struct MagnetDef {
     std::string id;
+    std::vector<std::string> tags;
     int layer = 0;
     float pos[2]{};
     float radius = 0.09f;
@@ -130,6 +136,7 @@ struct MagnetDef {
 
 struct KickerDef {
     std::string id;
+    std::vector<std::string> tags;
     int layer = 0;
     float pos[2]{};
     float radius = 0.014f;
@@ -141,6 +148,7 @@ struct KickerDef {
 
 struct DropTargetBankDef {
     std::string id;
+    std::vector<std::string> tags;
     int layer = 0;
 
     struct TargetDef {
@@ -156,6 +164,7 @@ struct DropTargetBankDef {
 
 struct CaptiveBallDef {
     std::string id;
+    std::vector<std::string> tags;
     int layer = 0;
     float a[2]{};
     float b[2]{};
@@ -163,6 +172,7 @@ struct CaptiveBallDef {
 
 struct BallLockDef {
     std::string id;
+    std::vector<std::string> tags;
     int layer = 0;
     float pos[2]{};
     int capacity = 2;
@@ -172,6 +182,7 @@ struct BallLockDef {
 
 struct SpinnerDef {
     std::string id;
+    std::vector<std::string> tags;
     int layer = 0;
     float pos[2]{};
     float facing_deg = 90.0f;
@@ -179,6 +190,7 @@ struct SpinnerDef {
 
 struct RolloverDef {
     std::string id;
+    std::vector<std::string> tags;
     int layer = 0;
     float pos[2]{};
     float facing_deg = 90.0f;
@@ -237,6 +249,7 @@ struct Element {
         def;
 
     const std::string& id() const;
+    const std::vector<std::string>& tagsOf() const;
     const char* type_name() const;
 };
 

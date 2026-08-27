@@ -94,6 +94,7 @@ struct LightState {
     Vec2 pos{};
     float size = 0.012f;
     bool on = false;
+    uint16_t table_id = 0xFFFF; // TableDef element index (tb.light_* lookup)
 };
 
 constexpr uint16_t kInvalidElement = 0xFFFF;

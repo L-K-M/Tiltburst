@@ -10,6 +10,7 @@
 #include "sim/flipper_ccd.h"
 #include "sim/math.h"
 #include "sim/ramp.h"
+#include "sim/script_host.h"
 #include "sim/types.h"
 
 #include <vector>
@@ -18,6 +19,8 @@
 // tb_sim depends only on tb_core (canon §5.1); step() is allocation-free
 // after build (03-process.md §1.6).
 namespace tb::sim {
+
+class ScriptHost; // 10-scripting.md; defined in sim/script_host.h
 
 struct SimTickStats {
     float t_total_us = 0.0f;
@@ -71,6 +74,23 @@ struct SimState {
     int ball_count = 4;
     int locked_balls = 0;
     BallSaveState ball_save{};
+
+    // Script plumbing (10-scripting.md §2.2). element_ids/tags are static
+    // build data indexed by TableDef element index; tick_events is the
+    // per-tick emission-order log the host dispatches in phase 2 (filled
+    // only while a host is attached). script is non-owning: the owner
+    // (app / test) must destroy it before the state.
+    std::vector<std::string> element_ids;
+    std::vector<std::vector<std::string>> element_tags;
+    ScriptHost* script = nullptr;
+    static constexpr size_t kTickEventCap = 128;
+    SimEvent tick_events[kTickEventCap]{};
+    size_t tick_event_n = 0;
+    // Overflow diagnostics (§2.2): events past the cap are dropped; the
+    // count and one-shot flag make the truncation diagnosable instead of
+    // silently diverging rules.lua / golden replays.
+    size_t tick_events_dropped = 0;
+    bool tick_event_drop_warned = false;
 
     // Balls.
     Ball balls[kMaxBalls]{};
@@ -149,6 +169,7 @@ private:
     void step_regions(SimState& s, const TickInput* input);
     void step_elements(SimState& s);
     void step_lifecycle(SimState& s, const TickInput* input);
+    void apply_script_actions(SimState& s, const std::vector<ScriptAction>& actions);
     void pushout(SimState& s);
 
     // Per-tick scratch, reused across ticks (never allocated in step()).

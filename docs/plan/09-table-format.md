@@ -1139,7 +1139,7 @@ rubber top post, two rollovers, two lights. Instantiate once per side.
 | `mirror_axis_x` | number m | `0.240` | playable center; used for `"right"` |
 | `wall_top` | [x,y] | `[0.000, 0.360]` | on the outer wall |
 | `wall_bottom` | [x,y] | `[0.096, 0.058]` | above the drain area |
-| `divider_top` | [x,y] | `[0.062, 0.268]` | — |
+| `divider_top` | [x,y] | `[0.074, 0.262]` | ADR-024: was `[0.062, 0.268]`, which jammed the outlane mouth at 23 mm |
 | `divider_bottom` | [x,y] | `[0.122, 0.138]` | near flipper pivot |
 
 Coordinates are given for `side:"left"`; for `"right"` every x maps to
@@ -1166,8 +1166,12 @@ Lights use color role `"insert_primary"` (13-art-direction.md).
         |     \ | \_flipper    surface.
 ```
 
-The outlane channel (side wall to divider) is ≈ 0.038 m wide at the top —
-above the 0.033 minimum, tight enough to feel dangerous. These defaults mesh
+The outlane channel (side wall to divider post) is ≈ 0.0328 m wide at
+the top — 0.2 mm under the 0.033 target, just clear of §6's 32 mm jam
+band, still dangerous
+(ADR-024: the original `[0.062, 0.268]` divider top left 0.0312 − the
+0.008 post = 23 mm, inside §6's jam band; a ball rolling the side wall
+wedged there forever). These defaults mesh
 with `flipper_pair_standard` at `[0.240, 0.115]` and `sling_pair` at
 `[0.240, 0.210]`; if you move those, run `tb_validate` and adjust until the
 clearance checks (V006) pass.

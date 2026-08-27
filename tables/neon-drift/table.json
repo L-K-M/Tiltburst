@@ -56,6 +56,39 @@
       "height_profile": [ { "s": 0.0, "z": 0.0 }, { "s": 0.45, "z": 0.052 },
                           { "s": 0.80, "z": 0.052 }, { "s": 1.0, "z": 0.030 } ] },
 
+    // Speedo spinner in the left orbit lane (15 §1.3; §0.8 keep-out (c):
+    // 0.0085 m outboard of the 0.0375 lane center, facing 76).
+    { "id": "speedo_spinner", "type": "spinner", "pos": [0.029, 0.690],
+      "facing_deg": 76 },
+
+    // Drift lock on the lane center, fed by the right_ramp drop exit
+    // (15 §1.3). Visible style.
+    { "id": "drift_lock", "type": "ball_lock", "pos": [0.0375, 0.862],
+      "capacity": 2, "eject_angle_deg": 90, "eject_speed": 3.0 },
+
+    // Gear drop bank: four targets across the mid-field (15 §1.3; facing
+    // 249 = the row's own normal, targets array per §4.8).
+    { "id": "gear_bank", "type": "drop_target_bank",
+      "targets": [
+        { "pos": [0.300, 0.715], "facing_deg": 249 },
+        { "pos": [0.332, 0.703], "facing_deg": 249 },
+        { "pos": [0.364, 0.691], "facing_deg": 249 },
+        { "pos": [0.396, 0.679], "facing_deg": 249 }
+      ],
+      "reset": "script" },
+
+    // Pit scoop: mode start / wizard start (15 §1.3).
+    { "id": "pit_scoop", "type": "kicker", "pos": [0.180, 0.480],
+      "style": "scoop", "eject_angle_deg": -57, "eject_speed": 3.0 },
+
+    // N-O-S standup bank (15 §1.3; lights Nitro Save).
+    { "id": "nos_left", "type": "standup_target", "pos": [0.430, 0.520],
+      "facing_deg": 205, "tags": ["nos"] },
+    { "id": "nos_mid", "type": "standup_target", "pos": [0.443, 0.490],
+      "facing_deg": 205, "tags": ["nos"] },
+    { "id": "nos_right", "type": "standup_target", "pos": [0.452, 0.460],
+      "facing_deg": 205, "tags": ["nos"] },
+
     // Upper-right flipper: the third flipper (15 §1.3 roster row 1).
     { "id": "upper_flipper", "type": "flipper", "pos": [0.448, 0.615],
       "length": 0.062, "rest_angle_deg": -100, "swing_deg": 46,

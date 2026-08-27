@@ -628,6 +628,65 @@ currents in the ball are aggressive). The §4.4 energy property is
 unaffected (magnets are active elements). FT-09 green with bands
 unmodified; the throw phase is unchanged (release still adds no impulse).
 
+## ADR-024 — inlane_outlane_pair divider top moved to clear the outlane mouth
+
+**Status:** Accepted (M9). Amends 09-table-format.md §5.4 defaults.
+
+### Context
+
+The prefab's documented divider top `[0.062, 0.268]` puts its rubber post
+0.0312 m from the side-wall line; subtracting the 0.008 post radius leaves
+23 mm of passable channel — inside §6's 25–32 mm jam band and far below
+the 33 mm minimum the same §5.4 text claims ("≈ 0.038 m wide at the top").
+Any ball fed down the side wall (e.g. off the left orbit leg on the
+Neon Drift greybox) wedges between wall and post with static friction
+holding it forever — observed live as a parked ball at (0.041, 0.274)
+through 100k+ ticks.
+
+### Decision
+
+`divider_top` default moves to `[0.074, 0.262]`: perpendicular distance
+0.0408 − 0.008 post = **32.8 mm** passable — 0.2 mm under the 33 mm
+floor, clear of §6's 32 mm jam band (the original 0.0426/34.6 mm claim
+was a mismeasured gap; the true perpendicular at y = 0.262 is 0.0408).
+`divider_bottom` is unchanged. 09 §5.4's table and width note amended in
+the same PR (§3.3).
+
+### Consequences
+
+Outlane mouths built from the prefab drain reliably; the inlane feeding
+geometry is untouched (divider bottom unchanged). Tables that overrode
+`divider_top` explicitly are unaffected.
+
+## ADR-025 — Lua 5.5.1 accepted in place of the spec's "Lua 5.4"
+
+**Status:** Accepted (M9). Amends 10-scripting.md §1.1.
+
+### Context
+
+10-scripting.md §1.1 pins "Lua 5.4 (vcpkg `lua`)". The repo's pinned
+vcpkg baseline ships the `lua` port at 5.5.1 — the API surface the
+sandbox uses (open_libraries whitelist, luaL_error, lua_sethook COUNT
+hooks, luaL_ref/unref registry refs, lua_gc step, coroutine.create
+wrapping) is unchanged between the versions for everything this host
+calls. Pinning 5.4.8 via a manifest override was tried (M9 triage):
+vcpkg's versioning checkout of the historical port fails on the
+Windows runner (`git checkout-index` exit 128), so the pin cannot ship.
+
+### Decision
+
+Ship the baseline's Lua 5.5.1. The fixed string-hash seed is kept via
+`lua_newstate`'s seed parameter (5.5 form; a no-op-level detail on 5.4
+builds would use the 2-arg form). If a future vcpkg baseline restores a
+5.4.x `lua` port that installs cleanly on all three OSes, flipping
+back is a one-line override.
+
+### Consequences
+
+None for the sandbox contract: no `io`/`os`/`require`/`load`, watchdog
+hooks, capped allocator, or coroutine wrapping depend on 5.5-only
+behavior. sol2 3.5.0 (with its 5.5 compatibility patch) binds both.
+
 ## Amendments to ARCHITECTURE.md (authoritative table)
 
 Where ARCHITECTURE.md disagrees with a row below, the amendment wins (canon

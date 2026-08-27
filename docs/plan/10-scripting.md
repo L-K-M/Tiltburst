@@ -16,7 +16,9 @@ canon).
 
 ### 1.1 Runtime
 
-- Lua **5.4** (vcpkg `lua`), bound via **sol2** (vcpkg `sol2`).
+- Lua **5.5.1** (vcpkg `lua` at the repo's pinned baseline, per
+  ADR-025; the spec originally pinned 5.4), bound via **sol2**
+  (vcpkg `sol2`).
 - Exactly one `lua_State` per running game, created at game start, destroyed
   at game end (or hot reload). Owned by the **sim thread**; no other thread
   may touch it, ever.

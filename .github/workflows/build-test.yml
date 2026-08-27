@@ -71,8 +71,10 @@ jobs:
       - name: Configure
         run: cmake --preset ${{ matrix.configure_preset }}
 
+
       - name: Build
         run: cmake --build --preset ${{ matrix.build_preset }}
+
 
       - name: Test (flake-retried; excludes det/fuzz/perf/bounds)
         shell: bash

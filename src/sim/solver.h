@@ -110,11 +110,11 @@ struct SimState {
     bool coils_enabled = true;
     // The M10 GameMachine attaches here (phase 3 of the tick, between
     // script dispatch and timers — 11-game-framework.md §1). Null in
-    // script-only / synthetic scenes.
+    // script-only / synthetic scenes. fsm_step != nullptr is the single
+    // source of truth for "framework attached": tick_events are
+    // recorded for it and the M5 auto-serve loop steps aside.
     void (*fsm_step)(void* ctx, SimState&, const TickInput&) = nullptr;
     void* fsm_ctx = nullptr;
-    // tick_events are recorded for the framework as well when attached.
-    bool framework_attached = false;
 
     // Script plumbing (10-scripting.md §2.2). element_ids/tags are static
     // build data indexed by TableDef element index; tick_events is the

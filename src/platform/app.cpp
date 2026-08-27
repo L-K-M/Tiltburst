@@ -860,7 +860,6 @@ int run(const CliOptions& cli) {
             }
             machine = std::make_unique<tb::game::GameMachine>(
                 loaded_table->script, sim_state, high_scores, fcfg);
-            sim_state.framework_attached = true;
             sim_state.nudge_level = std::clamp(settings.nudge_level, 1, 3);
             sim_state.fsm_ctx = machine.get();
             sim_state.fsm_step = [](void* ctx, tb::sim::SimState& s, const tb::sim::TickInput& in) {

@@ -39,7 +39,6 @@ struct Rig {
         state = std::make_unique<sim::SimState>();
         make_rig(*state);
         state->script = &host;
-        state->framework_attached = true;
         host.load(rules, *state);
     }
 

@@ -28,14 +28,15 @@ static_assert(kSpinnerDecayPerTick > 0.999402f && kSpinnerDecayPerTick < 0.99940
 void emit_bank_event(SimState& s, SimEventType type, uint16_t element);
 void emit_lock_event(SimState& s, const BallLockElem& lock);
 void request_bank_reset(SimState& s, DropBankElem& bank);
-void serve_ball(SimState& s);
+uint8_t serve_ball(SimState& s);
 void record_tick_event(SimState& s, const SimEvent& ev);
 
-// Serve one trough ball onto the plunger (§6.15 kinematics). No event:
-// callers decide whether BallServed applies (§3.5 fires none).
-void serve_ball(SimState& s) {
+// Serve one trough ball onto the plunger (§6.15 kinematics); returns
+// the spawned ball index (0xFF = nothing served). No event: callers
+// decide whether BallServed applies (§3.5 fires none).
+uint8_t serve_ball(SimState& s) {
     if (s.trough_balls <= 0 || !s.has_plunger) {
-        return;
+        return 0xFF;
     }
     for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
         Ball& b = s.balls[bi];
@@ -51,14 +52,15 @@ void serve_ball(SimState& s) {
         b.vel = {0.0f, 0.0f};
         b.omega_z = 0.0f;
         b.last_safe_pos = b.pos;
-        return;
+        return bi;
     }
+    return 0xFF;
 }
 
 // Per-tick emission-order log for the script host (§2.2 phase 2). Filled
 // only while a host is attached; the Collision audio event never records.
 void record_tick_event(SimState& s, const SimEvent& ev) {
-    if (s.script == nullptr && !s.framework_attached) {
+    if (s.script == nullptr && s.fsm_step == nullptr) {
         return;
     }
     if (s.tick_event_n >= SimState::kTickEventCap) {
@@ -163,22 +165,18 @@ inline void absorb(SimState& s, uint64_t tick, SimEventType type, uint16_t eleme
 // Framework serve (§6.15 + §4.2): spawn AND emit BallServed — the M10
 // framework's serve windows close on that event (11 §2.5).
 void serve_ball_notified(SimState& s) {
-    const int before = s.trough_balls;
-    serve_ball(s);
-    if (s.trough_balls < before) {
+    const uint8_t spawned = serve_ball(s);
+    if (spawned != 0xFF) {
         absorb(s, s.tick, SimEventType::BallServed, 0xFFFD);
         SimEvent ev;
         ev.tick = s.tick;
         ev.type = uint16_t(SimEventType::BallServed);
         ev.element = 0xFFFD;
-        for (uint8_t bi = 0; bi < kMaxBalls; ++bi) {
-            if (s.balls[bi].live) {
-                ev.x = s.balls[bi].pos.x;
-                ev.y = s.balls[bi].pos.y;
-                ev.data = s.balls[bi].index;
-                break;
-            }
-        }
+        // Attribute to the SPAWNED ball: with multiball live the
+        // lowest live index is some other ball.
+        ev.x = s.balls[spawned].pos.x;
+        ev.y = s.balls[spawned].pos.y;
+        ev.data = s.balls[spawned].index;
         s.render_ring.push(s.tick, ev);
         s.game_ring.push(s.tick, ev);
         record_tick_event(s, ev);
@@ -699,7 +697,7 @@ void Solver::step_body(SimState& s, const TickInput* input) {
     // Phase 1 pre (10-scripting.md §2.2): apply the physical actions
     // latched during tick n−1's handlers; physics state stays immutable
     // while scripts run.
-    if (s.script != nullptr || s.framework_attached) {
+    if (s.script != nullptr || s.fsm_step != nullptr) {
         s.tick_event_n = 0; // BEFORE actions: serve/eject actions record
                             // events this same tick (§2.2 phase 1)
     }
@@ -807,8 +805,8 @@ void Solver::step_body(SimState& s, const TickInput* input) {
     // omega) held constant for CCD this tick. Tilt clears the gate
     // (11-game-framework.md §5: flippers dead after tilt).
     for (Flipper& f : s.flippers) {
-        bool pressed =
-            f.enabled && s.flippers_enabled && ((input->buttons >> f.params.action) & 1u) != 0u;
+        bool pressed = f.enabled && s.flippers_enabled && input != nullptr &&
+                       ((input->buttons >> f.params.action) & 1u) != 0u;
         FlipperSim::tick(f, pressed);
     }
 
@@ -1336,7 +1334,7 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
     // When the M10 framework is attached it owns serving (11 §4.2:
     // BallReady/PlayerChange exit commands the eject; ball save and
     // add_ball serve with autolaunch) — this loop steps aside.
-    if (s.framework_attached) {
+    if (s.fsm_step != nullptr) {
         s.serve_delay_ticks = 0;
     }
     bool any_free = false;
@@ -1346,7 +1344,7 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
             break;
         }
     }
-    if (s.framework_attached || any_free || s.trough_balls <= 0 || !s.has_plunger) {
+    if (s.fsm_step != nullptr || any_free || s.trough_balls <= 0 || !s.has_plunger) {
         s.serve_delay_ticks = 0;
     } else {
         ++s.serve_delay_ticks;
@@ -2202,6 +2200,12 @@ void absorb_framework_event(SimState& s, const char* name) {
     s.event_seq_hash = h;
 }
 
+// 08 §7.3: reset all danger state — bob p/v, abuse accumulator, arm
+// latches, crossing counter, and in-flight nudge envelopes. The input
+// edge latch (input_prev_buttons) is input plumbing, not danger state:
+// the button stream is continuous across balls and its edges must not
+// be re-fired. Commanded by the framework at end of ball
+// (11-game-framework.md §4.5 step 5); never a timer.
 void reset_danger(SimState& s) {
     // 08 §7.3: the framework commands this at every end of ball;
     // danger is strictly per ball. The physics.tilt thresholds are

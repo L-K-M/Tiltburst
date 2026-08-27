@@ -71,16 +71,17 @@ jobs:
       - name: Configure
         run: cmake --preset ${{ matrix.configure_preset }}
 
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.build_preset }}
+
       # TEMP triage: crash backtrace for the script tests on macOS (revert
       # with the fix). Runs the one test under lldb and prints the stack.
       - name: macOS crash triage
         if: runner.os == 'macOS'
         run: |
           lldb -b -o "run --gtest_filter=Sandbox.IoOsRequireLoadAreNil" \
-               -o "bt" -- ./build/release/bin/tb_tests 2>&1 | tail -60 || true
-
-      - name: Build
-        run: cmake --build --preset ${{ matrix.build_preset }}
+               -o "bt" -- ./build/release/bin/tb_tests 2>&1 | tail -70 || true
 
       - name: Test (flake-retried; excludes det/fuzz/perf/bounds)
         shell: bash

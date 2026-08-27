@@ -412,9 +412,9 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
 
     // §1.2 whitelist: strip the escape hatches.
     for (const char* g : {"load", "loadstring", "loadfile", "dofile"}) {
-        lua[g] = sol::nil;
+        lua[g] = sol::lua_nil;
     }
-    lua["string"]["dump"] = sol::nil;
+    lua["string"]["dump"] = sol::lua_nil;
     lua["math"]["random"] = []() -> int {
         throw sol::error("math.random is disabled; use tb.rng()");
     };

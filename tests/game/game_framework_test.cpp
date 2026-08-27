@@ -52,7 +52,10 @@ struct Rig {
     // phase 3 via the same hook the app installs.
     template <typename F>
     void step(F&& attach, uint32_t buttons) {
-        attach(); // overwrites the construction-time no-op stub
+        // Runs every step: attach() must be IDEMPOTENT — re-point
+        // fsm_ctx/fsm_step at the persistent machine, never rebuild it
+        // (a construct-per-call lambda would wipe FSM state per tick).
+        attach();
         solver.step(*state, sim::TickInput{buttons});
     }
 

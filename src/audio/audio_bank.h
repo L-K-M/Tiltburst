@@ -1,6 +1,7 @@
 #pragma once
 
 #include "audio/sfx_synth.h"
+#include "sim/sound_out.h"
 
 #include <cstdint>
 #include <memory>
@@ -22,6 +23,9 @@ struct PatchEntry {
 
 class PatchBank {
 public:
+    // Intrusive retire-chain link (audio_engine's epoch protocol);
+    // null unless this bank is retired awaiting an ack.
+    PatchBank* __chain_next = nullptr;
     // Interned id -> entry. Ids 0..23 are the built-ins in §7.1 order;
     // table patches/wavs continue at 24 in JSON key order, and a table
     // patch with a built-in's name OVERRIDES it in place (same id).
@@ -35,30 +39,10 @@ public:
     static std::unique_ptr<PatchBank> built_ins();
 };
 
-// The default purpose map (§7.2): purpose key -> built-in patch id.
-// Index by SoundPurpose enum.
-enum class SoundPurpose : uint8_t {
-    Flipper = 0,
-    Slingshot,
-    PopBumper,
-    StandupTarget,
-    DropTarget,
-    Spinner,
-    Rollover,
-    RampMade,
-    Magnet,
-    Kicker,
-    Launch,
-    Drain,
-    TiltWarning,
-    Tilt,
-    BallLock,
-    WallHit,
-    BallBall,
-    MenuMove,
-    MenuSelect,
-    Count
-};
+// The §7.2 purpose vocabulary lives in sim/sound_out.h (the emission
+// side owns it — JOURNAL M11 layering decision); audio maps purpose
+// indices to patch ids.
+using sim::SoundPurpose;
 
 // The 19 legal `map` keys (§7.2) in SoundPurpose order.
 const char* purpose_key(SoundPurpose p);

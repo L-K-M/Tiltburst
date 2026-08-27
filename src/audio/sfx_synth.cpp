@@ -187,8 +187,11 @@ bool render_patch(const SfxPatch& patch, const std::string& patch_id, std::vecto
 
         // --- envelope (3-stage; the while-skip advances through
         // zero-length stages, so env_len[stage] > 0 whenever evaluated) ---
+        // `>=` semantics: a stage's samples run env_time 0..len-1, and
+        // a zero-length stage (len 0: 0 >= 0) skips immediately — the
+        // reset-to-0 otherwise wedges the envelope on a 0/0 volume.
         ++g.env_time;
-        while (g.env_stage < ENV_STAGES && g.env_time > g.env_len[g.env_stage]) {
+        while (g.env_stage < ENV_STAGES && g.env_time >= g.env_len[g.env_stage]) {
             g.env_time = 0;
             ++g.env_stage;
         }
@@ -261,7 +264,9 @@ bool render_patch(const SfxPatch& patch, const std::string& patch_id, std::vecto
     if (peak <= 1e-4f) {
         return false; // all-zero clip is a tb_validate error
     }
-    const float norm = 0.891f / peak;
+    // §5.4: normalize to -1 dBFS, THEN volume_db (authored relative
+    // loudness rides on volume_db only).
+    const float norm = (0.891f / peak) * db_to_amp(patch.volume_db);
 
     // Linear resample 44100 -> 48000.
     const size_t out_len = size_t(uint64_t(gen.size()) * kOutRate / kGenRate);

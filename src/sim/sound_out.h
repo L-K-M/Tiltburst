@@ -38,6 +38,9 @@ struct PatchIntern {
 
 // The §7.2 automatic purposes. Index order is binding: SimState's
 // purpose->patch array and audio_bank's default map both use it.
+// Emitters: the sim fires the physics purposes at their sites; the
+// framework fires TiltWarning/Tilt (on danger events); MenuMove/
+// MenuSelect are main-thread UI sounds (AudioCommand PlayUi, M18).
 enum class SoundPurpose : uint8_t {
     Flipper = 0,
     Slingshot,

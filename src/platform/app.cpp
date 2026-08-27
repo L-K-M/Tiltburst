@@ -928,7 +928,8 @@ int run(const CliOptions& cli) {
                 TB_LOG_WARN("main", "continuing without audio");
             }
         }
-        std::vector<tb::sim::PatchIntern> patch_intern;
+        std::vector<std::string> intern_names;          // owns the strings
+        std::vector<tb::sim::PatchIntern> patch_intern; // views into them
         if (loaded_table) {
             tb::audio::TableAudio table_audio;
             bool have_audio_json = false;
@@ -951,11 +952,18 @@ int run(const CliOptions& cli) {
                 log::flush_now();
                 return 1;
             }
-            if (have_audio_json) {
-                patch_intern.reserve(bank->entries.size());
-                for (size_t i = 0; i < bank->entries.size(); ++i) {
-                    patch_intern.push_back({bank->entries[i].name.c_str(), uint16_t(i)});
-                }
+            // The intern table OWNS its strings: the bank moves into
+            // the audio system (retired banks are freed by pump()), so
+            // borrowing name pointers from it would dangle.
+            intern_names.clear();
+            patch_intern.clear();
+            intern_names.reserve(bank->entries.size());
+            patch_intern.reserve(bank->entries.size());
+            for (size_t i = 0; i < bank->entries.size(); ++i) {
+                intern_names.push_back(bank->entries[i].name);
+            }
+            for (size_t i = 0; i < bank->entries.size(); ++i) {
+                patch_intern.push_back({intern_names[i].c_str(), uint16_t(i)});
             }
             audio.publish_bank(std::move(bank));
             for (int i = 0; i < tb::sim::SimState::kSoundPurposeCount; ++i) {

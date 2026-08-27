@@ -10,6 +10,7 @@
 #include "support/data_path.h"
 
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -283,14 +284,15 @@ TEST(Scheduler, DriftConvergesAndStallReanchors) {
     EXPECT_LE(spt_seen, 48.024);
     EXPECT_EQ(sys.stats().late_events.load(), 0u);
 
-    // 1 s stall: the sim freezes 1000 ticks while audio runs; the next
-    // publish is > 480 samples stale -> exactly one hard re-anchor.
+    // 1 s stall: the sim freezes (T stays at `before`) while the
+    // stream advances 48000 frames; the drifted mapping exceeds 480
+    // samples -> hard re-anchor on the NEXT mix.
     const uint64_t before = 3000;
     sys.publish_tick(before);
-    for (int i = 0; i < 8 + 2; ++i) { // ~1 s of audio at 128/period
+    for (int i = 0; i < 375; ++i) { // 48000 frames at 128/call
         sys.render_offline(buf, 128);
     }
-    sys.publish_tick(before + 1000);
+    sys.publish_tick(before); // still stalled when the re-anchor lands
     sys.render_offline(buf, 128);
     // The re-anchor reset d_avg; spt snapped back near 48.
     EXPECT_NEAR(sys.debug_spt(), 48.0, 0.05);
@@ -330,6 +332,27 @@ TEST(Mixer, LimiterGainReduction) {
     EXPECT_GT(peak, 0.5f) << "overdrive should be audible";
 }
 
+// ---- assets/patches.json mirrors the compiled built-in bank (§7.1) ----
+TEST(AudioBank, AssetsMirrorMatchesBuiltIns) {
+    std::ifstream in(tb::test::data_path("assets/patches.json"));
+    ASSERT_TRUE(in.good());
+    nlohmann::ordered_json doc;
+    try {
+        doc = nlohmann::ordered_json::parse(in, nullptr, true, true);
+    } catch (const nlohmann::json::parse_error& e) {
+        FAIL() << "assets/patches.json: " << e.what();
+    }
+    auto bank = audio::PatchBank::built_ins();
+    ASSERT_EQ(bank->entries.size(), 24u);
+    ASSERT_TRUE(doc.is_object());
+    ASSERT_EQ(doc.size(), 24u);
+    // Key order == id order (5.5).
+    size_t i = 0;
+    for (auto it = doc.begin(); it != doc.end(); ++it, ++i) {
+        EXPECT_EQ(it.key(), bank->entries[i].name) << "id " << i;
+    }
+}
+
 // ---- audio.json loading + validation ----
 TEST(AudioJson, LoadsTestLabAndValidates) {
     audio::TableAudio ta;
@@ -338,6 +361,7 @@ TEST(AudioJson, LoadsTestLabAndValidates) {
     EXPECT_TRUE(ta.has_songs); // shape-validated, deferred to M14
     int purpose[sim::SimState::kSoundPurposeCount] = {};
     auto bank = audio::build_bank(ta, tb::test::data_path("tables/test-lab"), purpose);
+    ASSERT_NE(bank, nullptr);
     // Built-ins 0-23 + 6 table patches = 30 ids.
     EXPECT_EQ(bank->entries.size(), 30u);
     EXPECT_EQ(bank->find("sfx_mode_start"), 24);

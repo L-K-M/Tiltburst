@@ -110,12 +110,17 @@ struct SimState {
     // table for tb.play_sound, and per-ball rate-limit stamps for
     // wall_hit/ball_ball (30 ms, §7.2). All default to "no audio".
     static constexpr int kSoundPurposeCount = 19;
-    int sound_purpose_patch[kSoundPurposeCount] = {};
+    // -1 = disabled: with a queue attached but no bank published, every
+    // purpose must be silent, not patch 0 (cycle-1 review).
+    int sound_purpose_patch[kSoundPurposeCount] = {
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
     SoundProducer* sound_queue = nullptr;
     const PatchIntern* patch_intern = nullptr;
     uint32_t patch_intern_n = 0;
     uint32_t wall_sound_tick[kMaxBalls] = {}; // last wall_hit tick per ball
     uint32_t ball_sound_tick = 0;             // last ball_ball tick (global)
+    uint32_t sounds_dropped = 0;              // full-ring drops (§4.1),
+                                              // mirrored into AudioStats
 
     // Framework gates (11-game-framework.md §5): on tilt the framework
     // clears both; coils cover slings/pops/kicker+lock captures/magnet

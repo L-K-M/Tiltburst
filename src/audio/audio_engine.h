@@ -24,11 +24,14 @@ static_assert(sizeof(SoundEvent) == 16);
 class SoundEventQueue : public SoundProducer {
 public:
     explicit SoundEventQueue(uint32_t capacity_log2 = 10) // 1024 (§2.3)
-        : cap_(1u << capacity_log2), mask_(cap_ - 1) {
+        : cap_(1u << std::min(capacity_log2, 16u)), mask_(cap_ - 1) {
         buf_ = new SoundEvent[cap_];
     }
 
     ~SoundEventQueue() { delete[] buf_; }
+
+    SoundEventQueue(const SoundEventQueue&) = delete;
+    SoundEventQueue& operator=(const SoundEventQueue&) = delete;
 
     // sim thread (SoundProducer). Returns false when full.
     bool push(const SoundEvent& ev) override {
@@ -79,6 +82,9 @@ public:
     }
 
     ~CommandQueue() { delete[] buf_; }
+
+    CommandQueue(const CommandQueue&) = delete;
+    CommandQueue& operator=(const CommandQueue&) = delete;
 
     bool push(const AudioCommand& cmd) {
         const uint64_t head = head_.load(std::memory_order_relaxed);

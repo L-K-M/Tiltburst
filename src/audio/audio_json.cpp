@@ -139,6 +139,13 @@ SfxPatch parse_patch(const json& obj, const std::string& pointer) {
 // §5.5: a wav entry decodes to 48 kHz mono PCM via ma_decoder; stereo
 // downmixes 0.5*(L+R); longer than 10 s is an error.
 bool decode_wav(const std::filesystem::path& path, std::vector<float>& out_pcm) {
+    // The path comes from table JSON: reject absolute paths and any
+    // ".." component so a pack cannot read outside itself.
+    const std::string ps = path.string();
+    if (path.is_absolute() || ps.find("..") != std::string::npos) {
+        TB_LOG_ERROR("audio", "wav path '{}' escapes the pack", ps);
+        return false;
+    }
     ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 1, 48000);
     ma_decoder dec;
     if (ma_decoder_init_file(path.string().c_str(), &cfg, &dec) != MA_SUCCESS) {
@@ -146,7 +153,11 @@ bool decode_wav(const std::filesystem::path& path, std::vector<float>& out_pcm) 
     }
     constexpr ma_uint64 kMaxFrames = 48000ull * 10;
     ma_uint64 frames = 0;
-    ma_decoder_get_length_in_pcm_frames(&dec, &frames);
+    if (ma_decoder_get_length_in_pcm_frames(&dec, &frames) != MA_SUCCESS) {
+        ma_decoder_uninit(&dec);
+        TB_LOG_ERROR("audio", "wav '{}' cannot report its length", path.string());
+        return false;
+    }
     if (frames > kMaxFrames) {
         ma_decoder_uninit(&dec);
         TB_LOG_ERROR("audio", "wav '{}' exceeds 10 s", path.string());
@@ -282,7 +293,7 @@ std::unique_ptr<PatchBank> build_bank(const TableAudio& audio,
         PatchEntry e;
         e.name = name;
         e.priority = patch.priority;
-        e.gain = db_to_amp(patch.volume_db);
+        e.gain = 1.0f; // volume_db applied at render (§5.4)
         if (!render_patch(patch, name, e.pcm)) {
             fail("patch '" + name + "' rendered silence", "/patches/" + name);
         }
@@ -290,6 +301,9 @@ std::unique_ptr<PatchBank> build_bank(const TableAudio& audio,
         if (existing != bank->by_name.end()) {
             bank->entries[existing->second] = std::move(e); // override in place
         } else {
+            if (bank->entries.size() >= 0xFFFF) {
+                fail("patch bank exceeds 65535 entries (id space)", "/patches/" + name);
+            }
             bank->by_name.emplace(name, uint16_t(bank->entries.size()));
             bank->entries.push_back(std::move(e));
         }

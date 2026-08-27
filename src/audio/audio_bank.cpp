@@ -355,7 +355,7 @@ std::unique_ptr<PatchBank> PatchBank::built_ins() {
         PatchEntry e;
         e.name = def.name;
         e.priority = def.patch.priority;
-        e.gain = db_to_amp(def.patch.volume_db);
+        e.gain = 1.0f; // volume_db is applied at render (§5.4)
         // A silent render still occupies its id slot (ids 0-23 are the
         // listed order — skipping would shift every later id); the
         // mixer no-ops empty PCM.

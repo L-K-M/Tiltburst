@@ -111,7 +111,8 @@ struct AudioEngineImpl {
     Probe probes[64];
     std::atomic<uint64_t> probe_head{0};
     std::atomic<uint64_t> probe_tail{0};
-    double lat_ms[256];
+    std::atomic<uint32_t> lat_us[256]; // micro-integer ms*1000: atomic
+                                       // reads are torn-free across threads
     std::atomic<uint32_t> lat_n{0};
     uint32_t lat_write = 0;
     bool latency_probe_on = false;
@@ -175,7 +176,12 @@ int find_steal_candidate(const Voice* voices) {
 
 // §3.2: cut with a 64-sample linear fade mixed into the current buffer.
 void steal_fade(AudioEngineImpl& impl, const Voice& v) {
-    const uint32_t bus = v.bus < 2 ? v.bus : 0;
+    // Only voices that actually sounded get a fade (pos > 0): a voice
+    // stolen before its scheduled start_frame has emitted nothing.
+    if (v.pos == 0) {
+        return;
+    }
+    const uint32_t bus = v.bus < 2 ? v.bus : 0; // same clamp as the mix
     const uint32_t n = std::min<uint32_t>(kFadeSamples, v.len - v.pos);
     for (uint32_t i = 0; i < n; ++i) {
         const float g = 1.0f - float(i) / float(kFadeSamples);
@@ -200,12 +206,16 @@ void record_latency_probe(AudioEngineImpl& impl, const SoundEvent& ev, int perio
                                  (double(uint32_t(period * periods)) / double(kRate)) * 1e9;
             const double delta_ms = (t_dac - double(p.t0_ns)) / 1e6;
             if (delta_ms >= 0.0 && delta_ms < 1000.0) {
-                impl.lat_ms[impl.lat_write & 255] = delta_ms;
+                impl.lat_us[impl.lat_write & 255].store(uint32_t(delta_ms * 1000.0),
+                                                        std::memory_order_relaxed);
                 impl.lat_write++;
                 impl.lat_n.fetch_add(1, std::memory_order_relaxed);
             }
             impl.probe_tail.store(next, std::memory_order_release);
             return;
+        }
+        if (p.tick > ev.tick) {
+            return; // future probe for a later event: keep it queued
         }
         impl.probe_tail.store(next, std::memory_order_release); // stale: drop
         tail = next;
@@ -264,14 +274,17 @@ int acquire_voice(AudioEngineImpl& impl,
     const float angle = (std::clamp(ev.pan, -1.0f, 1.0f) + 1.0f) * (float(kPi) * 0.25f);
     v.gl = std::cos(angle); // constant-power pan (§3.1)
     v.gr = std::sin(angle);
-    v.bus = (ev.flags >> 1) & 0x3;
+    // Event buses are 0 (sfx) / 1 (ui); 2 (music) is tracker-only
+    // (M14) and 3 is reserved — both clamp to sfx with the flags
+    // masked so no out-of-range bus index can exist.
+    v.bus = ((ev.flags >> 1) & 0x3) >= 2 ? 0 : uint8_t((ev.flags >> 1) & 0x3);
     v.priority = entry.priority;
     v.patch = ev.patch;
     v.seq = impl.next_seq++;
     v.active = true;
     // Test evidence: absolute start sample (stream pos at buffer start
     // + the in-buffer offset).
-    impl.debug_starts[impl.debug_write & (AudioEngineImpl::kDebugStartLog - 1)] = {
+    impl.debug_starts[impl.debug_write & (AudioSystem::kDebugStarts - 1)] = {
         ev.patch, 0, impl.stream_pos_at_mix_start + start_frame};
     impl.debug_write++;
     record_latency_probe(impl, ev, period, periods);
@@ -317,17 +330,34 @@ void AudioSystem::publish_bank(std::unique_ptr<PatchBank> bank) {
     const uint64_t epoch = impl_->publish_epoch.fetch_add(1, std::memory_order_acq_rel) + 1;
     if (old != nullptr) {
         if (impl_->retired != nullptr) {
-            delete impl_->retired; // prior retire never acked
+            // Prior retire never acked (device dead or callback idle):
+            // KEEP BOTH in the retire chain — an eager delete could
+            // free a bank a mid-mix callback still holds (cycle-1
+            // blocker). The chain leaks at most until shutdown, which
+            // frees everything.
+            PatchBank* first = impl_->retired;
+            impl_->retired = old;
+            old->__chain_next = first; // intrusive singly-linked list
+        } else {
+            impl_->retired = old;
+            old->__chain_next = nullptr;
         }
-        impl_->retired = old;
         impl_->retired_epoch = epoch;
     }
 }
 
 void AudioSystem::pump() {
+    // The callback acks at MIX EXIT: any bank in the chain is either
+    // the pre-swap mix target (acked only after that mix finished) or
+    // older. Free the whole chain once the newest epoch is acked.
     if (impl_->retired != nullptr &&
         stats_.acked_epoch.load(std::memory_order_acquire) >= impl_->retired_epoch) {
-        delete impl_->retired;
+        PatchBank* p = impl_->retired;
+        while (p != nullptr) {
+            PatchBank* next = p->__chain_next;
+            delete p;
+            p = next;
+        }
         impl_->retired = nullptr;
     }
 }
@@ -340,7 +370,7 @@ float AudioSystem::percentile_ms(int pct) const {
     double vals[256];
     const uint32_t count = std::min<uint32_t>(n, 256);
     for (uint32_t i = 0; i < count; ++i) {
-        vals[i] = impl_->lat_ms[i];
+        vals[i] = double(impl_->lat_us[i].load(std::memory_order_relaxed)) / 1000.0;
     }
     std::sort(vals, vals + count);
     const uint32_t idx = std::min(count - 1, count * uint32_t(pct) / 100u);
@@ -431,6 +461,7 @@ bool AudioSystem::init(const AudioConfig& cfg) {
         dc.pUserData = this;
         dc.noPreSilencedOutputBuffer = MA_TRUE;
         impl_->device = new ma_device();
+        periods_ = 2; // §2 configuration (fixed)
         if (ma_device_init(impl_->ctx, &dc, impl_->device) == MA_SUCCESS &&
             ma_device_start(impl_->device) == MA_SUCCESS) {
             opened = true;
@@ -492,8 +523,15 @@ void AudioSystem::shutdown() {
         delete impl_->ctx;
         impl_->ctx = nullptr;
     }
-    delete impl_->retired;
-    impl_->retired = nullptr;
+    {
+        PatchBank* p = impl_->retired;
+        while (p != nullptr) {
+            PatchBank* next = p->__chain_next;
+            delete p;
+            p = next;
+        }
+        impl_->retired = nullptr;
+    }
     PatchBank* b = impl_->bank.exchange(nullptr, std::memory_order_acq_rel);
     delete b;
 }
@@ -513,7 +551,15 @@ void AudioSystem::dataCallback(ma_device* device, void* out, const void*, ma_uin
     }
     impl->prev_cb_ns = t0;
 
-    self->mix(static_cast<float*>(out), std::min<uint32_t>(frames, kMaxFrames));
+    // Devices can request buffers beyond the scratch size: render in
+    // chunks so no tail is left unfilled (miniaudio expects a full
+    // buffer every callback).
+    uint32_t done = 0;
+    while (done < frames) {
+        const uint32_t chunk = std::min<uint32_t>(frames - done, kMaxFrames);
+        self->mix(static_cast<float*>(out) + 2 * size_t(done), chunk);
+        done += chunk;
+    }
 
     // CPU%: share of wall time spent inside the callback.
     impl->cb_cpu_ns += tb_now_ns() - t0;
@@ -540,8 +586,9 @@ void AudioSystem::mix(float* out, uint32_t frames) {
         std::memset(out, 0, sizeof(float) * 2 * size_t(frames));
         return;
     }
-    stats_.acked_epoch.store(impl_->publish_epoch.load(std::memory_order_relaxed),
-                             std::memory_order_release);
+    // NOTE: the epoch ack happens at MIX EXIT (below) — an entry ack
+    // would bless a publish while this callback still mixes the OLD
+    // bank pointer (cycle-1 blocker).
 
     const uint64_t T = latest_tick_.load(std::memory_order_relaxed);
     const uint64_t pos0 = impl_->stream_pos;
@@ -605,6 +652,14 @@ void AudioSystem::mix(float* out, uint32_t frames) {
     // ---- drain SoundEvents (§4.2 classification) ----
     SoundEvent ev;
     while (impl_->sounds.pop(ev)) {
+        // Events older than the anchor (stale ring contents across a
+        // re-anchor) would wrap the unsigned tick delta to ~2^64 and
+        // wedge a pending slot forever — they are late by definition.
+        if (ev.tick < impl_->anchor_tick) {
+            stats_.late_events.fetch_add(1, std::memory_order_relaxed);
+            acquire_voice(*impl_, stats_, *bank, ev, 0, period_, int(periods_));
+            continue;
+        }
         const double s = std::round(sample_for_tick(ev.tick));
         if (s < double(pos0)) {
             stats_.late_events.fetch_add(1, std::memory_order_relaxed);
@@ -709,6 +764,10 @@ void AudioSystem::mix(float* out, uint32_t frames) {
     }
 
     impl_->stream_pos = pos_end;
+    // §2.3 epoch ack: after the last use of the bank pointer in this
+    // mix, so a main-thread free of the retired bank is safe.
+    stats_.acked_epoch.store(impl_->publish_epoch.load(std::memory_order_relaxed),
+                             std::memory_order_release);
     stats_.active_voices.store(active, std::memory_order_relaxed);
     stats_.peak_master_milli.store(uint32_t(peak * 1000.0f), std::memory_order_relaxed);
 }

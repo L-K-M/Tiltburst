@@ -107,8 +107,12 @@ struct ScriptHostImpl {
     std::vector<std::vector<std::string>> element_tags;
 
     ~ScriptHostImpl() {
+        std::fprintf(stderr, "[tbdbg] dtor enter\n");
         if (L != nullptr) {
+            lua_sethook(L, nullptr, 0, 0); // no hooks during teardown
+            std::fprintf(stderr, "[tbdbg] dtor: hook cleared, closing\n");
             lua_close(L);
+            std::fprintf(stderr, "[tbdbg] dtor: closed\n");
         }
     }
 };

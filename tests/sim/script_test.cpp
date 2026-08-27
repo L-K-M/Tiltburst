@@ -11,6 +11,7 @@
 #include <fstream>
 #include <memory>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 // M9 scripting suites (04-milestones.md §M9; 10-scripting.md).
@@ -385,4 +386,122 @@ TEST(NeonDrift, ScriptedGameReachesGameEnd) {
 
     EXPECT_TRUE(game_end_seen) << "game never reached game_end";
     EXPECT_GT(host.player_scores(1).score, 0u);
+}
+
+// Watchdog bypass regression 1 (review cycle 1): a catchable-error loop
+// (`while true do pcall(tight loop) end`) must not outlive the budget.
+TEST(Sandbox, WatchdogKillsPcallLoop) {
+    Loaded loaded;
+    ASSERT_NO_THROW(loaded.load(R"lua(
+        tb.on("switch_hit", function(ev)
+          while true do pcall(function() while true do end end) end
+        end)
+        tb.on("switch_hit", function(ev) tb.score(10) end)
+    )lua"));
+
+    ScriptHost& host = loaded.host;
+    host.begin_game(1);
+    host.begin_tick(1);
+    host.dispatch(synth(SimEventType::SwitchHit, 0));
+    host.end_tick(1);
+    // Returns (no hang) and the budget was drained.
+    EXPECT_LT(host.watchdog_budget_remaining(), 10000);
+
+    // Next tick: budget refilled, second handler runs, first stays dead.
+    host.begin_tick(2);
+    host.dispatch(synth(SimEventType::SwitchHit, 0));
+    host.end_tick(2);
+    EXPECT_EQ(host.player_scores(1).score, 10u);
+}
+
+// Watchdog bypass regression 2: an infinite coroutine.wrap loop.
+TEST(Sandbox, WatchdogKillsCoroutineWrapLoop) {
+    Loaded loaded;
+    ASSERT_NO_THROW(loaded.load(R"lua(
+        tb.on("switch_hit", function(ev)
+          local w = coroutine.wrap(function() while true do end end)
+          while true do w() end
+        end)
+    )lua"));
+
+    ScriptHost& host = loaded.host;
+    host.begin_game(1);
+    host.begin_tick(1);
+    host.dispatch(synth(SimEventType::SwitchHit, 0));
+    host.end_tick(1);
+    EXPECT_LT(host.watchdog_budget_remaining(), 10000);
+}
+
+// tb.rng_range bounds (BLOCKER 2): out-of-int-range values raise a Lua
+// error instead of reaching UB conversions.
+TEST(Api, RngRangeRejectsOutOfBounds) {
+    Loaded loaded;
+    ASSERT_NO_THROW(loaded.load(R"lua(
+        tb.state.ok = 0
+        tb.state.err1 = false
+        tb.state.err2 = false
+        tb.state.err3 = false
+        if pcall(tb.rng_range, 0, 5e9) then tb.state.ok = tb.state.ok + 1
+        else tb.state.err1 = true end
+        if pcall(tb.rng_range, 0, 1e19) then tb.state.ok = tb.state.ok + 1
+        else tb.state.err2 = true end
+        if pcall(tb.rng_range, -1e300, 1e300) then tb.state.ok = tb.state.ok + 1
+        else tb.state.err3 = true end
+    )lua"));
+
+    ScriptHost& host = loaded.host;
+    host.begin_game(1);
+    host.begin_tick(1);
+    host.dispatch(synth(SimEventType::SwitchHit, 0));
+    host.end_tick(1);
+
+    int64_t v = 0;
+    ASSERT_TRUE(host.state_read_int(1, "err1", v));
+    EXPECT_EQ(v, 1);
+    ASSERT_TRUE(host.state_read_int(1, "err2", v));
+    EXPECT_EQ(v, 1);
+    ASSERT_TRUE(host.state_read_int(1, "err3", v));
+    EXPECT_EQ(v, 1);
+    ASSERT_TRUE(host.state_read_int(1, "ok", v));
+    EXPECT_EQ(v, 0);
+}
+
+// tb.on rejects unknown event names (§2.3) — negative test.
+TEST(Api, OnRejectsUnknownEventName) {
+    Loaded loaded;
+    EXPECT_THROW(loaded.load(R"lua(
+        tb.on("definitely_not_an_event", function() end)
+    )lua"),
+                 std::runtime_error);
+}
+
+// Drain payload off-by-one (review major): one ball draining alone
+// reports balls_remaining == 0.
+TEST(Events, DrainPayloadExcludesDrainingBall) {
+    Loaded loaded;
+    ASSERT_NO_THROW(loaded.load(R"lua(
+        tb.on("drain", function(ev) tb.state.remaining = ev.balls_remaining end)
+    )lua"));
+    ScriptHost& host = loaded.host;
+    host.begin_game(1);
+
+    // Force a drain through the real region logic: ball into the outhole.
+    tb::sim::SimState& s = *loaded.state;
+    s.outholes.push_back({{0.02f, 0.01f}, {0.46f, 0.01f}});
+    Ball& ball = s.balls[0];
+    ball.index = 0;
+    ball.live = true;
+    ball.mode = BallMode::Free;
+    ball.layer = 0;
+    ball.pos = {0.2f, 0.012f}; // inside the outhole capsule
+    ball.vel = {0.0f, 0.0f};
+    ball.last_safe_pos = ball.pos;
+
+    tb::sim::Solver solver;
+    tb::sim::TickInput in;
+    solver.step(s, in);
+
+    int64_t v = 0;
+    ASSERT_TRUE(host.state_read_int(1, "remaining", v));
+    EXPECT_EQ(v, 0);
 }

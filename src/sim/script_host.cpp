@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <unordered_map>
 
@@ -55,13 +56,12 @@ void* capped_alloc(void* ud, void* ptr, size_t osize, size_t nsize) {
         }
         return p;
     }
-    const long delta = static_cast<long>(nsize) - static_cast<long>(osize);
-    if (delta > 0 && *used + static_cast<size_t>(delta) > kLuaHeapCap) {
+    if (nsize > osize && *used + (nsize - osize) > kLuaHeapCap) {
         return nullptr;
     }
     void* p = std::realloc(ptr, nsize);
     if (p != nullptr) {
-        *used += static_cast<size_t>(delta);
+        *used = *used + nsize - osize;
     }
     return p;
 }
@@ -145,6 +145,10 @@ void watchdog_hook(lua_State* L, lua_Debug*) {
     }
     impl->instruction_budget -= kHookGranularity;
     if (impl->instruction_budget <= 0) {
+        // Flag at raise time: the error is catchable (pcall/resume), so
+        // run_handler may never see it — later invocations this tick must
+        // still be skipped (§2.4), not disabled.
+        impl->budget_exhausted_this_tick = true;
         luaL_error(L, "instruction budget exceeded");
     }
 }
@@ -394,6 +398,11 @@ void ScriptHost::set_timers_frozen(bool frozen) {
 }
 
 void ScriptHost::load(const std::string& rules_source, SimState& state) {
+    if (impl_->L != nullptr) {
+        // A second load would leak the lua_State and keep stale handlers
+        // / element ids; hot reload constructs a fresh host instead.
+        throw std::runtime_error("ScriptHost::load called twice; construct a new ScriptHost");
+    }
     impl_->sim = &state;
     impl_->element_ids = state.element_ids;
     impl_->element_tags = state.element_tags;
@@ -439,9 +448,47 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
     };
 
     // §2.4: the watchdog hook on the main state + hooked coroutine.create
-    // (§1.2); coroutine.wrap is redefined in Lua below.
+    // (§1.2); coroutine.wrap is redefined in Lua below. Budget errors are
+    // ordinary Lua errors and therefore catchable — pcall/xpcall are
+    // shimmed to re-raise them so a `while true do pcall(...) end`
+    // handler cannot outlive its budget (§2.4 breach).
     lua_sethook(impl_->L, watchdog_hook, LUA_MASKCOUNT, kHookGranularity);
     lua["coroutine"]["create"] = hooked_co_create;
+    lua.set_function("__rethrow_budget", [](sol::this_state s, sol::object err) -> int {
+        if (err.is<std::string>()) {
+            const std::string msg = err.as<std::string>();
+            if (msg.find("instruction budget exceeded") != std::string::npos) {
+                luaL_error(s, "instruction budget exceeded");
+                return 0;
+            }
+        }
+        sol::stack::push(s, err);
+        return lua_error(s);
+    });
+
+    // pcall/xpcall shims: pass ordinary errors through, re-raise budget
+    // errors uncatchably relative to script code.
+    lua.safe_script(R"lua(
+        local rethrow = __rethrow_budget
+        local raw_pcall = pcall
+        rawset(_G, "pcall", function(f, ...)
+            local results = table.pack(raw_pcall(f, ...))
+            if not results[1] and type(results[2]) == "string"
+               and string.find(results[2], "instruction budget exceeded", 1, true) then
+                return rethrow(results[2])
+            end
+            return table.unpack(results, 1, results.n)
+        end)
+        local raw_xpcall = xpcall
+        rawset(_G, "xpcall", function(f, handler, ...)
+            local ok, err = raw_xpcall(f, handler, ...)
+            if not ok and type(err) == "string"
+               and string.find(err, "instruction budget exceeded", 1, true) then
+                return rethrow(err)
+            end
+            return ok, err
+        end)
+    )lua");
 
     sol::table tb = lua.create_named_table("tb");
 
@@ -455,21 +502,23 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
 
     // ---- scoring (§3.1) ----
     tb.set_function("score", [this](double points) {
-        if (points < 0) {
-            TB_LOG_WARN("script", "tb.score(negative) ignored");
+        if (!(points >= 0.0) || points > double(std::numeric_limits<uint64_t>::max())) {
+            // NaN fails the first comparison; the second bounds the cast.
+            TB_LOG_WARN("script", "tb.score(negative/NaN) ignored");
             return;
         }
         player_scores(impl_->current_player).score += uint64_t(points);
     });
     tb.set_function("add_bonus", [this](double points) {
-        if (points < 0) {
-            TB_LOG_WARN("script", "tb.add_bonus(negative) ignored");
+        if (!(points >= 0.0) || points > double(std::numeric_limits<uint64_t>::max())) {
+            TB_LOG_WARN("script", "tb.add_bonus(negative/NaN) ignored");
             return;
         }
         player_scores(impl_->current_player).bonus += uint64_t(points);
     });
     tb.set_function("set_multiplier", [this](double n) {
-        player_scores(impl_->current_player).bonus_multiplier = std::clamp(int(n), 1, 10);
+        const int clamped = int(std::clamp(std::isfinite(n) ? n : 1.0, 1.0, 10.0));
+        player_scores(impl_->current_player).bonus_multiplier = clamped;
     });
 
     // ---- lights (§3.2): flip SimState light state by element id ----
@@ -530,7 +579,7 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
     tb.set_function("release_lock", [this, latch](const std::string& id, double count) {
         ScriptAction a{};
         a.kind = ScriptAction::Kind::ReleaseLock;
-        a.count = std::max(1, int(count));
+        a.count = int(std::clamp(count, 1.0, 6.0));
         const uint16_t elem = latch(a, id);
         if (elem == 0xFFFF) {
             return 0;
@@ -584,7 +633,9 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
     // ---- ball management (§3.5) ----
     tb.set_function("ball_save", [this](double ms, sol::object uses) {
         BallSaveState& bs = impl_->sim->ball_save;
-        const int m = int(ms);
+        const int m = int(std::clamp(std::isfinite(ms) ? ms : 0.0,
+                                     double(std::numeric_limits<int>::min()),
+                                     double(std::numeric_limits<int>::max())));
         if (m == 0) {
             bs.active = false;
             bs.ticks_left = 0;
@@ -597,7 +648,7 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
     tb.set_function("add_ball", [this](sol::object n) {
         ScriptAction a{};
         a.kind = ScriptAction::Kind::AddBall;
-        a.count = n.is<double>() ? std::max(1, int(n.as<double>())) : 1;
+        a.count = n.is<double>() ? int(std::clamp(n.as<double>(), 1.0, double(kMaxBalls))) : 1;
         impl_->actions.push_back(a);
     });
     tb.set_function("award_extra_ball", [this]() {
@@ -724,8 +775,13 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
     // ---- randomness (§3.9): rng_script stream ----
     tb.set_function("rng", [this]() { return impl_->sim->rng_script.next_float(); });
     tb.set_function("rng_range", [this](sol::this_state s, double a, double b) -> int {
-        if (a != std::floor(a) || b != std::floor(b) || a > b) {
-            luaL_error(s, "tb.rng_range: need integers a <= b");
+        // Bounding to int range first keeps every integer conversion
+        // below well-defined (double > INT64_MAX casts are UB).
+        constexpr double kIntMin = -2147483648.0;
+        constexpr double kIntMax = 2147483647.0;
+        if (!std::isfinite(a) || !std::isfinite(b) || a != std::floor(a) || b != std::floor(b) ||
+            a > b || a < kIntMin || b > kIntMax) {
+            luaL_error(s, "tb.rng_range: need finite integers a <= b within int range");
         }
         const int64_t span = int64_t(b) - int64_t(a) + 1;
         const double u = impl_->sim->rng_script.next_float();
@@ -787,12 +843,16 @@ void ScriptHost::dispatch(const SimEvent& event) {
     sol::table ev = lua.create_table();
     ev.set("name", std::string(name));
     fill_event_payload(*impl_, event, ev);
-    for (HandlerEntry& h : it->second) {
-        if (h.disabled) {
+    // Index-bounded: a handler may register another handler for the same
+    // event (push_back invalidates references); §2.3 says the new one
+    // takes effect from the NEXT dispatched event.
+    const size_t n = it->second.size();
+    for (size_t hi = 0; hi < n && hi < it->second.size(); ++hi) {
+        if (it->second[hi].disabled) {
             continue;
         }
-        if (!run_handler(*impl_, h, ev, name)) {
-            h.disabled = true;
+        if (!run_handler(*impl_, it->second[hi], ev, name)) {
+            it->second[hi].disabled = true;
         }
     }
 }
@@ -806,11 +866,18 @@ void ScriptHost::end_tick(uint64_t tick) {
         std::sort(impl_->timers.begin(),
                   impl_->timers.end(),
                   [](const TimerEntry& a, const TimerEntry& b) { return a.id < b.id; });
-        for (TimerEntry& t : impl_->timers) {
-            if (t.canceled || t.disabled || t.deadline_tick != tick) {
+        // Index-based: a timer callback may call tb.timer (push_back),
+        // reallocating the vector — never hold references across the call.
+        // Callbacks appended this tick are NOT due (deadline is future).
+        const size_t due_n = impl_->timers.size();
+        for (size_t ti = 0; ti < due_n && ti < impl_->timers.size(); ++ti) {
+            if (impl_->timers[ti].canceled || impl_->timers[ti].disabled ||
+                impl_->timers[ti].deadline_tick != tick) {
                 continue;
             }
-            sol::protected_function_result r = t.fn(uint64_t(t.id));
+            const uint64_t id = impl_->timers[ti].id;
+            sol::protected_function_result r = impl_->timers[ti].fn(id);
+            TimerEntry& t = impl_->timers[ti]; // re-acquire after the call
             if (!r.valid()) {
                 const sol::error err = r;
                 const std::string msg = err.what();
@@ -875,12 +942,13 @@ void ScriptHost::fire_event(const char* name,
         }
         ev.set(k, arr);
     }
-    for (HandlerEntry& h : it->second) {
-        if (h.disabled) {
+    const size_t n = it->second.size();
+    for (size_t hi = 0; hi < n && hi < it->second.size(); ++hi) {
+        if (it->second[hi].disabled) {
             continue;
         }
-        if (!run_handler(*impl_, h, ev, name)) {
-            h.disabled = true;
+        if (!run_handler(*impl_, it->second[hi], ev, name)) {
+            it->second[hi].disabled = true;
         }
     }
 }

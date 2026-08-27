@@ -32,12 +32,16 @@ local function set_lane_light()
 end
 
 local function start_frenzy()
-  tb.state.frenzy = true
+  -- Token identity: timers only freeze (never cancel), so a stale timer
+  -- from a previous frenzy must not tear down a newer one (§3.6).
+  local frenzy_token = {}
+  tb.state.frenzy = frenzy_token
   tb.light_blink("light_pop", "strobe")         -- pop light = frenzy tell
   tb.backglass.set_layout("mode")
   tb.backglass.animate("mode_start")
   tb.show_message("LAB FRENZY!", { style = "mode", duration_ms = 3000 })
   tb.timer(CONFIG.FRENZY_MS, function()         -- frozen while not in play
+    if tb.state.frenzy ~= frenzy_token then return end
     tb.state.frenzy = false
     tb.light_off("light_pop")
     tb.backglass.set_layout("scores")

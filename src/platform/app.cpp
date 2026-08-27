@@ -126,6 +126,12 @@ bool load_table_pack(LoadedTable& loaded,
     std::error_code ec;
     if (std::filesystem::exists(rules, ec)) {
         std::ifstream in(rules);
+        if (!in) {
+            TB_LOG_ERROR("main",
+                         "rules.lua exists but is unreadable (continuing unscripted): {}",
+                         rules.string());
+            return true;
+        }
         std::stringstream buf;
         buf << in.rdbuf();
         try {
@@ -731,8 +737,11 @@ int run(const CliOptions& cli) {
         }
 
         tb::SnapshotBuffer snapshots;
-        tb::sim::SimState sim_state;
+        // Declaration order is load-bearing: loaded_table (which owns the
+        // ScriptHost that sim_state.script points at) must be destroyed
+        // AFTER sim_state, so it is declared first.
         std::unique_ptr<LoadedTable> loaded_table;
+        tb::sim::SimState sim_state;
         std::filesystem::path table_dir;
         if (!cli.table.empty()) {
             table_dir = resolve_table_dir(cli.table);

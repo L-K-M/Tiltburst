@@ -34,6 +34,7 @@ local function drift_active()
 end
 
 local function end_drift_mode()
+  if not drift_active() then return end   -- timer/drain double-fire guard
   tb.state.drift = nil
   tb.magnet_off("drift_magnet")
   tb.show_message("DRIFT OVER", { style = "info" })
@@ -123,11 +124,15 @@ tb.on("ramp_made", function(ev)
   tb.score(value)
   tb.add_bonus(CONFIG.BONUS_RAMP)
   if ev.id == "right_ramp" and not drift_active() then
-    -- Drop-ramp into the drift corner: mode start (15 §1.3).
-    tb.state.drift = true
+    -- Drop-ramp into the drift corner: mode start (15 §1.3). Token
+    -- identity guards the stale timer (timers freeze, never cancel).
+    local drift_token = {}
+    tb.state.drift = drift_token
     tb.magnet_on("drift_magnet")
     tb.show_message("DRIFT CORNER", { style = "mode" })
-    tb.timer(CONFIG.DRIFT_MODE_MS, function() end_drift_mode() end)
+    tb.timer(CONFIG.DRIFT_MODE_MS, function()
+      if tb.state.drift == drift_token then end_drift_mode() end
+    end)
   end
 end)
 

@@ -1141,7 +1141,7 @@ void Solver::step_regions(SimState& s, const TickInput* input) {
             // §4.2 payload: balls still in play after this drain.
             int remaining = 0;
             for (const Ball& other : s.balls) {
-                if (other.live && other.mode == BallMode::Free) {
+                if (&other != &b && other.live && other.mode == BallMode::Free) {
                     ++remaining;
                 }
             }

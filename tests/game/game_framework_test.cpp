@@ -25,6 +25,26 @@ namespace {
 
 int temp_dir_counter = 0;
 
+// RAII temp dir: removes itself even when an ASSERT returns early.
+struct TempDir {
+    std::filesystem::path path;
+
+    explicit TempDir(const std::string& prefix)
+        : path(std::filesystem::temp_directory_path() /
+               (prefix + "_" + std::to_string(tb_now_ns()) + "_" +
+                std::to_string(++temp_dir_counter))) {
+        std::filesystem::create_directories(path);
+    }
+
+    ~TempDir() {
+        std::error_code ec;
+        std::filesystem::remove_all(path, ec);
+    }
+
+    TempDir(const TempDir&) = delete;
+    TempDir& operator=(const TempDir&) = delete;
+};
+
 using namespace tb;
 using tb::game::GameMachine;
 using tb::game::GameState;
@@ -461,11 +481,8 @@ TEST(Tilt, FlippersDeadAfterTilt) {
 // ---- HighScores.PersistRoundTripAndOrdering ----
 TEST(HighScores, PersistRoundTripAndOrdering) {
     HighScoreTable t;
-    const std::filesystem::path dir =
-        std::filesystem::temp_directory_path() / ("tb_scores_test_" + std::to_string(tb_now_ns()) +
-                                                  "_" + std::to_string(++temp_dir_counter));
-    std::filesystem::create_directories(dir);
-    const auto path = dir / "test-table.json";
+    TempDir dir("tb_scores_test");
+    const auto path = dir.path / "test-table.json";
 
     game::HighScoreEntry e;
     e.date = "2026-08-27";
@@ -493,18 +510,12 @@ TEST(HighScores, PersistRoundTripAndOrdering) {
     EXPECT_EQ(loaded.entries()[1].initials, (std::array<char, 3>{'M', 'M', 'M'}));
     EXPECT_EQ(loaded.entries()[2].initials, (std::array<char, 3>{'N', 'N', 'N'}));
     EXPECT_EQ(loaded.entries()[3].score, 100u);
-
-    std::error_code ec;
-    std::filesystem::remove_all(dir, ec);
 }
 
 // ---- HighScores.SeedsDeclaredDefaultsElseStartsEmpty ----
 TEST(HighScores, SeedsDeclaredDefaultsElseStartsEmpty) {
-    const std::filesystem::path dir =
-        std::filesystem::temp_directory_path() /
-        ("tb_seed_test_" + std::to_string(tb_now_ns()) + "_" + std::to_string(++temp_dir_counter));
-    std::filesystem::create_directories(dir);
-    const auto path = dir / "seeded.json";
+    TempDir dir("tb_seed_test");
+    const auto path = dir.path / "seeded.json";
 
     // A pack declaring defaults seeds exactly those 10 on a fresh file.
     std::vector<table::DefaultScore> defaults;
@@ -532,7 +543,7 @@ TEST(HighScores, SeedsDeclaredDefaultsElseStartsEmpty) {
     // A pack that declares none starts EMPTY: first posted score lands
     // at rank 1 — no built-in ladder (§7, binding).
     HighScoreTable empty;
-    const auto empty_path = dir / "empty.json";
+    const auto empty_path = dir.path / "empty.json";
     ASSERT_FALSE(empty.load(empty_path));
     empty.seed_defaults({}, "2026-08-27");
     EXPECT_TRUE(empty.entries().empty());
@@ -542,9 +553,6 @@ TEST(HighScores, SeedsDeclaredDefaultsElseStartsEmpty) {
     first.date = "2026-08-27";
     EXPECT_EQ(empty.insert(first), 1);
     EXPECT_EQ(empty.entries().size(), 1u);
-
-    std::error_code ec;
-    std::filesystem::remove_all(dir, ec);
 }
 
 // ---- ExtraBall.SamePlayerShootsAgain ----

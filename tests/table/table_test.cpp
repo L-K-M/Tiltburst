@@ -602,14 +602,24 @@ TEST(Prefab, LaneOrbitMergeIsOrderIndependent) {
 // covers Release only; this one runs under asan/debug too — a malformed
 // table.json, JSONC included, fails CI everywhere).
 TEST(TableLoader, EveryShippedPackParses) {
-    for (const char* slug : {"test-lab", "neon-drift"}) {
+    // Directory iteration, not a hardcoded list: every pack under
+    // tables/ is covered the moment it lands (malformed fixtures live
+    // in tests/fixtures, never here).
+    int packs = 0;
+    for (const auto& entry : std::filesystem::directory_iterator(tb::test::data_path("tables"))) {
+        if (!entry.is_directory()) {
+            continue;
+        }
+        const std::string slug = entry.path().filename().string();
         try {
             const tb::table::TableDef def =
-                tb::table::load_table(tb::test::data_path(std::string("tables/") + slug));
+                tb::table::load_table(tb::test::data_path("tables") / slug);
             EXPECT_FALSE(def.slug.empty()) << slug;
             EXPECT_FALSE(def.elements.empty()) << slug;
         } catch (const tb::table::TableLoadError& e) {
             FAIL() << slug << ": " << e.what() << " (" << e.json_pointer << ")";
         }
+        ++packs;
     }
+    EXPECT_GE(packs, 2) << "the shipped packs went missing";
 }

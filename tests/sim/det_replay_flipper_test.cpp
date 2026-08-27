@@ -125,9 +125,9 @@ TEST(det_replay, flipper_tape_hash_stable) {
         ASSERT_TRUE(tb::test::load_tape(
             tb::test::data_path("tests/fixtures/tapes/flipper_tap.replay.json"), tape));
         // record is non-null by the enclosing getenv guard; the null half is
-// belt-and-braces so the assertion reads as presence validation.
-ASSERT_TRUE(record != nullptr && record[0] != '\0')
-    << "TB_RECORD_GOLDEN must be a non-empty path";
+        // belt-and-braces so the assertion reads as presence validation.
+        ASSERT_TRUE(record != nullptr && record[0] != '\0')
+            << "TB_RECORD_GOLDEN must be a non-empty path";
         const auto hashes = run_flipper_tape(tape);
         std::ofstream out(record);
         ASSERT_TRUE(out.is_open()) << "cannot write golden to " << record;

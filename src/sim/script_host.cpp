@@ -167,6 +167,21 @@ int hooked_co_create(lua_State* L) {
     return 1;
 }
 
+// Budget-error rethrow: a raw lua_CFunction on purpose — luaL_error
+// longjmps past C++ destructors, so an erroring binding must hold no
+// std::string/std::object in scope (LeakSanitizer-visible otherwise).
+int rethrow_budget(lua_State* L) {
+    size_t len = 0;
+    const char* msg = lua_tolstring(L, 1, &len); // view, no allocation
+    static const char kBudgetError[] = "instruction budget exceeded";
+    const size_t needle = sizeof(kBudgetError) - 1;
+    if (msg != nullptr && len >= needle &&
+        std::search(msg, msg + len, kBudgetError, kBudgetError + needle) != msg + len) {
+        return luaL_error(L, "instruction budget exceeded");
+    }
+    return lua_error(L); // ordinary error: re-raise the original value
+}
+
 // Canon §5.7 event names (payloads per 10-scripting.md §4).
 bool is_canon_event(const std::string& name) {
     static const char* const kNames[] = {
@@ -454,17 +469,7 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
     // handler cannot outlive its budget (§2.4 breach).
     lua_sethook(impl_->L, watchdog_hook, LUA_MASKCOUNT, kHookGranularity);
     lua["coroutine"]["create"] = hooked_co_create;
-    lua.set_function("__rethrow_budget", [](sol::this_state s, sol::object err) -> int {
-        if (err.is<std::string>()) {
-            const std::string msg = err.as<std::string>();
-            if (msg.find("instruction budget exceeded") != std::string::npos) {
-                luaL_error(s, "instruction budget exceeded");
-                return 0;
-            }
-        }
-        sol::stack::push(s, err);
-        return lua_error(s);
-    });
+    lua["__rethrow_budget"] = rethrow_budget;
 
     // pcall/xpcall shims: pass ordinary errors through, re-raise budget
     // errors uncatchably relative to script code.

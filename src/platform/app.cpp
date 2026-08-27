@@ -860,6 +860,7 @@ int run(const CliOptions& cli) {
                         &machine,
                         &high_scores,
                         &score_path,
+                        &score_slug,
                         &loaded_table](uint64_t tick) {
             // §2.1 step 1: late-latch the freshest input exactly once.
             const uint64_t latch_ts = tb_now_ns();

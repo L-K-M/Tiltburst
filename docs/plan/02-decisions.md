@@ -646,7 +646,9 @@ through 100k+ ticks.
 ### Decision
 
 `divider_top` default moves to `[0.074, 0.262]`: perpendicular distance
-0.0426 − 0.008 post = **34.6 mm** passable, above the 33 mm floor.
+0.0408 − 0.008 post = **32.8 mm** passable — 0.2 mm under the 33 mm
+floor, clear of §6's 32 mm jam band (the original 0.0426/34.6 mm claim
+was a mismeasured gap; the true perpendicular at y = 0.262 is 0.0408).
 `divider_bottom` is unchanged. 09 §5.4's table and width note amended in
 the same PR (§3.3).
 

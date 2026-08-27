@@ -1166,8 +1166,9 @@ Lights use color role `"insert_primary"` (13-art-direction.md).
         |     \ | \_flipper    surface.
 ```
 
-The outlane channel (side wall to divider post) is ≈ 0.0346 m wide at
-the top — above the 0.033 minimum, tight enough to feel dangerous
+The outlane channel (side wall to divider post) is ≈ 0.0328 m wide at
+the top — 0.2 mm under the 0.033 target, just clear of §6's 32 mm jam
+band, still dangerous
 (ADR-024: the original `[0.062, 0.268]` divider top left 0.0312 − the
 0.008 post = 23 mm, inside §6's jam band; a ball rolling the side wall
 wedged there forever). These defaults mesh

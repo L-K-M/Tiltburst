@@ -922,7 +922,7 @@ std::vector<Element> expand_prefab(const TableDef& partial, const PrefabInstance
             pid + "_side_wall", inst.layer, inst.tags, std::move(side_path), MaterialId::Wood)});
 
         // ADR-024: divider top moved (0.062,0.268)→(0.074,0.262) so the
-        // outlane mouth (side wall → divider post) is 34.6 mm passable —
+        // outlane mouth (side wall → divider post) is 32.8 mm passable —
         // §5.4's own numbers left 23 mm (§6 jam band).
         std::vector<PathNode> div_path = {point(mirror(0.074f), 0.262f),
                                           point(mirror(0.122f), 0.138f)};

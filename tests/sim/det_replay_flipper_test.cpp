@@ -161,8 +161,12 @@ TEST(det_replay, flipper_tape_hash_stable) {
     ASSERT_GE(golden.size(), 6u);
 
     const auto hashes = run_flipper_tape(tape);
-    ASSERT_GE(golden.size(), 6u);
     ASSERT_EQ(hashes.size(), 30u);
+    // The golden must cover EVERY sample: a truncated file (bad merge,
+    // interrupted record run) would otherwise pass while the tail of
+    // the replay window silently loses determinism coverage.
+    ASSERT_EQ(golden.size(), hashes.size())
+        << "golden must cover all 30 samples of the 3000-tick replay";
     for (size_t gi = 0; gi < golden.size(); ++gi) {
         ASSERT_LT(gi, hashes.size());
         const uint64_t tick = golden[gi].first;

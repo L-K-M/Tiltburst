@@ -656,6 +656,35 @@ Outlane mouths built from the prefab drain reliably; the inlane feeding
 geometry is untouched (divider bottom unchanged). Tables that overrode
 `divider_top` explicitly are unaffected.
 
+## ADR-025 — Lua 5.5.1 accepted in place of the spec's "Lua 5.4"
+
+**Status:** Accepted (M9). Amends 10-scripting.md §1.1.
+
+### Context
+
+10-scripting.md §1.1 pins "Lua 5.4 (vcpkg `lua`)". The repo's pinned
+vcpkg baseline ships the `lua` port at 5.5.1 — the API surface the
+sandbox uses (open_libraries whitelist, luaL_error, lua_sethook COUNT
+hooks, luaL_ref/unref registry refs, lua_gc step, coroutine.create
+wrapping) is unchanged between the versions for everything this host
+calls. Pinning 5.4.8 via a manifest override was tried (M9 triage):
+vcpkg's versioning checkout of the historical port fails on the
+Windows runner (`git checkout-index` exit 128), so the pin cannot ship.
+
+### Decision
+
+Ship the baseline's Lua 5.5.1. The fixed string-hash seed is kept via
+`lua_newstate`'s seed parameter (5.5 form; a no-op-level detail on 5.4
+builds would use the 2-arg form). If a future vcpkg baseline restores a
+5.4.x `lua` port that installs cleanly on all three OSes, flipping
+back is a one-line override.
+
+### Consequences
+
+None for the sandbox contract: no `io`/`os`/`require`/`load`, watchdog
+hooks, capped allocator, or coroutine wrapping depend on 5.5-only
+behavior. sol2 3.5.0 (with its 5.5 compatibility patch) binds both.
+
 ## Amendments to ARCHITECTURE.md (authoritative table)
 
 Where ARCHITECTURE.md disagrees with a row below, the amendment wins (canon

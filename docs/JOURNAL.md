@@ -373,3 +373,14 @@ corrections are new entries. Format: 03-process.md §3.1.
   incident: the WIP commit let clang-format run over CMake files AND
   dropped tb_sim's -ffp-contract=off determinism flag — caught by
   det_golden going red in a clean build; both repaired before the PR.
+- Script-host segfault hunt (6 triage pushes, then the real fix): the
+  macOS-arm64-only crash survived three plausible fixes (L luaL_error
+  lambdas, watchdog-hook stack safety, handlers/timers released before
+  lua_close) because x86/5.5 heap layout masked the defect. Pinning
+  Lua 5.4.8 locally turned it into a reproducible Linux segfault; a
+  signal-handler backtrace nailed it: ~unique_ptr<sol::state_view>
+  calls luaL_unref on the state AFTER the destructor body's lua_close
+  — a pure destructor-order use-after-free. Fix: reset the state_view
+  (with handlers/timers) before closing. The 5.4 pin itself could not
+  ship (vcpkg historical-port checkout fails on Windows) — reverted;
+  baseline 5.5.1 accepted via ADR-025.

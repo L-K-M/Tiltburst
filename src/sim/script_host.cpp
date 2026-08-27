@@ -401,7 +401,8 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
         impl_->element_index[state.element_ids[i]] = i;
     }
 
-    impl_->L = lua_newstate(capped_alloc, &impl_->heap_used);
+    // 5.5.1 exposes the seeded form; the fixed seed keeps §1.4's intent.
+    impl_->L = lua_newstate(capped_alloc, &impl_->heap_used, 0x74696C74u);
     if (impl_->L == nullptr) {
         throw std::runtime_error("cannot create the Lua state (heap cap?)");
     }

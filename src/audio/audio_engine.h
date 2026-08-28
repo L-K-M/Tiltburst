@@ -77,7 +77,7 @@ struct AudioCommand {
 class CommandQueue {
 public:
     explicit CommandQueue(uint32_t capacity_log2 = 6) // 64 (§2.3)
-        : cap_(1u << capacity_log2), mask_(cap_ - 1) {
+        : cap_(1u << std::min(capacity_log2, 16u)), mask_(cap_ - 1) {
         buf_ = new AudioCommand[cap_];
     }
 

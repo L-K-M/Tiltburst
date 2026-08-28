@@ -268,7 +268,8 @@ TEST(Scheduler, DriftConvergesAndStallReanchors) {
     const double drift_spt = 48.0 * (1.0 + 300e-6);
     uint64_t stream = 0;
     sys.publish_tick(0);
-    sys.render_offline(buf, 128); // anchor at stream=128? Anchor is
+    sys.render_offline(buf, 128); // clock anchors at stream_pos=0 (the
+                                  // buffer start this mix filled FROM)
     stream += 128;
     double spt_seen = 48.0;
     for (uint64_t t = 1; t <= 2000; ++t) {
@@ -297,8 +298,9 @@ TEST(Scheduler, DriftConvergesAndStallReanchors) {
     }
     sys.publish_tick(before); // still stalled when the re-anchor lands
     sys.render_offline(buf, 128);
-    // The re-anchor reset d_avg; spt snapped back near 48.
-    EXPECT_NEAR(sys.debug_spt(), 48.0, 0.05);
+    // Tolerance INSIDE the ±500 ppm clamp span (0.024): a drifted-but-
+    // not-reanchored spt (~48.0144 at 300 ppm) must FAIL here.
+    EXPECT_NEAR(sys.debug_spt(), 48.0, 0.005);
 }
 
 // ---- Limiter: +6 dB overdrive shows gain reduction, no hard clip ----

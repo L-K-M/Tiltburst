@@ -728,9 +728,16 @@ void AudioSystem::mix(float* out, uint32_t frames) {
             continue;
         }
         ++active;
-        const uint32_t bus = v.bus < 2 ? v.bus : 0;
+        // 0 sfx, 1 ui, 2 music (M14 tracker voices; event buses are
+        // pre-clamped to 0/1 at acquire — this stays consistent with
+        // the 3-bus summing loop below either way).
+        const uint32_t bus = v.bus < 3 ? v.bus : 0;
         float* mixbuf = impl_->bus_mix[bus];
+        // start_frame is a ONE-SHOT offset into the buffer the voice
+        // was acquired for: consume it, or every later buffer skips
+        // its first N frames and long sounds chop (cycle-23 major).
         uint32_t i = std::min(v.start_frame, frames);
+        v.start_frame = 0;
         while (i < frames && v.pos < v.len) {
             const float s = v.pcm[v.pos];
             mixbuf[2 * i] += s * v.gl * v.gain;

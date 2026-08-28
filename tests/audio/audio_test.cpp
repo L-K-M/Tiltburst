@@ -471,8 +471,12 @@ TEST(AudioJson, WavLoadsFromAbsolutePackDir) {
 // Escape rejections: root-relative and UNC forms must fail even where
 // is_absolute() is false (Windows) — has_root_path() closes it.
 TEST(AudioJson, WavGuardRejectsEscapes) {
+    // R"(\\escape.wav)" as a raw literal: the C++ string must carry
+    // TWO backslashes so the JSON escape decodes to one — a single
+    // backslash makes the JSON invalid and the case never reaches the
+    // path guard (cycle-15 review).
     for (const char* bad : {"/escape.wav",
-                            "\\escape.wav",
+                            R"(\\escape.wav)",
                             "//server/share/x.wav",
                             "C:escape.wav",
                             "assets/../../escape.wav"}) {
@@ -489,7 +493,7 @@ TEST(AudioJson, WavGuardRejectsEscapes) {
         try {
             if (audio::load_audio_json(dir, ta)) {
                 int purpose[sim::SimState::kSoundPurposeCount] = {};
-                auto bank = audio::build_bank(ta, dir, purpose);
+                (void)audio::build_bank(ta, dir, purpose);
             }
         } catch (const audio::AudioLoadError&) {
             threw = true;

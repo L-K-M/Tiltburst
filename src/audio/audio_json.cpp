@@ -142,17 +142,21 @@ SfxPatch parse_patch_json(const json& obj, const std::string& pointer) {
 // downmixes 0.5*(L+R); longer than 10 s is an error.
 namespace {
 
-bool decode_wav(const std::filesystem::path& path, std::vector<float>& out_pcm) {
-    // The path comes from table JSON: reject absolute paths and any
-    // ".." component so a pack cannot read outside itself.
-    const std::string ps = path.string();
-    // ':' also rejects Windows drive-relative paths (C:foo), which are
-    // neither absolute nor pack-relative.
-    if (path.is_absolute() || ps.find("..") != std::string::npos ||
-        ps.find(':') != std::string::npos) {
-        TB_LOG_ERROR("audio", "wav path '{}' escapes the pack", ps);
+bool decode_wav(const std::filesystem::path& dir,
+                const std::string& rel,
+                std::vector<float>& out_pcm) {
+    // Validate ONLY the pack-relative string from table JSON (cycle-13
+    // blocker: testing the JOINED path rejected every wav whenever the
+    // table dir was absolute — always, on Windows). The pack dir itself
+    // is trusted and may legitimately be absolute or carry a drive
+    // letter. ':' also rejects drive-relative forms (C:foo).
+    const std::filesystem::path rel_path(rel);
+    if (rel_path.is_absolute() || rel.find("..") != std::string::npos ||
+        rel.find(':') != std::string::npos) {
+        TB_LOG_ERROR("audio", "wav path '{}' escapes the pack", rel);
         return false;
     }
+    const std::filesystem::path path = dir / rel_path;
     ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 1, 48000);
     ma_decoder dec;
     if (ma_decoder_init_file(path.string().c_str(), &cfg, &dec) != MA_SUCCESS) {
@@ -330,7 +334,7 @@ std::unique_ptr<PatchBank> build_bank(const TableAudio& audio,
         e.name = name;
         e.priority = 5;
         e.gain = 1.0f;
-        if (!decode_wav(dir / rel, e.pcm)) {
+        if (!decode_wav(dir, rel, e.pcm)) {
             fail("wav '" + name + "' could not be decoded from '" + rel + "'", "/wav/" + name);
         }
         insert_into_bank(*bank, name, std::move(e), "/wav/" + name);

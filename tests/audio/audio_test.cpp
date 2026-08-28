@@ -416,4 +416,56 @@ TEST(AudioJson, NoneDisablesPurpose) {
     std::filesystem::remove_all(dir, ec);
 }
 
+// ---- Regression (cycle-13 blocker): a wav entry must load when the
+// PACK DIR is absolute (always on Windows); the escape guard validates
+// only the pack-relative string ----
+TEST(AudioJson, WavLoadsFromAbsolutePackDir) {
+    std::filesystem::path dir =
+        std::filesystem::temp_directory_path() / ("tb_wav_abs_" + std::to_string(tb_now_ns()));
+    std::filesystem::create_directories(dir / "assets");
+    ASSERT_TRUE(dir.is_absolute()); // temp_directory_path is absolute
+
+    // Hand-roll a 48 kHz mono f32 RIFF wav (miniaudio reads f32 PCM).
+    constexpr uint32_t kFrames = 4800; // 100 ms
+
+    struct {
+        char riff[4] = {'R', 'I', 'F', 'F'};
+        uint32_t riff_size = 36 + kFrames * 4;
+        char wave[4] = {'W', 'A', 'V', 'E'};
+        char fmt_[4] = {'f', 'm', 't', ' '};
+        uint32_t fmt_size = 16;
+        uint16_t audio_format = 3; // IEEE float
+        uint16_t channels = 1;
+        uint32_t rate = 48000;
+        uint32_t byte_rate = 48000 * 4;
+        uint16_t block_align = 4;
+        uint16_t bits = 32;
+        char data[4] = {'d', 'a', 't', 'a'};
+        uint32_t data_size = kFrames * 4;
+    } hdr;
+
+    std::vector<float> pcm(kFrames);
+    for (uint32_t i = 0; i < kFrames; ++i) {
+        pcm[i] = 0.5f * std::sin(2.0f * 3.14159265f * 440.0f * float(i) / 48000.0f);
+    }
+    {
+        std::ofstream wav(dir / "assets" / "tone.wav", std::ios::binary);
+        wav.write(reinterpret_cast<const char*>(&hdr), sizeof(hdr));
+        wav.write(reinterpret_cast<const char*>(pcm.data()), std::streamsize(pcm.size() * 4));
+    }
+    { std::ofstream(dir / "audio.json") << R"json({ "wav": { "tone": "assets/tone.wav" } })json"; }
+
+    audio::TableAudio ta;
+    ASSERT_TRUE(audio::load_audio_json(dir, ta));
+    int purpose[sim::SimState::kSoundPurposeCount] = {};
+    auto bank = audio::build_bank(ta, dir, purpose); // must NOT throw
+    ASSERT_NE(bank, nullptr);
+    const int id = bank->find("tone");
+    ASSERT_GE(id, 0);
+    EXPECT_EQ(bank->patch_entries()[size_t(id)].pcm.size(), kFrames);
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
 } // namespace

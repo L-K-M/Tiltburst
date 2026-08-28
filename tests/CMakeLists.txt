@@ -1,7 +1,6 @@
 find_package(GTest CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
-find_path(miniaudio_INCLUDE_DIR NAMES miniaudio.h REQUIRED)
 
 add_executable(tb_tests
     core/config_test.cpp

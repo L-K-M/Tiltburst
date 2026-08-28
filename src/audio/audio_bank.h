@@ -4,6 +4,7 @@
 #include "sim/sound_out.h"
 
 #include <cstdint>
+#include <utility>
 #include <memory>
 #include <string>
 #include <unordered_map>

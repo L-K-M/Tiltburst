@@ -2,7 +2,8 @@ find_package(SDL3 CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 
 add_library(tb_render STATIC
-    render.cpp
+    backglass_renderer.cpp
+    render_renderer.cpp
     overlay.cpp
     pipeline_quad.cpp
     present_pass.cpp

@@ -8,14 +8,19 @@
 #include "core/version.h"
 #include "game/game_machine.h"
 #include "game/high_scores.h"
+#include "game/score_format.h"
+#include "platform/backglass_pacer.h"
+#include "platform/display_detect.h"
 #include "platform/gpu_device.h"
 #include "platform/input.h"
 #include "platform/latency.h"
 #include "platform/paths.h"
 #include "platform/window.h"
+#include "render/backglass_renderer.h"
 #include "render/overlay.h"
 #include "render/renderer.h"
 #include "render/sdl_gpu_renderer.h"
+#include "sim/script_host.h"
 #include "sim/sim_thread.h"
 #include "sim/snapshot.h"
 #include "sim/solver.h"
@@ -753,9 +758,75 @@ int run(const CliOptions& cli) {
             return 1; // ✗ step 8
         }
 
+        // --- Display topology (07-displays.md, M12) ---
+        // Windowed dev mode (§11) skips detection; the backglass is a
+        // second 640x512 window beside the playfield.
+        platform::DisplaysConfig displays_cfg;
+        {
+            const std::filesystem::path cfg_path =
+                paths::pref() / "displays.json"; // --display-config: M18
+            std::ifstream cfg_in(cfg_path);
+            if (cfg_in.good()) {
+                const auto parsed = platform::load_displays_json(std::string(
+                    std::istreambuf_iterator<char>(cfg_in), std::istreambuf_iterator<char>()));
+                if (parsed.corrupt) {
+                    TB_LOG_WARN("main", "displays.json corrupt; using heuristics");
+                } else if (parsed.loaded) {
+                    displays_cfg = parsed.cfg;
+                }
+            }
+        }
+
+        platform::WindowPtr backglass_window;
+        int bg_rotation = 0;
+        if (!cli.headless) {
+            std::vector<platform::DisplayInfo> displays;
+            platform::Assignment assign;
+            if (platform::enumerate_displays(displays)) {
+                assign = platform::detect(displays, displays_cfg);
+                for (const std::string& w : assign.warnings) {
+                    TB_LOG_WARN("main", "displays: {}", w);
+                }
+                // T13: single landscape display without a square
+                // backglass reads as a desktop — say how to override.
+                if (assign.backglass == -1 && assign.playfield >= 0 &&
+                    displays[size_t(assign.playfield)].w >= displays[size_t(assign.playfield)].h) {
+                    TB_LOG_WARN("main",
+                                "landscape display without square backglass: assuming "
+                                "desktop; set displays.json playfield.rotation for a "
+                                "cabinet");
+                }
+                TB_LOG_INFO("main",
+                            "displays: playfield={} backglass={} pf_rotation={}",
+                            assign.playfield,
+                            assign.backglass,
+                            assign.pf_rotation);
+            } else {
+                TB_LOG_WARN("main", "no displays detected; playfield window only");
+            }
+
+            if (assign.backglass >= 0 && !cli.headless) {
+                // 07 §7: borderless fullscreen on the assigned display.
+                // Windowed dev mode keeps its own second window (§11).
+                int id_count = 0;
+                SDL_DisplayID* ids = SDL_GetDisplays(&id_count);
+                if (ids != nullptr && assign.backglass < id_count) {
+                    const SDL_DisplayID did = ids[assign.backglass];
+                    const SDL_DisplayMode* dm = SDL_GetDesktopDisplayMode(did);
+                    if (dm != nullptr) {
+                        backglass_window = platform::create_fullscreen_window(
+                            "Tiltburst Backglass", uint32_t(dm->w), uint32_t(dm->h), did);
+                    }
+                }
+                SDL_free(ids);
+            }
+            bg_rotation = assign.bg_rotation;
+        }
+
         auto renderer = render::make_sdl_gpu_renderer();
         render::RendererConfig rcfg;
         rcfg.playfield_window = window.get();
+        rcfg.backglass_window = backglass_window.get();
         rcfg.debug_device = cli.dev;
         rcfg.prefer_mailbox = settings.present_mode != "vsync";
         if (!renderer->init(rcfg)) {
@@ -763,6 +834,14 @@ int run(const CliOptions& cli) {
             SDL_Quit();
             return 1; // ✗ step 9
         }
+
+        sim::BackglassModel game_no_table_model; // defaults; M14 attract
+        // Backglass content pipeline: layout + ~30 Hz pacer (07 §8).
+        render::BackglassLayout bg_layout;
+        render::Overlay bg_font; // glyph emitter only
+        platform::BackglassPacer bg_pacer;
+        std::vector<render::QuadInstance> bg_quads;
+        std::vector<render::QuadInstance> bg_built;
 
         tb::SnapshotBuffer snapshots;
         // Declaration order is load-bearing: the ScriptHost owned by
@@ -1257,6 +1336,56 @@ int run(const CliOptions& cli) {
             frame.debug_collider_count = uint32_t(render_scene.colliders.size());
 
             renderer->render_playfield(frame);
+
+            // Backglass at ~30 Hz, non-blocking (07 §8): the attempt
+            // cadence is deadline-driven; a skipped acquire retries
+            // next playfield frame without advancing the deadline.
+            if (backglass_window) {
+                const uint64_t now_bg = tb_now_ns();
+                if (bg_pacer.should_attempt(now_bg)) {
+                    bg_quads.clear();
+                    bg_built.clear();
+                    render::BackglassContent content;
+                    content.in_attract =
+                        machine == nullptr || machine->state() == game::GameState::Attract;
+                    if (machine != nullptr) {
+                        content.player_count = machine->player_count();
+                        content.current_player = machine->current_player();
+                        const auto& ps = machine->player(1);
+                        content.ball_number = ps.ball_number;
+                        for (int pi = 1; pi <= content.player_count; ++pi) {
+                            content.scores[size_t(pi - 1)] =
+                                loaded_table->script.player_scores(pi).score;
+                        }
+                        content.ball_number =
+                            machine->player(machine->current_player()).ball_number;
+                    } else if (loaded_table) {
+                        content.player_count = 1;
+                        content.scores[0] = loaded_table->script.player_scores(1).score;
+                    }
+                    for (uint32_t i = 0; i < high_scores.entries().size() && i < 10; ++i) {
+                        auto& row = content.high_scores[i];
+                        row.initials[0] = high_scores.entries()[i].initials[0];
+                        row.initials[1] = high_scores.entries()[i].initials[1];
+                        row.initials[2] = high_scores.entries()[i].initials[2];
+                        row.score = high_scores.entries()[i].score;
+                        ++content.high_score_count;
+                    }
+                    bg_layout.build(content,
+                                    loaded_table ? loaded_table->script.backglass()
+                                                 : game_no_table_model,
+                                    bg_font,
+                                    &bg_built);
+                    render::BackglassFrame bframe;
+                    bframe.quads = bg_built.data();
+                    bframe.quad_count = uint32_t(bg_built.size());
+                    if (renderer->render_backglass(bframe)) {
+                        bg_pacer.report_drawn(now_bg);
+                    } else {
+                        bg_pacer.report_skipped();
+                    }
+                }
+            }
 
             // §14.1 stages 4–5 on the record matching the rendered snapshot.
             input.ring.complete_main(snap.tick, frame_start_ns, tb_now_ns());

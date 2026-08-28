@@ -8,6 +8,14 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Added
 
+- M12: multi-display & backglass (07-displays.md) — pure display
+  detection with the canon §5.9 heuristic (portrait/landscape pools,
+  lexicographic argmax keys, squarest-backglass, cabinet-vs-desktop
+  rotation), displays.json with explicit match/rotation overrides and
+  last_auto stability, borderless-fullscreen backglass window,
+  non-blocking ~30 Hz backglass pacing (skip-never-blocks), and
+  BackglassRenderer v1 (score cards, status band, message ticker,
+  attract high-score list) on the shared 640×512 canvas.
 - M11: audio engine (12-audio.md) — miniaudio device with the period
   ladder and §2.2 startup log, allocation-free 32-voice mixer with
   priority/age stealing + per-patch cap, the sfxr-style SFX synth

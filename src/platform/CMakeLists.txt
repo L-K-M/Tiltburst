@@ -5,6 +5,9 @@ find_package(SDL3 CONFIG REQUIRED)
 # symbols must be visible to the linker before static archives are
 # scanned.
 add_library(tb_platform STATIC
+    backglass_pacer.cpp
+    display_detect.cpp
+    display_detect_sdl.cpp
     platform.cpp
     gpu_device.cpp
     input.cpp
@@ -17,4 +20,5 @@ add_library(tb_platform STATIC
 )
 
 target_include_directories(tb_platform PUBLIC ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(tb_platform PUBLIC tb_core SDL3::SDL3)
+find_package(nlohmann_json CONFIG REQUIRED)
+target_link_libraries(tb_platform PUBLIC tb_core nlohmann_json::nlohmann_json SDL3::SDL3)

@@ -501,3 +501,36 @@ corrections are new entries. Format: 03-process.md §3.1.
   lessons reaffirmed: comment-only fixes still need compile+test, and
   an assertion whose tolerance spans the whole legal range is
   decorative.
+
+## M12 — Multi-display & backglass (2026-08-28)
+
+- Scope per 04 §M12: display enumeration + the §3 heuristic (canon
+  §5.9), displays.json with last_auto stability, borderless-fullscreen
+  backglass window, ~30 Hz non-blocking backglass pacing, and
+  BackglassRenderer v1 (score cards, status band, message ticker,
+  attract high-score list). Scope out: hotplug re-creation choreography
+  (needs hardware; §9 order documented in code), DMD/topper, M13 art.
+- Layering: detection is PURE (platform/display_detect.h — no SDL
+  types; the SDL fill-in is display_detect_sdl.cpp), so T1-T15 run in
+  CI on all three OSes with no displays. BackglassPacer is GPU-free
+  state machine; BackglassLayout produces the flat quad list in
+  640x512 canvas space that BOTH the window path and the single-display
+  B-key overlay consume (07 §10 — overlay compositing itself lands with
+  M13's present-pass work).
+- Implementation notes: rotation is projection-only (§6 binding; the
+  renderer's existing Rotation path applies it); the backglass render
+  uses the NON-BLOCKING acquire + cancel (07 §7) and letterboxes the
+  fixed canvas into the swapchain; the playfield render is untouched.
+  Both windows' quads flow through one QuadBatch (device-wide
+  frames-in-flight 1 stands).
+- Bug found by my own tests before review: the pacer's hitch-resync
+  unsigned subtraction UNDERFLOWED for the ahead-of-deadline case —
+  every should_attempt() returned true, i.e. the "30 Hz" cadence was
+  really per-playfield-frame. Signed-guarded both resync sites. And
+  T15's backglass expectation: the NEC (5:4, squareness 0.80) beats the
+  leftover 16:9 on the (squareness, area, -index) key — my test comment
+  had rationalized the wrong pick.
+- tests: 22 new (T1-T15 incl. stability, stale-match warnings, glob
+  ambiguity, same-display drop, empty list; JSON round-trip with
+  comments/corrupt/missing; pacer draw/skip/retry/hitch semantics;
+  layout content + canvas bounds). 137/137 total.

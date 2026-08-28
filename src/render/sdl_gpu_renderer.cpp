@@ -301,7 +301,8 @@ void SdlGpuRenderer::render_playfield(const RenderFrame& frame) {
         return;
     }
 
-    draw_scene(cmd, frame, frame.snapshot ? double(frame.snapshot->tick) * 0.001 : 0.0);
+    sim_time_s_ = frame.snapshot ? double(frame.snapshot->tick) * 0.001 : sim_time_s_;
+    draw_scene(cmd, frame, sim_time_s_);
 
     present_.build_corners(view_, w, h);
     present_.add_pass(cmd, scene_, tex);
@@ -322,8 +323,50 @@ void SdlGpuRenderer::render_playfield(const RenderFrame& frame) {
     }
 }
 
-bool SdlGpuRenderer::render_backglass(const BackglassFrame&) {
-    return backglass_ != nullptr; // content arrives at M12
+bool SdlGpuRenderer::render_backglass(const BackglassFrame& frame) {
+    if (backglass_ == nullptr) {
+        return false;
+    }
+    sim_time_s_ = std::max(sim_time_s_, 0.0);
+    SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(device_);
+    if (cmd == nullptr) {
+        ++stats_.backglass_skips;
+        return false;
+    }
+    SDL_GPUTexture* tex = nullptr;
+    Uint32 w = 0;
+    Uint32 h = 0;
+    // 07 §7: NON-BLOCKING acquire — no texture means skip the frame
+    // (and cancel the buffer exactly once); only the playfield may
+    // wait.
+    if (!SDL_AcquireGPUSwapchainTexture(cmd, backglass_, &tex, &w, &h) || tex == nullptr) {
+        SDL_CancelGPUCommandBuffer(cmd);
+        ++stats_.backglass_skips;
+        return false;
+    }
+    // The canvas is a fixed 640x512 design surface; letterbox into the
+    // swapchain by scaling the pixel-space ortho to the actual extent.
+    SDL_GPUColorTargetInfo target{};
+    target.texture = tex;
+    target.load_op = SDL_GPU_LOADOP_CLEAR;
+    target.clear_color = {0.0f, 0.0f, 0.0f, 1.0f};
+    SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(cmd, &target, 1, nullptr);
+
+    quads_.begin_frame(cmd, w, h, sim_time_s_);
+    quads_.reserve(frame.quad_count);
+    const float scale = std::min(float(w) / float(BackglassFrame::kCanvasW),
+                                 float(h) / float(BackglassFrame::kCanvasH));
+    const float ox = (float(w) - scale * float(BackglassFrame::kCanvasW)) * 0.5f;
+    const float oy = (float(h) - scale * float(BackglassFrame::kCanvasH)) * 0.5f;
+    for (uint32_t i = 0; i < frame.quad_count; ++i) {
+        const QuadInstance& q = frame.quads[i];
+        quads_.push(
+            ox + q.cx * scale, oy + q.cy * scale, q.hx * scale, q.hy * scale, q.r, q.g, q.b, q.a);
+    }
+    quads_.upload_and_draw(pass);
+    SDL_EndGPURenderPass(pass);
+    SDL_SubmitGPUCommandBuffer(cmd);
+    return true;
 }
 
 void SdlGpuRenderer::request_screenshot(const char* png_path) {

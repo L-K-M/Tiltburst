@@ -59,6 +59,8 @@ uint8_t serve_ball(SimState& s) {
 
 // Per-tick emission-order log for the script host (§2.2 phase 2). Filled
 // only while a host is attached; the Collision audio event never records.
+// (record_tick_event itself lives below, after the sound emitters.)
+
 // 12-audio.md §7.2: emit a purpose-mapped SoundEvent. Velocity is
 // impact-derived (impact_speed / 8 m/s) for impact purposes, 1.0 for
 // state purposes; pan derives from the ball's x position (§4.1).

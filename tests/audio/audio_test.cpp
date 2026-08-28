@@ -30,8 +30,9 @@ uint64_t pcm_hash(const std::vector<float>& pcm) {
     return fnv1a64(pcm.data(), pcm.size() * sizeof(float), 0xA0D105E7ull);
 }
 
-// ---- SfxSynth.PatchRendersDeterministicPcm (golden hash of 5
-// reference patches + the 24 built-ins render within bounds) ----
+// ---- SfxSynth.PatchRendersDeterministicPcm (5 reference patches
+// render deterministically within one binary; the 24 built-ins render
+// within bounds — a cross-build PCM golden is future work) ----
 TEST(SfxSynth, PatchRendersDeterministicPcm) {
     // Five reference patches chosen to exercise distinct synth paths:
     // pure square arp, noise + LPF, sweep, vibrato sine, flanger.
@@ -197,7 +198,7 @@ TEST(Mixer, VoiceStealOldestNoClick) {
     EXPECT_EQ(sys.stats().active_voices.load(), 32u);
 
     // A LOWER-priority sound loses and is dropped (§3.2 rule 2):
-    // menu_move (priority 2) cannot steal anything at 4+.
+    // menu_select (patch 18, priority 2) cannot steal anything at 4+.
     const uint32_t dropped_before = sys.stats().dropped_events.load();
     ev.patch = 18; // menu_select, priority 2
     ASSERT_TRUE(sys.sound_queue().push(ev));
@@ -223,9 +224,11 @@ TEST(Mixer, CallbackAllocationFree) {
     }
     float buf[512 * 2];
     sys.publish_tick(0);
-    sys.render_offline(buf, 512);
 
     tb::test::ScopedAllocCount count;
+    // The FIRST render after the burst is inside the window: event
+    // drain, tick->sample classification, and voice starts all happen
+    // here (cycle-7 review — the warm-up render defeated the gate).
     sys.publish_tick(1);
     sys.render_offline(buf, 512);
     sys.render_offline(buf, 512);

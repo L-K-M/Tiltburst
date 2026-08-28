@@ -261,6 +261,25 @@ bool load_audio_json(const std::filesystem::path& dir, TableAudio& out) {
     return true;
 }
 
+// Shared insert: override a same-named entry in place, else append —
+// with the 0xFFFF id-space cap enforced in ONE place (cycle-9 review:
+// the wav loop had drifted from the patches loop's guard).
+void insert_into_bank(PatchBank& bank,
+                      const std::string& name,
+                      PatchEntry entry,
+                      const std::string& pointer) {
+    const auto existing = bank.mutable_names().find(name);
+    if (existing != bank.mutable_names().end()) {
+        bank.mutable_entries()[existing->second] = std::move(entry); // override in place
+        return;
+    }
+    if (bank.mutable_entries().size() >= 0xFFFF) {
+        fail("patch bank exceeds 65535 entries (id space)", pointer);
+    }
+    bank.mutable_names().emplace(name, uint16_t(bank.mutable_entries().size()));
+    bank.mutable_entries().push_back(std::move(entry));
+}
+
 std::unique_ptr<PatchBank> build_bank(const TableAudio& audio,
                                       const std::filesystem::path& dir,
                                       int (&purpose_patch)[int(SoundPurpose::Count)]) {
@@ -304,16 +323,7 @@ std::unique_ptr<PatchBank> build_bank(const TableAudio& audio,
         if (!render_patch(patch, name, e.pcm)) {
             fail("patch '" + name + "' rendered silence", "/patches/" + name);
         }
-        const auto existing = bank->mutable_names().find(name);
-        if (existing != bank->mutable_names().end()) {
-            bank->mutable_entries()[existing->second] = std::move(e); // override in place
-        } else {
-            if (bank->mutable_entries().size() >= 0xFFFF) {
-                fail("patch bank exceeds 65535 entries (id space)", "/patches/" + name);
-            }
-            bank->mutable_names().emplace(name, uint16_t(bank->mutable_entries().size()));
-            bank->mutable_entries().push_back(std::move(e));
-        }
+        insert_into_bank(*bank, name, std::move(e), "/patches/" + name);
     }
     for (const auto& [name, rel] : audio.wav) {
         PatchEntry e;
@@ -323,13 +333,7 @@ std::unique_ptr<PatchBank> build_bank(const TableAudio& audio,
         if (!decode_wav(dir / rel, e.pcm)) {
             fail("wav '" + name + "' could not be decoded from '" + rel + "'", "/wav/" + name);
         }
-        const auto existing = bank->mutable_names().find(name);
-        if (existing != bank->mutable_names().end()) {
-            bank->mutable_entries()[existing->second] = std::move(e);
-        } else {
-            bank->mutable_names().emplace(name, uint16_t(bank->mutable_entries().size()));
-            bank->mutable_entries().push_back(std::move(e));
-        }
+        insert_into_bank(*bank, name, std::move(e), "/wav/" + name);
     }
 
     for (const DefaultMap& d : kDefaults) {

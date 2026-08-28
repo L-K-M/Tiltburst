@@ -42,7 +42,7 @@ public:
     // the sync source for the assets/patches.json mirror test.
     static const std::vector<std::pair<std::string, SfxPatch>>& built_in_params();
 
-    // Build-time mutation (audio_json's build_bank is the only caller);
+    // Build-time mutation (built_ins and audio_json's build_bank);
     // closed after build — the §5.5 immutability the epoch protocol
     // relies on.
     std::vector<PatchEntry>& mutable_entries() { return entries_; }

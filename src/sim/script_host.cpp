@@ -597,6 +597,9 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
         if (id == nullptr || impl_->sim == nullptr || impl_->sim->sound_queue == nullptr) {
             return;
         }
+        // Linear scan of the intern table (§5.5): banks are tens of
+        // entries in practice; a hash here would cost more than it
+        // saves on the sim thread.
         int patch = -1;
         for (uint32_t i = 0; i < impl_->sim->patch_intern_n; ++i) {
             if (std::strcmp(impl_->sim->patch_intern[i].name, id) == 0) {

@@ -122,8 +122,7 @@ struct AudioEngineImpl {
     uint64_t cb_frames = 0;
 
     // Test-only start log (audio thread writes; offline tests read).
-    static constexpr uint32_t kDebugStartLog = 32;
-    AudioSystem::DebugStart debug_starts[kDebugStartLog] = {};
+    AudioSystem::DebugStart debug_starts[AudioSystem::kDebugStarts] = {};
     uint32_t debug_write = 0;
     uint64_t stream_pos_at_mix_start = 0;
 };
@@ -462,6 +461,12 @@ bool AudioSystem::init(const AudioConfig& cfg) {
         dc.noPreSilencedOutputBuffer = MA_TRUE;
         impl_->device = new ma_device();
         periods_ = 2; // §2 configuration (fixed)
+        // Callback-visible state must be ready BEFORE ma_device_start:
+        // the first callback can fire before start() returns.
+        impl_->lead = ma_uint32(period_) + 64;
+        impl_->running = true;
+        impl_->started_ns = tb_now_ns();
+        impl_->prev_cb_ns = 0;
         if (ma_device_init(impl_->ctx, &dc, impl_->device) == MA_SUCCESS &&
             ma_device_start(impl_->device) == MA_SUCCESS) {
             opened = true;
@@ -482,9 +487,6 @@ bool AudioSystem::init(const AudioConfig& cfg) {
         return false;
     }
 
-    impl_->lead = ma_uint32(period_) + 64;
-    impl_->running = true;
-    impl_->started_ns = tb_now_ns();
     const double lead_ms = double(impl_->lead) / double(kRate) * 1000.0;
     // §2.2 startup line: exactly one, INFO at 128, WARN otherwise.
     if (period_ == 128) {

@@ -3,6 +3,7 @@
 #include "audio/audio_bank.h"
 #include "sim/sound_out.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <memory>

@@ -608,7 +608,7 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
             TB_LOG_WARN("script", "tb.play_sound: unknown id '{}'", id);
             return;
         }
-        SoundEvent ev;
+        SoundEvent ev{}; // NSDMIs: velocity 1.0, pan 0.0 per 12 s4.1
         ev.tick = uint32_t(impl_->sim->tick);
         ev.patch = uint16_t(patch);
         if (opts.is<sol::table>() && opts.as<sol::table>().get_or("duck", false)) {

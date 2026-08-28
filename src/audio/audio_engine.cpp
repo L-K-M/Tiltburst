@@ -471,6 +471,9 @@ bool AudioSystem::init(const AudioConfig& cfg) {
             ma_device_start(impl_->device) == MA_SUCCESS) {
             opened = true;
         } else {
+            // Failed candidate: running was set pre-attempt; a dead
+            // ladder step must not claim a live device.
+            impl_->running = false;
             ma_device_uninit(impl_->device);
             delete impl_->device;
             impl_->device = nullptr;

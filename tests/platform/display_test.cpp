@@ -377,4 +377,73 @@ TEST(BackglassLayout, BuildsContentForBothModes) {
     }
 }
 
+// ---- Cycle-1 regressions ----
+
+// A failed explicit backglass match falls back to the heuristic (the
+// warning promises it).
+TEST(DisplayAssign, FailedBackglassMatchFallsBackToHeuristic) {
+    std::vector<platform::DisplayInfo> ds = {
+        make_display(0, 1920, 1080, 60, "TV"),
+        make_display(1, 1280, 1024, 60, "NEC"),
+    };
+    platform::DisplaysConfig cfg;
+    cfg.playfield.match = "index:0";
+    cfg.backglass.match = "name:MISSING*";
+    const auto a = platform::detect(ds, cfg);
+    EXPECT_EQ(a.playfield, 0);
+    EXPECT_EQ(a.backglass, 1); // heuristic picked the NEC
+    EXPECT_EQ(a.pf_rotation, 90);
+}
+
+// last_auto with an EMPTY backglass must not block discovery when a
+// second display appears (set equality, both directions).
+TEST(DisplayAssign, LastAutoNoBackglassDoesNotBlockDiscovery) {
+    std::vector<platform::DisplayInfo> ds = {
+        make_display(0, 1080, 1920, 60, "TV"),
+        make_display(1, 1280, 1024, 60, "NEC"), // newly attached
+    };
+    platform::DisplaysConfig cfg;
+    cfg.last_auto.present = true;
+    cfg.last_auto.playfield = "TV";
+    cfg.last_auto.backglass = ""; // previous run: no backglass
+    const auto a = platform::detect(ds, cfg);
+    EXPECT_EQ(a.playfield, 0);
+    EXPECT_EQ(a.backglass, 1); // the new display is discovered
+    EXPECT_FALSE(a.stability_reused);
+}
+
+// Malformed index forms never silently bind display 0.
+TEST(DisplayAssign, MalformedIndexMatchRejected) {
+    std::vector<platform::DisplayInfo> ds = {
+        make_display(0, 1080, 1920),
+        make_display(1, 1280, 1024),
+    };
+    EXPECT_EQ(platform::resolve_match("index:abc", ds), -1);
+    EXPECT_EQ(platform::resolve_match("index: 1", ds), -1);
+    EXPECT_EQ(platform::resolve_match("index:", ds), -1);
+    EXPECT_EQ(platform::resolve_match("index:1x", ds), -1);
+    EXPECT_EQ(platform::resolve_match("index:1", ds), 1);
+}
+
+// An unknown schema version refuses to parse.
+TEST(DisplaysJson, UnknownVersionRefused) {
+    const auto res = platform::load_displays_json(R"json({"version": 2})json");
+    EXPECT_FALSE(res.loaded);
+    EXPECT_TRUE(res.corrupt);
+}
+
+// Ambiguous name matches surface as warnings.
+TEST(DisplayAssign, AmbiguousGlobWarns) {
+    std::vector<platform::DisplayInfo> ds = {
+        make_display(0, 1080, 1920, 60, "AOC"),
+        make_display(1, 1280, 1024, 60, "AOC"),
+    };
+    platform::DisplaysConfig cfg;
+    cfg.playfield.match = "name:AOC*";
+    const auto a = platform::detect(ds, cfg);
+    EXPECT_EQ(a.playfield, 0);
+    ASSERT_EQ(a.warnings.size(), 1u);
+    EXPECT_NE(a.warnings[0].find("ambiguous"), std::string::npos);
+}
+
 } // namespace

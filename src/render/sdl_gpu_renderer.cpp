@@ -327,7 +327,6 @@ bool SdlGpuRenderer::render_backglass(const BackglassFrame& frame) {
     if (backglass_ == nullptr) {
         return false;
     }
-    sim_time_s_ = std::max(sim_time_s_, 0.0);
     SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(device_);
     if (cmd == nullptr) {
         ++stats_.backglass_skips;
@@ -351,6 +350,11 @@ bool SdlGpuRenderer::render_backglass(const BackglassFrame& frame) {
     target.load_op = SDL_GPU_LOADOP_CLEAR;
     target.clear_color = {0.0f, 0.0f, 0.0f, 1.0f};
     SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(cmd, &target, 1, nullptr);
+    if (pass == nullptr) {
+        SDL_CancelGPUCommandBuffer(cmd);
+        ++stats_.backglass_skips;
+        return false;
+    }
 
     quads_.begin_frame(cmd, w, h, sim_time_s_);
     quads_.reserve(frame.quad_count);

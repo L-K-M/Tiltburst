@@ -301,6 +301,7 @@ CliOptions parse_cli(int argc, char** argv) {
                 cli.window_w <= 0 || cli.window_h <= 0) {
                 return fail("--windowed expects WxH (e.g. 540x1080)");
             }
+            cli.windowed = true;
             continue;
         }
 
@@ -805,22 +806,26 @@ int run(const CliOptions& cli) {
                 TB_LOG_WARN("main", "no displays detected; playfield window only");
             }
 
-            if (assign.backglass >= 0 && !cli.headless) {
-                // 07 §7: borderless fullscreen on the assigned display.
-                // Windowed dev mode keeps its own second window (§11).
-                int id_count = 0;
-                SDL_DisplayID* ids = SDL_GetDisplays(&id_count);
-                if (ids != nullptr && assign.backglass < id_count) {
-                    const SDL_DisplayID did = ids[assign.backglass];
-                    const SDL_DisplayMode* dm = SDL_GetDesktopDisplayMode(did);
-                    if (dm != nullptr) {
-                        backglass_window = platform::create_fullscreen_window(
-                            "Tiltburst Backglass", uint32_t(dm->w), uint32_t(dm->h), did);
+            if (assign.backglass >= 0) {
+                // 07 §7: borderless fullscreen via the CARRIED sdl_id —
+                // never a second enumeration (the list can change
+                // between calls; cycle-1 review).
+                const platform::DisplayInfo& bg_display = displays[size_t(assign.backglass)];
+                const SDL_DisplayMode* dm = SDL_GetDesktopDisplayMode(bg_display.sdl_id);
+                if (dm == nullptr) {
+                    TB_LOG_WARN("main", "backglass display mode unavailable; no backglass");
+                } else {
+                    backglass_window = platform::create_fullscreen_window(
+                        "Tiltburst Backglass", uint32_t(dm->w), uint32_t(dm->h), bg_display.sdl_id);
+                    if (!backglass_window) {
+                        TB_LOG_WARN("main", "backglass window creation failed: {}", SDL_GetError());
                     }
                 }
-                SDL_free(ids);
             }
-            bg_rotation = assign.bg_rotation;
+        } else if (cli.windowed && !cli.headless && displays_cfg.backglass.enabled) {
+            // §11 dev mode: a second 640x512 window (side positioning
+            // lands with M18 menu work; v1 centers it).
+            backglass_window = platform::create_window("Tiltburst Backglass", 640, 512);
         }
 
         auto renderer = render::make_sdl_gpu_renderer();
@@ -840,7 +845,6 @@ int run(const CliOptions& cli) {
         render::BackglassLayout bg_layout;
         render::Overlay bg_font; // glyph emitter only
         platform::BackglassPacer bg_pacer;
-        std::vector<render::QuadInstance> bg_quads;
         std::vector<render::QuadInstance> bg_built;
 
         tb::SnapshotBuffer snapshots;
@@ -1343,22 +1347,22 @@ int run(const CliOptions& cli) {
             if (backglass_window) {
                 const uint64_t now_bg = tb_now_ns();
                 if (bg_pacer.should_attempt(now_bg)) {
-                    bg_quads.clear();
                     bg_built.clear();
                     render::BackglassContent content;
                     content.in_attract =
                         machine == nullptr || machine->state() == game::GameState::Attract;
                     if (machine != nullptr) {
+                        // machine exists only when loaded_table &&
+                        // script_loaded (its construction site); the
+                        // deref below is invariant-safe (cycle-1).
                         content.player_count = machine->player_count();
                         content.current_player = machine->current_player();
-                        const auto& ps = machine->player(1);
-                        content.ball_number = ps.ball_number;
+                        content.ball_number =
+                            machine->player(machine->current_player()).ball_number;
                         for (int pi = 1; pi <= content.player_count; ++pi) {
                             content.scores[size_t(pi - 1)] =
                                 loaded_table->script.player_scores(pi).score;
                         }
-                        content.ball_number =
-                            machine->player(machine->current_player()).ball_number;
                     } else if (loaded_table) {
                         content.player_count = 1;
                         content.scores[0] = loaded_table->script.player_scores(1).score;

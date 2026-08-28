@@ -110,7 +110,13 @@ int resolve_match(const std::string& match,
         return -1;
     }
     if (match.rfind("index:", 0) == 0) {
-        const int n = std::atoi(match.c_str() + 6);
+        const std::string digits = match.substr(6);
+        if (digits.empty() || !std::all_of(digits.begin(), digits.end(), [](char c) {
+                return c >= '0' && c <= '9';
+            })) {
+            return -1; // "index:abc"/"index: 2" must not silently bind 0
+        }
+        const int n = std::atoi(digits.c_str());
         return n >= 0 && size_t(n) < displays.size() ? n : -1;
     }
     if (match.rfind("name:", 0) == 0) {
@@ -140,47 +146,60 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
     }
 
     // --- 1. explicit config beats heuristics, per role independently ---
-    int pf = resolve_match(cfg.playfield.match, displays);
-    int bg = cfg.backglass.enabled ? resolve_match(cfg.backglass.match, displays) : -1;
-    if (cfg.playfield.match != "auto" && pf == -1) {
+    bool pf_ambiguous = false;
+    bool bg_ambiguous = false;
+    int pf = resolve_match(cfg.playfield.match, displays, &pf_ambiguous);
+    int bg =
+        cfg.backglass.enabled ? resolve_match(cfg.backglass.match, displays, &bg_ambiguous) : -1;
+    if (pf_ambiguous) {
+        a.warnings.push_back("playfield name match '" + cfg.playfield.match +
+                             "' is ambiguous; using the lowest index");
+    }
+    if (bg_ambiguous) {
+        a.warnings.push_back("backglass name match '" + cfg.backglass.match +
+                             "' is ambiguous; using the lowest index");
+    }
+    if (!cfg.playfield.match.empty() && cfg.playfield.match != "auto" && pf == -1) {
         a.warnings.push_back("playfield match '" + cfg.playfield.match +
                              "' not found; using heuristics");
     }
-    if (cfg.backglass.enabled && cfg.backglass.match != "auto" && bg == -1) {
+    if (cfg.backglass.enabled && !cfg.backglass.match.empty() && cfg.backglass.match != "auto" &&
+        bg == -1) {
         a.warnings.push_back("backglass match '" + cfg.backglass.match +
                              "' not found; using heuristics");
     }
+    bool bg_dropped = false; // same-display collision: FINAL (§3 step 1)
     if (pf != -1 && pf == bg) {
         a.warnings.push_back("playfield and backglass match the same display; backglass dropped");
         bg = -1;
+        bg_dropped = true;
     }
 
     // --- 2. stability: reuse last auto assignment when nothing changed ---
-    if (pf == -1 && cfg.backglass.match == "auto" && cfg.last_auto.present) {
+    if (pf == -1 && (cfg.backglass.match.empty() || cfg.backglass.match == "auto") &&
+        cfg.last_auto.present) {
         // Same display-name SET and every last_auto name resolves uniquely.
         std::vector<std::string> names;
         for (const DisplayInfo& d : displays) {
             names.push_back(d.name);
         }
-        std::vector<std::string> last_names = names; // rebuild from cfg
-        last_names.clear();
+        std::vector<std::string> last_names;
         if (!cfg.last_auto.playfield.empty()) {
             last_names.push_back(cfg.last_auto.playfield);
         }
         if (!cfg.last_auto.backglass.empty()) {
             last_names.push_back(cfg.last_auto.backglass);
         }
-        // All last_auto entries must exist in the current set.
-        bool all_present = true;
-        for (const std::string& want : last_names) {
-            const bool found = std::any_of(
-                names.begin(), names.end(), [&](const std::string& n) { return n == want; });
-            if (!found) {
-                all_present = false;
-                break;
-            }
-        }
-        if (all_present && !last_names.empty()) {
+        // §3 step 2: SET equality, BOTH directions — a newly attached
+        // or removed display breaks the reuse (subset-only kept a
+        // no-backglass result forever; cycle-1 review).
+        auto set_of = [](std::vector<std::string> v) {
+            std::sort(v.begin(), v.end());
+            v.erase(std::unique(v.begin(), v.end()), v.end());
+            return v;
+        };
+        const bool all_present = !last_names.empty() && set_of(names) == set_of(last_names);
+        if (all_present) {
             // Resolve by name against the CURRENT indices.
             int pf_by_name = -1;
             int bg_by_name = -1;
@@ -219,17 +238,18 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
         }
     }
     if (pf == -1) {
-        const std::vector<const DisplayInfo*>* pool =
-            !portrait.empty() ? &portrait : (!landscape.empty() ? &landscape : nullptr);
-        if (pool == nullptr) {
-            pool = &portrait; // both empty -> ds itself (below rebuilds)
+        // Portrait else landscape else everything (the neither-pool
+        // case: near-square displays like 5:4 panels).
+        const std::vector<const DisplayInfo*>* pool = &portrait;
+        if (pool->empty()) {
+            pool = &landscape;
         }
-        std::vector<const DisplayInfo*> all;
-        if (portrait.empty() && landscape.empty()) {
+        std::vector<const DisplayInfo*> everything;
+        if (pool->empty()) {
             for (const DisplayInfo& d : displays) {
-                all.push_back(&d);
+                everything.push_back(&d);
             }
-            pool = &all;
+            pool = &everything;
         }
         const DisplayInfo* best = nullptr;
         for (const DisplayInfo* d : *pool) {
@@ -239,7 +259,10 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
         }
         pf = best != nullptr ? best->index : -1;
     }
-    if (cfg.backglass.match == "auto" && bg == -1 && cfg.backglass.enabled) {
+    // A failed explicit match falls through to heuristics (the warning
+    // above promises it); a same-display collision drop is deliberate
+    // and must NOT be re-picked (cycle-1 regression).
+    if (bg == -1 && !bg_dropped && cfg.backglass.enabled) {
         const DisplayInfo* best = nullptr;
         for (const DisplayInfo& d : displays) {
             if (d.index == pf) {
@@ -255,9 +278,15 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
     // --- 4. rotation resolution ---
     a.playfield = pf;
     a.backglass = bg;
-    a.pf_rotation = cfg.playfield.rotation != "auto"
-                        ? parse_rotation(cfg.playfield.rotation)
-                        : (pf >= 0 ? auto_pf_rotation(displays[size_t(pf)], bg, displays) : 0);
+    a.pf_rotation =
+        cfg.playfield.rotation != "auto" ? parse_rotation(cfg.playfield.rotation) : ([&] {
+            for (const DisplayInfo& d : displays) {
+                if (d.index == pf) {
+                    return auto_pf_rotation(d, bg, displays);
+                }
+            }
+            return 0;
+        })();
     a.bg_rotation = parse_rotation(cfg.backglass.rotation);
     return a;
 }
@@ -304,6 +333,12 @@ DisplaysFileResult load_displays_json(const std::string& text) {
     if (!doc.is_object()) {
         res.corrupt = true;
         return res;
+    }
+    if (auto it = doc.find("version"); it != doc.end() && it->is_number_integer()) {
+        if (it->get<int>() != 1) {
+            res.corrupt = true; // unknown schema version: refuse, not guess
+            return res;
+        }
     }
     DisplaysConfig cfg;
     if (auto it = doc.find("playfield"); it != doc.end()) {

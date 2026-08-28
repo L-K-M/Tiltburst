@@ -37,9 +37,11 @@ public:
     uint32_t skips() const { return skips_; }
 
 private:
+    // A skip does not advance next_ns_, so the deadline stays in the
+    // past and should_attempt() keeps returning true until a frame is
+    // drawn — the retry needs no extra flag (cycle-1 review).
     uint64_t next_ns_ = 0;
     bool primed_ = false;
-    bool awaiting_result_ = false;
     uint32_t drawn_ = 0;
     uint32_t skips_ = 0;
 };

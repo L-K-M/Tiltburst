@@ -3,9 +3,6 @@
 namespace tb::platform {
 
 bool BackglassPacer::should_attempt(uint64_t now_ns) {
-    if (awaiting_result_) {
-        return true; // last attempt was skipped: retry next playfield frame
-    }
     if (!primed_) {
         next_ns_ = now_ns;
         primed_ = true;
@@ -20,7 +17,6 @@ bool BackglassPacer::should_attempt(uint64_t now_ns) {
 }
 
 void BackglassPacer::report_drawn(uint64_t now_ns) {
-    awaiting_result_ = false;
     ++drawn_;
     // Advance from the DEADLINE, not from now: a frame drawn 5 ms late
     // does not slide the whole cadence late.
@@ -31,7 +27,6 @@ void BackglassPacer::report_drawn(uint64_t now_ns) {
 }
 
 void BackglassPacer::report_skipped() {
-    awaiting_result_ = false;
     ++skips_;
     // Deadline NOT advanced (07 §8): the attempt repeats next frame.
 }

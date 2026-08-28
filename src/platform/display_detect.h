@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -10,11 +11,13 @@
 namespace tb::platform {
 
 struct DisplayInfo {
-    int index = 0;
+    int index = 0; // position in the enumeration (0..n-1)
     int w = 0;
     int h = 0;
     float refresh_hz = 0.0f; // 0/unknown -> treated as 60 by scoring
     std::string name;        // e.g. "SAMSUNG 32in TV"
+    uint32_t sdl_id = 0;     // SDL_DisplayID for window creation (07 §2);
+                             // 0 for synthetic/test entries
 };
 
 // min(w,h)/max(w,h) in (0,1]; 1.0 = square (07 §1).
@@ -61,6 +64,12 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
 int resolve_match(const std::string& match,
                   const std::vector<DisplayInfo>& displays,
                   bool* ambiguous = nullptr);
+
+// SDL enumeration fill-in (07 §2); declared here (the header's own
+// contract), defined in display_detect_sdl.cpp. Index = position in
+// SDL order even when a desktop mode is unavailable (skipped entries
+// keep their position so indices never shift).
+bool enumerate_displays(std::vector<DisplayInfo>& out);
 
 // displays.json (07 §5): missing file -> all-"auto" defaults + false.
 // Corrupt file -> false + defaults (the caller logs; the run continues

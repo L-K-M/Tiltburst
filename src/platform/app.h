@@ -30,6 +30,7 @@ struct CliOptions {
     int window_h = 1080;
     std::string screenshot_dir;
     std::string table;
+    bool windowed = false; // --windowed was passed (07 §11 dev mode)
 
     // Set when parsing fails: reason filled, exit_code == 2 (§2.1).
     std::string error;

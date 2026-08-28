@@ -19,6 +19,6 @@ add_library(tb_audio STATIC
     sfx_synth.cpp
 )
 
-target_include_directories(tb_audio PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(tb_audio PUBLIC ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(tb_audio PUBLIC tb_core nlohmann_json::nlohmann_json
                                       miniaudio::miniaudio)

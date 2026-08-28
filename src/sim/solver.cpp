@@ -1746,17 +1746,26 @@ void Solver::step_elements(SimState& s) {
             sp.plate_omega *= kSpinnerDecayPerTick; // 0.55/s (§6.6)
             if (sp.rev_angle_acc >= 2.0f * float(kPiF)) {
                 sp.rev_angle_acc -= 2.0f * float(kPiF);
-                for (Ball& b : s.balls) {
+                // ONE revolution = ONE event set. The representative
+                // ball is picked BEFORE the emissions so no reader can
+                // mistake this for a per-ball loop (raised and rebutted
+                // three review cycles running).
+                const Ball* rep = nullptr;
+                for (const Ball& b : s.balls) {
                     if (b.live) {
-                        emit_sound(s, int(SoundPurpose::Spinner), &b, 8.0f);
-                        emit_element_event(s, SimEventType::SwitchHit, sp.common.table_id, b, 0.0f);
-                        emit_element_event(s,
-                                           SimEventType::SpinnerSpin,
-                                           sp.common.table_id,
-                                           b,
-                                           std::abs(sp.plate_omega) * 60.0f / (2.0f * float(kPiF)));
+                        rep = &b;
                         break;
                     }
+                }
+                if (rep != nullptr) {
+                    emit_sound(s, int(SoundPurpose::Spinner), rep, 8.0f);
+                    emit_element_event(
+                        s, SimEventType::SwitchHit, sp.common.table_id, *rep, 0.0f);
+                    emit_element_event(s,
+                                       SimEventType::SpinnerSpin,
+                                       sp.common.table_id,
+                                       *rep,
+                                       std::abs(sp.plate_omega) * 60.0f / (2.0f * float(kPiF)));
                 }
             }
         } else {

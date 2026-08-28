@@ -127,7 +127,10 @@ int resolve_match(const std::string& match,
         // string is UB (C standard), not merely implementation-defined.
         char* end = nullptr;
         const long v = std::strtol(digits.c_str(), &end, 10);
-        if (end == nullptr || *end != '\0' || v < 0 || v > long(std::numeric_limits<int>::max())) {
+        // end == start rejects a no-conversion result ("index:")
+        // unconditionally — not by the empty-digits check's ordering.
+        if (end == nullptr || end == digits.c_str() || *end != '\0' || v < 0 ||
+            v > long(std::numeric_limits<int>::max())) {
             return -1;
         }
         const int n = int(v);

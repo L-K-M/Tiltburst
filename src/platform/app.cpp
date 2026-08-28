@@ -760,8 +760,6 @@ int run(const CliOptions& cli) {
         }
 
         // --- Display topology (07-displays.md, M12) ---
-        // Windowed dev mode (§11) skips detection; the backglass is a
-        // second 640x512 window beside the playfield.
         platform::DisplaysConfig displays_cfg;
         {
             const std::filesystem::path cfg_path =
@@ -779,8 +777,12 @@ int run(const CliOptions& cli) {
         }
 
         platform::WindowPtr backglass_window;
-        int bg_rotation = 0;
-        if (!cli.headless) {
+        if (!cli.headless && !cli.windowed) {
+            // Fullscreen cabinet path. --windowed dev mode (§11) skips
+            // detection and creates its own second window below.
+            // (bg_rotation rides on the Assignment and is consumed by
+            // the M13 art pass — v1 backglass content is
+            // orientation-agnostic by design.)
             std::vector<platform::DisplayInfo> displays;
             platform::Assignment assign;
             if (platform::enumerate_displays(displays)) {

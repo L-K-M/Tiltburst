@@ -12,6 +12,9 @@ WindowPtr create_fullscreen_window(const std::string& title,
                                    uint32_t height,
                                    uint32_t display) {
     SDL_PropertiesID p = SDL_CreateProperties();
+    if (p == 0) {
+        return nullptr; // allocation failure: fail cleanly, not defaults
+    }
     SDL_SetStringProperty(p, SDL_PROP_WINDOW_CREATE_TITLE_STRING, title.c_str());
     SDL_SetNumberProperty(
         p, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED_DISPLAY(display));

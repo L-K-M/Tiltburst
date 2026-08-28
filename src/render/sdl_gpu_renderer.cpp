@@ -327,6 +327,9 @@ bool SdlGpuRenderer::render_backglass(const BackglassFrame& frame) {
     if (backglass_ == nullptr) {
         return false;
     }
+    // sim_time_s_ is assigned only from snapshot->tick (unsigned) * ms,
+    // so it can never be negative; a clamp here guarded nothing (and
+    // std::max(NaN, 0.0) returns NaN anyway — it was never a NaN guard).
     SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(device_);
     if (cmd == nullptr) {
         ++stats_.backglass_skips;

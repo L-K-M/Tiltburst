@@ -1143,14 +1143,19 @@ int run(const CliOptions& cli) {
             // only the published snapshot, never the live objects
             // (cycle-5 review: the old direct reads were a data race).
             if (machine != nullptr) {
-                snap.game.player_count = machine->player_count();
-                snap.game.current_player = machine->current_player();
+                snap.game.player_count =
+                    std::clamp(machine->player_count(), 1, decltype(snap.game)::kMaxPlayers);
+                snap.game.current_player =
+                    std::clamp(machine->current_player(), 1, snap.game.player_count);
                 snap.game.ball_number = machine->player(machine->current_player()).ball_number;
                 snap.game.game_state = uint8_t(machine->state());
                 for (int pi = 1; pi <= snap.game.player_count; ++pi) {
                     snap.game.scores[size_t(pi - 1)] = loaded_table->script.player_scores(pi).score;
                 }
             } else if (loaded_table) {
+                // No framework attached: attract EXPLICITLY — never by
+                // relying on GameState::Attract == 0.
+                snap.game.game_state = uint8_t(game::GameState::Attract);
                 snap.game.scores[0] = loaded_table->script.player_scores(1).score;
             }
             if (loaded_table) {
@@ -1158,12 +1163,13 @@ int run(const CliOptions& cli) {
                 snap.game.layout = bm.layout;
                 snap.game.focus_player = bm.focus_player;
                 snap.game.message_style = bm.message_style;
-                snap.game.message_len = bm.message_len;
-                std::memcpy(snap.game.message,
-                            bm.message,
-                            std::min(size_t(bm.message_len), sizeof(snap.game.message) - 1));
-                snap.game.message[std::min(size_t(bm.message_len), sizeof(snap.game.message) - 1)] =
-                    '\0';
+                // Clamp ONCE and store the clamped length — a longer
+                // live message must not leave a stale tail in the copy.
+                const uint32_t msg_len =
+                    uint32_t(std::min(size_t(bm.message_len), sizeof(snap.game.message) - 1));
+                snap.game.message_len = msg_len;
+                std::memcpy(snap.game.message, bm.message, msg_len);
+                snap.game.message[msg_len] = '\0';
             }
             snapshots.publish(snap);
 

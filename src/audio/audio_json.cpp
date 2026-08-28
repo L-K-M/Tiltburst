@@ -159,7 +159,12 @@ bool decode_wav(const std::filesystem::path& dir,
     const std::filesystem::path path = dir / rel_path;
     ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 1, 48000);
     ma_decoder dec;
+#if defined(_WIN32)
+    // Narrow-char paths break on non-ASCII directories (cycle-13).
+    if (ma_decoder_init_file_w(path.wstring().c_str(), &cfg, &dec) != MA_SUCCESS) {
+#else
     if (ma_decoder_init_file(path.string().c_str(), &cfg, &dec) != MA_SUCCESS) {
+#endif
         return false;
     }
     constexpr ma_uint64 kMaxFrames = 48000ull * 10;

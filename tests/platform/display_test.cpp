@@ -446,4 +446,33 @@ TEST(DisplayAssign, AmbiguousGlobWarns) {
     EXPECT_NE(a.warnings[0].find("ambiguous"), std::string::npos);
 }
 
+// A disabled backglass must stay disabled through the stability path.
+TEST(DisplayAssign, DisabledBackglassSurvivesStabilityReuse) {
+    std::vector<platform::DisplayInfo> ds = {
+        make_display(0, 1920, 1080, 60, "TV"),
+        make_display(1, 1280, 1024, 60, "NEC"),
+    };
+    platform::DisplaysConfig cfg;
+    cfg.backglass.enabled = false;
+    cfg.last_auto.present = true;
+    cfg.last_auto.playfield = "TV";
+    cfg.last_auto.backglass = "NEC"; // last run had one; user disabled it
+    const auto a = platform::detect(ds, cfg);
+    EXPECT_EQ(a.playfield, 0);
+    EXPECT_EQ(a.backglass, -1); // disabled, not resurrected
+}
+
+// A string/float version is an unknown schema, refused.
+TEST(DisplaysJson, NonIntegerVersionRefused) {
+    EXPECT_TRUE(platform::load_displays_json(R"json({"version": "2"})json").corrupt);
+    EXPECT_TRUE(platform::load_displays_json(R"json({"version": 2.5})json").corrupt);
+}
+
+// Overflowing index never UBs.
+TEST(DisplayAssign, OverflowIndexRejected) {
+    std::vector<platform::DisplayInfo> ds = {make_display(0, 1080, 1920)};
+    EXPECT_EQ(platform::resolve_match("index:99999999999", ds), -1);
+    EXPECT_EQ(platform::resolve_match("index:2147483648", ds), -1);
+}
+
 } // namespace

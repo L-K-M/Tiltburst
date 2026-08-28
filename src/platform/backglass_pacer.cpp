@@ -19,11 +19,11 @@ bool BackglassPacer::should_attempt(uint64_t now_ns) {
 void BackglassPacer::report_drawn(uint64_t now_ns) {
     ++drawn_;
     // Advance from the DEADLINE, not from now: a frame drawn 5 ms late
-    // does not slide the whole cadence late.
+    // does not slide the whole cadence late. (No second resync here:
+    // under the documented call pattern should_attempt() already
+    // snapped the deadline past any >100 ms backlog before the attempt
+    // that led here — the extra check was unreachable.)
     next_ns_ += kFrameNs;
-    if (now_ns > next_ns_ && now_ns - next_ns_ > kHitchResyncNs) {
-        next_ns_ = now_ns; // still hopelessly behind: resync
-    }
 }
 
 void BackglassPacer::report_skipped() {

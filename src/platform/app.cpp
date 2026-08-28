@@ -760,22 +760,6 @@ int run(const CliOptions& cli) {
         }
 
         // --- Display topology (07-displays.md, M12) ---
-        platform::DisplaysConfig displays_cfg;
-        {
-            const std::filesystem::path cfg_path =
-                paths::pref() / "displays.json"; // --display-config: M18
-            std::ifstream cfg_in(cfg_path);
-            if (cfg_in.good()) {
-                const auto parsed = platform::load_displays_json(std::string(
-                    std::istreambuf_iterator<char>(cfg_in), std::istreambuf_iterator<char>()));
-                if (parsed.corrupt) {
-                    TB_LOG_WARN("main", "displays.json corrupt; using heuristics");
-                } else if (parsed.loaded) {
-                    displays_cfg = parsed.cfg;
-                }
-            }
-        }
-
         platform::WindowPtr backglass_window;
         if (!cli.headless && !cli.windowed) {
             // Fullscreen cabinet path. --windowed dev mode (§11) skips
@@ -783,6 +767,25 @@ int run(const CliOptions& cli) {
             // (bg_rotation rides on the Assignment and is consumed by
             // the M13 art pass — v1 backglass content is
             // orientation-agnostic by design.)
+            //
+            // displays.json loads ONLY on this path — headless and
+            // windowed runs never read a config they cannot consume.
+            platform::DisplaysConfig displays_cfg;
+            {
+                const std::filesystem::path cfg_path =
+                    paths::pref() / "displays.json"; // --display-config: M18
+                std::ifstream cfg_in(cfg_path);
+                if (cfg_in.good()) {
+                    const auto parsed = platform::load_displays_json(std::string(
+                        std::istreambuf_iterator<char>(cfg_in), std::istreambuf_iterator<char>()));
+                    if (parsed.corrupt) {
+                        TB_LOG_WARN("main", "displays.json corrupt; using heuristics");
+                    } else if (parsed.loaded) {
+                        displays_cfg = parsed.cfg;
+                    }
+                }
+            }
+
             std::vector<platform::DisplayInfo> displays;
             platform::Assignment assign;
             if (platform::enumerate_displays(displays)) {
@@ -824,9 +827,10 @@ int run(const CliOptions& cli) {
                     }
                 }
             }
-        } else if (cli.windowed && !cli.headless && displays_cfg.backglass.enabled) {
+        } else if (cli.windowed && !cli.headless) {
             // §11 dev mode: a second 640x512 window (side positioning
-            // lands with M18 menu work; v1 centers it).
+            // lands with M18 menu work; v1 centers it). No displays.json
+            // on this path — the dev window always exists.
             backglass_window = platform::create_window("Tiltburst Backglass", 640, 512);
         }
 

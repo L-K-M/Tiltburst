@@ -3,6 +3,8 @@
 #include "audio/sfx_synth.h"
 #include "sim/sound_out.h"
 
+#include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>

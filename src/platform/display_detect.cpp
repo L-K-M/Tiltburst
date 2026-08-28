@@ -176,8 +176,11 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
     }
 
     // --- 2. stability: reuse last auto assignment when nothing changed ---
-    if (pf == -1 && cfg.backglass.enabled &&
-        (cfg.backglass.match.empty() || cfg.backglass.match == "auto") && cfg.last_auto.present) {
+    // Stability protects the PLAYFIELD across runs even when the
+    // backglass is disabled — only the backglass half of the reuse is
+    // suppressed below (cycle-4 review).
+    if (pf == -1 && (cfg.backglass.match.empty() || cfg.backglass.match == "auto") &&
+        cfg.last_auto.present) {
         // Same display-name SET and every last_auto name resolves uniquely.
         std::vector<std::string> names;
         for (const DisplayInfo& d : displays) {
@@ -215,7 +218,7 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
             }
             if (pf_by_name != -1 && pf_by_name != bg_by_name) {
                 a.playfield = pf_by_name;
-                a.backglass = bg_by_name; // enabled gated at the top
+                a.backglass = cfg.backglass.enabled ? bg_by_name : -1;
                 a.stability_reused = true;
                 a.pf_rotation =
                     cfg.playfield.rotation != "auto"
@@ -337,7 +340,8 @@ DisplaysFileResult load_displays_json(const std::string& text) {
     if (auto it = doc.find("version"); it != doc.end()) {
         // ANY present version must be the integer 1 — a string or float
         // form is an unknown schema: refuse, not guess.
-        if (!it->is_number_integer() || it->get<int>() != 1) {
+        // 64-bit compare first: a huge integer must not narrow to 1.
+        if (!it->is_number_integer() || it->get<int64_t>() != 1) {
             res.corrupt = true;
             return res;
         }

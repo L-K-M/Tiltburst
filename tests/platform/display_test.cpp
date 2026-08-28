@@ -460,6 +460,9 @@ TEST(DisplayAssign, DisabledBackglassSurvivesStabilityReuse) {
     const auto a = platform::detect(ds, cfg);
     EXPECT_EQ(a.playfield, 0);
     EXPECT_EQ(a.backglass, -1); // disabled, not resurrected
+    // The PLAYFIELD half of the reuse still ran: disabled backglass
+    // must not cost playfield stability (cycle-4).
+    EXPECT_TRUE(a.stability_reused);
 }
 
 // A string/float version is an unknown schema, refused.

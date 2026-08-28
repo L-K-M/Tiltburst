@@ -154,8 +154,16 @@ bool decode_wav(const std::filesystem::path& dir,
     // has_root_path() also rejects root-relative ("/x", "\x") and
     // drive/UNC forms that is_absolute() misses on Windows (an
     // absolute path always HAS a root path, so this subsumes it).
-    if (rel_path.has_root_path() || rel.find("..") != std::string::npos ||
-        rel.find(':') != std::string::npos) {
+    // ".." is checked per COMPONENT: "foo..bar.wav" is a legal name,
+    // only an actual parent traversal escapes.
+    bool parent_hop = false;
+    for (const auto& part : rel_path) {
+        if (part == "..") {
+            parent_hop = true;
+            break;
+        }
+    }
+    if (rel_path.has_root_path() || parent_hop || rel.find(':') != std::string::npos) {
         TB_LOG_ERROR("audio", "wav path '{}' escapes the pack", rel);
         return false;
     }
@@ -196,9 +204,15 @@ bool decode_wav(const std::filesystem::path& dir,
 
 bool load_audio_json(const std::filesystem::path& dir, TableAudio& out) {
     const std::filesystem::path file = dir / "audio.json";
+    std::error_code ec;
+    if (!std::filesystem::exists(file, ec)) {
+        return false; // optional file: built-ins cover everything (§6)
+    }
     std::ifstream in(file);
     if (!in.good()) {
-        return false; // optional file: built-ins cover everything (§6)
+        // Present but unreadable (permissions): a SILENT built-ins
+        // fallback would hide author mistakes — fail loudly instead.
+        fail("audio.json exists but cannot be read", "/audio.json");
     }
     json doc;
     try {

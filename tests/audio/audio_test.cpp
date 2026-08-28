@@ -111,8 +111,8 @@ TEST(SfxSynth, PatchRendersDeterministicPcm) {
 
     // All 24 built-ins render (id slots 0-23 stable, §5.5).
     auto bank = audio::PatchBank::built_ins();
-    ASSERT_EQ(bank->entries.size(), 24u);
-    for (const auto& e : bank->entries) {
+    ASSERT_EQ(bank->size(), 24u);
+    for (const auto& e : bank->patch_entries()) {
         EXPECT_FALSE(e.pcm.empty()) << e.name;
     }
 }
@@ -198,9 +198,9 @@ TEST(Mixer, VoiceStealOldestNoClick) {
     EXPECT_EQ(sys.stats().active_voices.load(), 32u);
 
     // A LOWER-priority sound loses and is dropped (§3.2 rule 2):
-    // menu_select (patch 18, priority 2) cannot steal anything at 4+.
+    // menu_move (patch 18, priority 2) cannot steal anything at 4+.
     const uint32_t dropped_before = sys.stats().dropped_events.load();
-    ev.patch = 18; // menu_select, priority 2
+    ev.patch = 18; // menu_move, priority 2
     ASSERT_TRUE(sys.sound_queue().push(ev));
     sys.publish_tick(4);
     sys.render_offline(buf, 128);
@@ -346,7 +346,7 @@ TEST(AudioBank, AssetsMirrorMatchesBuiltIns) {
         FAIL() << "assets/patches.json: " << e.what();
     }
     auto bank = audio::PatchBank::built_ins();
-    ASSERT_EQ(bank->entries.size(), 24u);
+    ASSERT_EQ(bank->size(), 24u);
     ASSERT_TRUE(doc.is_object());
     ASSERT_EQ(doc.size(), 24u);
     // Key order == id order (§5.5) AND every parameter matches the
@@ -355,7 +355,7 @@ TEST(AudioBank, AssetsMirrorMatchesBuiltIns) {
     ASSERT_EQ(params.size(), 24u);
     size_t i = 0;
     for (auto it = doc.begin(); it != doc.end(); ++it, ++i) {
-        EXPECT_EQ(it.key(), bank->entries[i].name) << "id " << i;
+        EXPECT_EQ(it.key(), bank->patch_entries()[i].name) << "id " << i;
         const audio::SfxPatch parsed = audio::parse_patch_json(*it, "/" + it.key());
         EXPECT_EQ(parsed, params[i].second) << "params for '" << it.key() << "'";
     }
@@ -371,7 +371,7 @@ TEST(AudioJson, LoadsTestLabAndValidates) {
     auto bank = audio::build_bank(ta, tb::test::data_path("tables/test-lab"), purpose);
     ASSERT_NE(bank, nullptr);
     // Built-ins 0-23 + 6 table patches = 30 ids.
-    EXPECT_EQ(bank->entries.size(), 30u);
+    EXPECT_EQ(bank->size(), 30u);
     EXPECT_EQ(bank->find("sfx_mode_start"), 24);
     // Defaults resolve (§7.2).
     EXPECT_EQ(purpose[int(sim::SoundPurpose::Flipper)], bank->find("flipper_clack"));

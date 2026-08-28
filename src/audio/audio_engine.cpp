@@ -229,10 +229,10 @@ int acquire_voice(AudioEngineImpl& impl,
                   uint32_t start_frame,
                   int period,
                   int periods) {
-    if (ev.patch >= bank.entries.size()) {
+    if (ev.patch >= bank.size()) {
         return -1;
     }
-    const PatchEntry& entry = bank.entries[ev.patch];
+    const PatchEntry& entry = bank.patch_entries()[ev.patch];
     if (entry.pcm.empty()) {
         return -1;
     }

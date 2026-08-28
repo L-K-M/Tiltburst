@@ -957,12 +957,12 @@ int run(const CliOptions& cli) {
             // borrowing name pointers from it would dangle.
             intern_names.clear();
             patch_intern.clear();
-            intern_names.reserve(bank->entries.size());
-            patch_intern.reserve(bank->entries.size());
-            for (size_t i = 0; i < bank->entries.size(); ++i) {
-                intern_names.push_back(bank->entries[i].name);
+            intern_names.reserve(bank->size());
+            patch_intern.reserve(bank->size());
+            for (size_t i = 0; i < bank->size(); ++i) {
+                intern_names.push_back(bank->patch_entries()[i].name);
             }
-            for (size_t i = 0; i < bank->entries.size(); ++i) {
+            for (size_t i = 0; i < bank->size(); ++i) {
                 patch_intern.push_back({intern_names[i].c_str(), uint16_t(i)});
             }
             audio.publish_bank(std::move(bank));

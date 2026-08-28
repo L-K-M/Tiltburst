@@ -304,15 +304,15 @@ std::unique_ptr<PatchBank> build_bank(const TableAudio& audio,
         if (!render_patch(patch, name, e.pcm)) {
             fail("patch '" + name + "' rendered silence", "/patches/" + name);
         }
-        const auto existing = bank->by_name.find(name);
-        if (existing != bank->by_name.end()) {
-            bank->entries[existing->second] = std::move(e); // override in place
+        const auto existing = bank->mutable_names().find(name);
+        if (existing != bank->mutable_names().end()) {
+            bank->mutable_entries()[existing->second] = std::move(e); // override in place
         } else {
-            if (bank->entries.size() >= 0xFFFF) {
+            if (bank->mutable_entries().size() >= 0xFFFF) {
                 fail("patch bank exceeds 65535 entries (id space)", "/patches/" + name);
             }
-            bank->by_name.emplace(name, uint16_t(bank->entries.size()));
-            bank->entries.push_back(std::move(e));
+            bank->mutable_names().emplace(name, uint16_t(bank->mutable_entries().size()));
+            bank->mutable_entries().push_back(std::move(e));
         }
     }
     for (const auto& [name, rel] : audio.wav) {
@@ -323,12 +323,12 @@ std::unique_ptr<PatchBank> build_bank(const TableAudio& audio,
         if (!decode_wav(dir / rel, e.pcm)) {
             fail("wav '" + name + "' could not be decoded from '" + rel + "'", "/wav/" + name);
         }
-        const auto existing = bank->by_name.find(name);
-        if (existing != bank->by_name.end()) {
-            bank->entries[existing->second] = std::move(e);
+        const auto existing = bank->mutable_names().find(name);
+        if (existing != bank->mutable_names().end()) {
+            bank->mutable_entries()[existing->second] = std::move(e);
         } else {
-            bank->by_name.emplace(name, uint16_t(bank->entries.size()));
-            bank->entries.push_back(std::move(e));
+            bank->mutable_names().emplace(name, uint16_t(bank->mutable_entries().size()));
+            bank->mutable_entries().push_back(std::move(e));
         }
     }
 

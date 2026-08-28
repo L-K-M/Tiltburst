@@ -5,8 +5,8 @@
 namespace tb::audio {
 
 int PatchBank::find(const std::string& name) const {
-    const auto it = by_name.find(name);
-    return it == by_name.end() ? -1 : int(it->second);
+    const auto it = by_name_.find(name);
+    return it == by_name_.end() ? -1 : int(it->second);
 }
 
 namespace {
@@ -361,7 +361,7 @@ const std::vector<std::pair<std::string, SfxPatch>>& PatchBank::built_in_params(
 
 std::unique_ptr<PatchBank> PatchBank::built_ins() {
     auto bank = std::make_unique<PatchBank>();
-    bank->entries.reserve(32);
+    bank->mutable_entries().reserve(32);
     for (const BuiltinDef& def : kBuiltIns) {
         PatchEntry e;
         e.name = def.name;
@@ -374,8 +374,8 @@ std::unique_ptr<PatchBank> PatchBank::built_ins() {
             TB_LOG_WARN("audio", "built-in patch '{}' rendered silence", def.name);
             e.pcm.clear();
         }
-        bank->by_name.emplace(e.name, uint16_t(bank->entries.size()));
-        bank->entries.push_back(std::move(e));
+        bank->mutable_names().emplace(e.name, uint16_t(bank->mutable_entries().size()));
+        bank->mutable_entries().push_back(std::move(e));
     }
     return bank;
 }

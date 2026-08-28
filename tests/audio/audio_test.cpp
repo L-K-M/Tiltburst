@@ -468,4 +468,36 @@ TEST(AudioJson, WavLoadsFromAbsolutePackDir) {
     std::filesystem::remove_all(dir, ec);
 }
 
+// Escape rejections: root-relative and UNC forms must fail even where
+// is_absolute() is false (Windows) — has_root_path() closes it.
+TEST(AudioJson, WavGuardRejectsEscapes) {
+    for (const char* bad : {"/escape.wav",
+                            "\\escape.wav",
+                            "//server/share/x.wav",
+                            "C:escape.wav",
+                            "assets/../../escape.wav"}) {
+        std::filesystem::path dir =
+            std::filesystem::temp_directory_path() / ("tb_wav_esc_" + std::to_string(tb_now_ns()));
+        std::filesystem::create_directories(dir);
+        {
+            const std::string json_text = std::string(R"json({ "wav": { "bad": ")json") + bad +
+                                          std::string(R"json(" } })json");
+            std::ofstream(dir / "audio.json") << json_text;
+        }
+        audio::TableAudio ta;
+        bool threw = false;
+        try {
+            if (audio::load_audio_json(dir, ta)) {
+                int purpose[sim::SimState::kSoundPurposeCount] = {};
+                auto bank = audio::build_bank(ta, dir, purpose);
+            }
+        } catch (const audio::AudioLoadError&) {
+            threw = true;
+        }
+        EXPECT_TRUE(threw) << "escape '" << bad << "' was accepted";
+        std::error_code ec;
+        std::filesystem::remove_all(dir, ec);
+    }
+}
+
 } // namespace

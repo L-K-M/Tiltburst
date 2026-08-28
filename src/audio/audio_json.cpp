@@ -151,7 +151,10 @@ bool decode_wav(const std::filesystem::path& dir,
     // is trusted and may legitimately be absolute or carry a drive
     // letter. ':' also rejects drive-relative forms (C:foo).
     const std::filesystem::path rel_path(rel);
-    if (rel_path.is_absolute() || rel.find("..") != std::string::npos ||
+    // has_root_path() also rejects root-relative ("/x", "\x") and
+    // drive/UNC forms that is_absolute() misses on Windows (an
+    // absolute path always HAS a root path, so this subsumes it).
+    if (rel_path.has_root_path() || rel.find("..") != std::string::npos ||
         rel.find(':') != std::string::npos) {
         TB_LOG_ERROR("audio", "wav path '{}' escapes the pack", rel);
         return false;

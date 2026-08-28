@@ -27,7 +27,8 @@ public:
     // Intrusive retire-chain link (audio_engine's epoch protocol);
     // null unless this bank is retired awaiting an ack.
     PatchBank* retire_next = nullptr;
-    // -1 when unknown ("none" is never an id — it disables a purpose).
+    // The int return is deliberate: -1 is the disabled sentinel, so
+    // callers must check >= 0 before any size_t use.
     int find(const std::string& name) const;
 
     // §5.5: the bank is immutable after build — reads only.
@@ -35,7 +36,10 @@ public:
 
     size_t size() const { return entries_.size(); }
 
-    const PatchEntry& operator[](size_t i) const { return entries_[i]; }
+    const PatchEntry& operator[](size_t i) const {
+        assert(i < entries_.size());
+        return entries_[i];
+    }
 
     // Renders the 24 built-ins (§7.1, ids 0-23 in listed order).
     static std::unique_ptr<PatchBank> built_ins();

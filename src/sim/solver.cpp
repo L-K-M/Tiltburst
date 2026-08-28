@@ -1746,10 +1746,9 @@ void Solver::step_elements(SimState& s) {
             sp.plate_omega *= kSpinnerDecayPerTick; // 0.55/s (§6.6)
             if (sp.rev_angle_acc >= 2.0f * float(kPiF)) {
                 sp.rev_angle_acc -= 2.0f * float(kPiF);
-                // ONE revolution = ONE event set. The representative
-                // ball is picked BEFORE the emissions so no reader can
-                // mistake this for a per-ball loop (raised and rebutted
-                // three review cycles running).
+                // ONE revolution = ONE event set. A single
+                // representative live ball is chosen, then the sound
+                // and events are emitted exactly once per revolution.
                 const Ball* rep = nullptr;
                 for (const Ball& b : s.balls) {
                     if (b.live) {

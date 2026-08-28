@@ -58,14 +58,21 @@ bool pf_beats(const DisplayInfo& a, const DisplayInfo& b) {
     return a.index < b.index; // -index: lower index wins
 }
 
-// §3 step 3: backglass key (squareness, then area, then index).
+// §3 step 3: backglass key — EXACTLY (squareness, w*h, -index);
+// deliberately NOT reusing pf_beats (which folds in refresh_hz — the
+// backglass key has no Hz term; cycle-8 review).
 bool bg_beats(const DisplayInfo& a, const DisplayInfo& b) {
     const float sq_a = squareness(a);
     const float sq_b = squareness(b);
     if (sq_a != sq_b) {
         return sq_a > sq_b;
     }
-    return pf_beats(a, b);
+    const long long area_a = static_cast<long long>(a.w) * a.h;
+    const long long area_b = static_cast<long long>(b.w) * b.h;
+    if (area_a != area_b) {
+        return area_a > area_b;
+    }
+    return a.index < b.index;
 }
 
 // §3 step 4: the cabinet-vs-desktop rotation call.
@@ -116,8 +123,15 @@ int resolve_match(const std::string& match,
             })) {
             return -1; // "index:abc"/"index: 2" must not silently bind 0
         }
-        const int n = std::atoi(digits.c_str());
-        return n >= 0 && size_t(n) < displays.size() ? n : -1;
+        // strtol with a range guard: atoi on an out-of-range digit
+        // string is UB (C standard), not merely implementation-defined.
+        char* end = nullptr;
+        const long v = std::strtol(digits.c_str(), &end, 10);
+        if (end == nullptr || *end != '\0' || v < 0 || v > long(std::numeric_limits<int>::max())) {
+            return -1;
+        }
+        const int n = int(v);
+        return size_t(n) < displays.size() ? n : -1;
     }
     if (match.rfind("name:", 0) == 0) {
         const std::string pattern = match.substr(5);

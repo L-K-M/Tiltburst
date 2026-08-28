@@ -68,6 +68,15 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Fixed
 
+- M11 (post-review hardening): the patch-bank epoch ack moved to mix
+  exit (an entry ack could free a bank mid-mix); the envelope loop's
+  >= semantics fix a 0/0 NaN wedge; voice start offsets are consumed
+  once (sounds longer than one buffer no longer chop); wav path
+  guards validate the pack-relative string (root-relative, UNC,
+  drive-relative, separator-split, and component-wise ".." traversal
+  all rejected, legal dot-dot filenames pass); an unreadable
+  audio.json fails loudly; the assets/patches.json mirror test
+  compares full parameter sets.
 - M10 (post-review hardening): multiplayer SHOOT AGAIN rotation (the
   extra ball is consumed where the pointer decision is made), tilt
   force-ejects energized magnets on de-energize, score-0 games never

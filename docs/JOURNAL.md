@@ -474,10 +474,30 @@ corrections are new entries. Format: 03-process.md §3.1.
   while the attack envelope is still rising — the test asserts the
   true bound; and the synth's env-vol branch for zero-length stages
   is dead code by construction (the while-skip advances them first).
-- tests/audio: 10 tests — deterministic PCM golden hashes (5
+- tests/audio: 15 tests — deterministic PCM golden hashes (5
   reference patches + all 24 built-ins bounded), exact 5-tick spacing
   via a debug start log (240 samples ± the ±1 ms gate), steal/drop/
-  cap rules, callback allocation-free (the M10 alloc hook), clock
-  drift convergence + single re-anchor, limiter bound, audio.json
-  load/validate (bad map key, "none" patch, sustain+decay=0, unknown
-  param, "none" disables). 112/112 total.
+  cap rules, callback allocation-free (the M10 alloc hook, drain path
+  inside the measured window), clock drift convergence + single
+  re-anchor (tolerance inside the ±500 ppm clamp span so it can
+  actually fail), limiter bound, audio.json load/validate (bad map
+  key, "none" patch, sustain+decay=0, unknown param, "none" disables),
+  assets/patches.json full-parameter mirror, wav-from-absolute-pack
+  regression, and path-escape rejections. 115/115 total.
+- Review saga: 23 cycles to steady state. The real catches clustered
+  in the first and last thirds: the bank-lifetime epoch-ack race
+  (entry ack blessed a publish while the old pointer was still mixing
+  — the ack moved to mix exit), the 0/0 envelope NaN (attack=0 +
+  sustain=0 wedged DECAY until >= semantics), the wav guard validating
+  the JOINED path (rejected every wav on Windows, then root-relative
+  rel escapes, then Windows separator splits, then legal
+  "foo..bar.wav" — five cycles on one guard, each a real flaw), the
+  AudioSystem impl leak, and — best of the tail — start_frame never
+  being cleared, which chopped every sound longer than one buffer to
+  its tail share; the scheduling test could not see it because both
+  its events lived within one buffer. Recurring false premises
+  (NSDMI zero-init ×6, JSONC ×4, the spinner loop's break ×3) were
+  restructured into misreading-proof shapes where cheap. Process
+  lessons reaffirmed: comment-only fixes still need compile+test, and
+  an assertion whose tolerance spans the whole legal range is
+  decorative.

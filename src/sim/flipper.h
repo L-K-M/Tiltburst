@@ -50,6 +50,8 @@ struct Flipper {
     bool enabled = true;                    // tb.set_flipper_enabled / tilt
     uint16_t table_id = 0xFFFF;             // TableDef element index (script lookup)
     bool button_latched = false;            // logical level used this tick
+    bool sound_prev_pressed = false;        // press edge for the flipper
+                                            // sound purpose (12 §7.2)
     uint32_t ticks_since_eos = 0xFFFFFFFFu; // live-catch window clock
     uint32_t rise_ticks = 0;                // time since RISING entry (τ_rise ramp)
     float drop_omega = 0.0f;                // |ω| accumulated during DROPPING

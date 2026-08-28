@@ -22,8 +22,10 @@ struct CliOptions {
     bool headless = false;
     bool dev = false;
     bool render_smoke = false;
-    bool latency_test = false; // §14.4 photodiode measurement mode
-    int frames = 120;          // --render-smoke frame count
+    bool latency_test = false;       // §14.4 photodiode measurement mode
+    bool audio_null = false;         // 12 §2: null backend (CLI/CI)
+    bool audio_latency_test = false; // 12 §12: p50/p95 measurement mode
+    int frames = 120;                // --render-smoke frame count
     int window_w = 540;
     int window_h = 1080;
     std::string screenshot_dir;

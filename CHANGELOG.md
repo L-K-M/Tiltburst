@@ -8,6 +8,15 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Added
 
+- M11: audio engine (12-audio.md) — miniaudio device with the period
+  ladder and §2.2 startup log, allocation-free 32-voice mixer with
+  priority/age stealing + per-patch cap, the sfxr-style SFX synth
+  (44.1 kHz generation, −1 dBFS normalization, 48 kHz output), the
+  drift-corrected tick→sample clock with sample-accurate scheduling,
+  audio.json patches/wav/map with the 24-patch built-in bank, all 19
+  automatic §7.2 purposes fired from the sim with impact velocity and
+  position pan, tb.play_sound, framework sounds, and --audio-null /
+  --audio-latency-test. tables/test-lab ships its §6.1 audio.json.
 - M10: game framework (11-game-framework.md §2–§7) — the GameState
   machine running in phase 3 of the sim tick, 1–4 player rotation with
   per-player tb.state swap, extra balls/replay, nudge physics with the
@@ -59,6 +68,15 @@ project versions the product, not the library API; v1.0.0 is milestone M20.
 
 ### Fixed
 
+- M10 (post-review hardening): multiplayer SHOOT AGAIN rotation (the
+  extra ball is consumed where the pointer decision is made), tilt
+  force-ejects energized magnets on de-energize, score-0 games never
+  qualify for initials (a persisted 0 would have wiped the file on the
+  next boot), corrupt score files keep a .bad copy and never lose the
+  only copy on a failed keep, single-key physics.tilt tables keep the
+  warn/hard pair ordered, out-of-range nudge levels fall back to the
+  middle strength, and the golden recorder/compare paths share one
+  replay helper with provenance and full 30-sample coverage.
 - M09: §3.8 push-out now depenetrates arcs (a 7 m/s orbit ball could
   tunnel through the corner-arc wall band; det_golden regenerated).
 - M09: inlane_outlane_pair outlane mouth widened to 32.8 mm passable

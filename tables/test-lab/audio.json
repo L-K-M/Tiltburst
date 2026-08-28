@@ -1,0 +1,49 @@
+{
+  // test-lab — minimal valid audio file. Canon: PLAN.md 5.8.
+  // Companion to table.json (09-table-format.md §7) and rules.lua
+  // (10-scripting.md §6); used by tb_audio unit tests and the authoring docs.
+  "patches": {
+    // SFX referenced by rules.lua
+    "sfx_mode_start":  { "wave": "square", "base_freq": 0.45, "punch": 0.4,
+                         "sustain": 0.25, "decay": 0.35, "arp_mod": 0.5,
+                         "arp_speed": 0.5, "priority": 7 },
+    "sfx_bonus_count": { "wave": "triangle", "base_freq": 0.5,
+                         "sustain": 0.03, "decay": 0.1, "volume_db": -3,
+                         "priority": 4 },
+    "sfx_scoop":       { "wave": "noise", "base_freq": 0.14, "punch": 0.4,
+                         "sustain": 0.08, "decay": 0.22, "lpf_cutoff": 0.35,
+                         "priority": 6 },
+    // Tracker instruments for the "main" song (channel rules in §8.1)
+    "lab_lead": { "wave": "square", "duty": 0.25, "attack": 0.02,
+                  "sustain": 0.4, "decay": 0.25, "volume_db": -2 },
+    "lab_bass": { "wave": "triangle", "sustain": 0.5, "decay": 0.2 },
+    "lab_kit":  { "wave": "noise", "sustain": 0, "decay": 0.15 }
+  },
+  "songs": {
+    // Reserved id (§9); rules.lua starts it with tb.play_music("main").
+    "main": {
+      "bpm": 120, "ticks_per_row": 12,
+      "patterns": {
+        "A": {
+          "pulse1": ["A-4 lab_lead 10", "---", "C-5", "---",
+                     "E-5", "---", "C-5", "---",
+                     "G-4", "---", "B-4", "---",
+                     "D-5", "---", "B-4", "OFF"],
+          "pulse2": ["---", "A-3 lab_lead 6", "---", "A-3",
+                     "---", "A-3", "---", "A-3",
+                     "---", "G-3", "---", "G-3",
+                     "---", "G-3", "---", "G-3"],
+          "wide":   ["A-2 lab_bass 12", "---", "A-2", "---",
+                     "A-2", "---", "A-2", "---",
+                     "G-2", "---", "G-2", "---",
+                     "G-2", "---", "G-2", "---"],
+          "noise":  ["C-2 lab_kit 14", "C-6 . 5", "C-2 . 14", "C-6 . 5",
+                     "C-2 . 14", "C-6 . 5", "C-2 . 14", "C-6 . 5",
+                     "C-2 . 14", "C-6 . 5", "C-2 . 14", "C-6 . 5",
+                     "C-2 . 14", "C-6 . 5", "C-2 . 14", "C-6 . 5"]
+        }
+      },
+      "order": ["A"]
+    }
+  }
+}

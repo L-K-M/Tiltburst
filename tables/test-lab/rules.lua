@@ -40,6 +40,7 @@ local function start_frenzy()
   tb.backglass.set_layout("mode")
   tb.backglass.animate("mode_start")
   tb.show_message("LAB FRENZY!", { style = "mode", duration_ms = 3000 })
+  tb.play_sound("sfx_mode_start", { duck = true })   -- music dips (12 §10)
   tb.timer(CONFIG.FRENZY_MS, function()         -- frozen while not in play
     if tb.state.frenzy ~= frenzy_token then return end
     tb.state.frenzy = false
@@ -66,6 +67,17 @@ tb.on("ball_start", function()
   tb.backglass.set_layout("scores")
   set_lane_light()
   tb.ball_save(CONFIG.BALL_SAVE_MS)
+end)
+
+tb.on("ball_end", function(ev)
+  -- The framework is about to count bonus x multiplier; dress it (10 §6).
+  tb.play_sound("sfx_bonus_count")
+  tb.show_message("BONUS " .. ev.bonus .. " x" .. ev.bonus_multiplier,
+                  { style = "mode", duration_ms = 2000 })
+end)
+
+tb.on("kicker_enter", function(ev)
+  tb.play_sound("sfx_scoop")                     -- capture blip (12 §6.1)
 end)
 
 tb.on("game_end", function(ev)

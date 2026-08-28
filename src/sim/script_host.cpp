@@ -590,7 +590,35 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
                     });
 
     // ---- sound/music (§3.3): request emission only; playback is M11 ----
-    tb.set_function("play_sound", [](const std::string&, sol::object) {});
+    // §3.3/12 §6.2: resolve the id through the intern table published
+    // with the table's bank; velocity 1.0, pan 0.0 (no ball behind a
+    // script emission — impact/pan are the automatic purposes' job).
+    tb.set_function("play_sound", [this](const char* id, sol::object opts) {
+        if (id == nullptr || impl_->sim == nullptr || impl_->sim->sound_queue == nullptr) {
+            return;
+        }
+        // Linear scan of the intern table (§5.5): banks are tens of
+        // entries in practice; a hash here would cost more than it
+        // saves on the sim thread.
+        int patch = -1;
+        for (uint32_t i = 0; i < impl_->sim->patch_intern_n; ++i) {
+            if (std::strcmp(impl_->sim->patch_intern[i].name, id) == 0) {
+                patch = impl_->sim->patch_intern[i].id;
+                break;
+            }
+        }
+        if (patch < 0) {
+            TB_LOG_WARN("script", "tb.play_sound: unknown id '{}'", id);
+            return;
+        }
+        SoundEvent ev{}; // NSDMIs: velocity 1.0, pan 0.0 per 12 s4.1
+        ev.tick = uint32_t(impl_->sim->tick);
+        ev.patch = uint16_t(patch);
+        if (opts.is<sol::table>() && opts.as<sol::table>().get_or("duck", false)) {
+            ev.flags |= 1u; // duck (§10; music bus arrives M14)
+        }
+        (void)impl_->sim->sound_queue->push(ev); // full: dropped (§4.1)
+    });
     tb.set_function("play_music", [](const std::string&) {});
     tb.set_function("stop_music", []() {});
 

@@ -8,8 +8,17 @@ if(NOT TARGET miniaudio::miniaudio)
         INTERFACE_INCLUDE_DIRECTORIES "${miniaudio_INCLUDE_DIR}")
 endif()
 
+find_package(nlohmann_json CONFIG REQUIRED)
+
 add_library(tb_audio STATIC
     audio.cpp
+    miniaudio_impl.c
+    audio_bank.cpp
+    audio_engine.cpp
+    audio_json.cpp
+    sfx_synth.cpp
 )
 
-target_link_libraries(tb_audio PUBLIC tb_core miniaudio::miniaudio)
+target_include_directories(tb_audio PUBLIC ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(tb_audio PUBLIC tb_core nlohmann_json::nlohmann_json
+                                      miniaudio::miniaudio)

@@ -514,6 +514,7 @@ int run(const CliOptions& cli) {
             snap.tilt_armed = uint8_t((sim_state.tilt.warn_armed ? 1u : 0u) |
                                       (sim_state.tilt.hard_armed ? 2u : 0u) |
                                       (sim_state.tilt.abuse_armed ? 4u : 0u));
+
             snapshots.publish(snap);
         });
         const uint64_t start = tb_now_ns();
@@ -1136,6 +1137,34 @@ int run(const CliOptions& cli) {
             snap.tilt_armed = uint8_t((sim_state.tilt.warn_armed ? 1u : 0u) |
                                       (sim_state.tilt.hard_armed ? 2u : 0u) |
                                       (sim_state.tilt.abuse_armed ? 4u : 0u));
+
+            // Game-layer fields for the backglass (07 §8): filled HERE,
+            // on the sim thread that owns them — the render loop reads
+            // only the published snapshot, never the live objects
+            // (cycle-5 review: the old direct reads were a data race).
+            if (machine != nullptr) {
+                snap.game.player_count = machine->player_count();
+                snap.game.current_player = machine->current_player();
+                snap.game.ball_number = machine->player(machine->current_player()).ball_number;
+                snap.game.game_state = uint8_t(machine->state());
+                for (int pi = 1; pi <= snap.game.player_count; ++pi) {
+                    snap.game.scores[size_t(pi - 1)] = loaded_table->script.player_scores(pi).score;
+                }
+            } else if (loaded_table) {
+                snap.game.scores[0] = loaded_table->script.player_scores(1).score;
+            }
+            if (loaded_table) {
+                const sim::BackglassModel& bm = loaded_table->script.backglass();
+                snap.game.layout = bm.layout;
+                snap.game.focus_player = bm.focus_player;
+                snap.game.message_style = bm.message_style;
+                snap.game.message_len = bm.message_len;
+                std::memcpy(snap.game.message,
+                            bm.message,
+                            std::min(size_t(bm.message_len), sizeof(snap.game.message) - 1));
+                snap.game.message[std::min(size_t(bm.message_len), sizeof(snap.game.message) - 1)] =
+                    '\0';
+            }
             snapshots.publish(snap);
 
             // §14.1 stages 1–3 of this tick's latency record.
@@ -1354,24 +1383,18 @@ int run(const CliOptions& cli) {
                 const uint64_t now_bg = tb_now_ns();
                 if (bg_pacer.should_attempt(now_bg)) {
                     bg_built.clear();
+                    // Everything below reads the SNAPSHOT — the same
+                    // record the playfield frame used (07 §8); no live
+                    // ScriptHost/GameMachine access on this thread.
                     render::BackglassContent content;
                     content.in_attract =
-                        machine == nullptr || machine->state() == game::GameState::Attract;
-                    if (machine != nullptr) {
-                        // machine exists only when loaded_table &&
-                        // script_loaded (its construction site); the
-                        // deref below is invariant-safe (cycle-1).
-                        content.player_count = machine->player_count();
-                        content.current_player = machine->current_player();
-                        content.ball_number =
-                            machine->player(machine->current_player()).ball_number;
-                        for (int pi = 1; pi <= content.player_count; ++pi) {
-                            content.scores[size_t(pi - 1)] =
-                                loaded_table->script.player_scores(pi).score;
-                        }
-                    } else if (loaded_table) {
-                        content.player_count = 1;
-                        content.scores[0] = loaded_table->script.player_scores(1).score;
+                        snap.game.game_state == uint8_t(game::GameState::Attract) ||
+                        snap.game.player_count <= 0;
+                    content.player_count = std::max(1, snap.game.player_count);
+                    content.current_player = snap.game.current_player;
+                    content.ball_number = snap.game.ball_number;
+                    for (int pi = 0; pi < content.player_count; ++pi) {
+                        content.scores[size_t(pi)] = snap.game.scores[size_t(std::min(pi, 3))];
                     }
                     for (uint32_t i = 0; i < high_scores.entries().size() && i < 10; ++i) {
                         auto& row = content.high_scores[i];
@@ -1381,11 +1404,15 @@ int run(const CliOptions& cli) {
                         row.score = high_scores.entries()[i].score;
                         ++content.high_score_count;
                     }
-                    bg_layout.build(content,
-                                    loaded_table ? loaded_table->script.backglass()
-                                                 : game_no_table_model,
-                                    bg_font,
-                                    &bg_built);
+                    sim::BackglassModel model; // rebuilt from the snapshot copy
+                    model.layout = snap.game.layout;
+                    model.focus_player = snap.game.focus_player;
+                    model.message_style = snap.game.message_style;
+                    model.message_len = snap.game.message_len;
+                    std::memcpy(model.message,
+                                snap.game.message,
+                                std::min(size_t(snap.game.message_len), sizeof(model.message)));
+                    bg_layout.build(content, model, bg_font, &bg_built);
                     render::BackglassFrame bframe;
                     bframe.quads = bg_built.data();
                     bframe.quad_count = uint32_t(bg_built.size());

@@ -38,6 +38,29 @@ struct SimSnapshot {
     float tilt_abuse = 0.0f;              // abuse accumulator (m/s)
     uint16_t tilt_crossings = 0;          // per-ball crossing count
     uint8_t tilt_armed = 0x7;             // warn|hard|abuse arm bits
+
+    // Game-layer state for the backglass (07 §8: "produced by the game
+    // layer on the main thread from the latest SimSnapshot — the same
+    // snapshot read the playfield frame used; no extra sim access").
+    // The sim thread fills this from the GameMachine/ScriptHost each
+    // tick; the render loop NEVER reads those live objects.
+    struct Game {
+        static constexpr int kMaxPlayers = 4;
+        int player_count = 1;
+        int current_player = 1; // 1-based
+        int ball_number = 1;
+        uint8_t game_state = 0; // game::GameState value
+        uint8_t _pad[3] = {};
+        uint64_t scores[kMaxPlayers] = {};
+
+        // BackglassModel copy (message ticker + layout).
+        static constexpr uint32_t kMessageCap = 64;
+        int layout = 0;
+        int focus_player = 1;
+        int message_style = 0;
+        uint32_t message_len = 0;
+        char message[kMessageCap + 1] = {};
+    } game{};
 };
 
 // Triple buffer (§7.2, binding). Single writer (sim), single reader

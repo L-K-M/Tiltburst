@@ -1759,8 +1759,7 @@ void Solver::step_elements(SimState& s) {
                 }
                 if (rep != nullptr) {
                     emit_sound(s, int(SoundPurpose::Spinner), rep, 8.0f);
-                    emit_element_event(
-                        s, SimEventType::SwitchHit, sp.common.table_id, *rep, 0.0f);
+                    emit_element_event(s, SimEventType::SwitchHit, sp.common.table_id, *rep, 0.0f);
                     emit_element_event(s,
                                        SimEventType::SpinnerSpin,
                                        sp.common.table_id,

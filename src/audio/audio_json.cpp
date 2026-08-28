@@ -93,7 +93,9 @@ bool is_known_key(const std::string& k) {
     return false;
 }
 
-SfxPatch parse_patch(const json& obj, const std::string& pointer) {
+} // namespace
+
+SfxPatch parse_patch_json(const json& obj, const std::string& pointer) {
     if (!obj.is_object()) {
         fail("patch must be an object", pointer);
     }
@@ -138,11 +140,16 @@ SfxPatch parse_patch(const json& obj, const std::string& pointer) {
 
 // §5.5: a wav entry decodes to 48 kHz mono PCM via ma_decoder; stereo
 // downmixes 0.5*(L+R); longer than 10 s is an error.
+namespace {
+
 bool decode_wav(const std::filesystem::path& path, std::vector<float>& out_pcm) {
     // The path comes from table JSON: reject absolute paths and any
     // ".." component so a pack cannot read outside itself.
     const std::string ps = path.string();
-    if (path.is_absolute() || ps.find("..") != std::string::npos) {
+    // ':' also rejects Windows drive-relative paths (C:foo), which are
+    // neither absolute nor pack-relative.
+    if (path.is_absolute() || ps.find("..") != std::string::npos ||
+        ps.find(':') != std::string::npos) {
         TB_LOG_ERROR("audio", "wav path '{}' escapes the pack", ps);
         return false;
     }
@@ -206,7 +213,7 @@ bool load_audio_json(const std::filesystem::path& dir, TableAudio& out) {
             if (it.key() == "none") {
                 fail("a patch may not be named \"none\" (reserved, §6.2c)", "/patches/" + it.key());
             }
-            out.patches.emplace_back(it.key(), parse_patch(*it, "/patches/" + it.key()));
+            out.patches.emplace_back(it.key(), parse_patch_json(*it, "/patches/" + it.key()));
         }
     }
     if (doc.contains("wav")) {

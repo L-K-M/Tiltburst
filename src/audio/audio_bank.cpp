@@ -348,6 +348,17 @@ const BuiltinDef kBuiltIns[24] = {
 
 } // namespace
 
+const std::vector<std::pair<std::string, SfxPatch>>& PatchBank::built_in_params() {
+    static const std::vector<std::pair<std::string, SfxPatch>> table = [] {
+        std::vector<std::pair<std::string, SfxPatch>> out;
+        for (const BuiltinDef& def : kBuiltIns) {
+            out.emplace_back(def.name, def.patch);
+        }
+        return out;
+    }();
+    return table;
+}
+
 std::unique_ptr<PatchBank> PatchBank::built_ins() {
     auto bank = std::make_unique<PatchBank>();
     bank->entries.reserve(32);

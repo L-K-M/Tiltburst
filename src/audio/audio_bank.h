@@ -25,7 +25,7 @@ class PatchBank {
 public:
     // Intrusive retire-chain link (audio_engine's epoch protocol);
     // null unless this bank is retired awaiting an ack.
-    PatchBank* __chain_next = nullptr;
+    PatchBank* retire_next = nullptr;
     // Interned id -> entry. Ids 0..23 are the built-ins in §7.1 order;
     // table patches/wavs continue at 24 in JSON key order, and a table
     // patch with a built-in's name OVERRIDES it in place (same id).
@@ -37,6 +37,9 @@ public:
 
     // Renders the 24 built-ins (§7.1, ids 0-23 in listed order).
     static std::unique_ptr<PatchBank> built_ins();
+    // The compiled §7.1 parameter table (name, params) in id order —
+    // the sync source for the assets/patches.json mirror test.
+    static const std::vector<std::pair<std::string, SfxPatch>>& built_in_params();
 };
 
 // The §7.2 purpose vocabulary lives in sim/sound_out.h (the emission

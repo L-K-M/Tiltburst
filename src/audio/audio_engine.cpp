@@ -337,10 +337,10 @@ void AudioSystem::publish_bank(std::unique_ptr<PatchBank> bank) {
             // frees everything.
             PatchBank* first = impl_->retired;
             impl_->retired = old;
-            old->__chain_next = first; // intrusive singly-linked list
+            old->retire_next = first; // intrusive singly-linked list
         } else {
             impl_->retired = old;
-            old->__chain_next = nullptr;
+            old->retire_next = nullptr;
         }
         impl_->retired_epoch = epoch;
     }
@@ -354,7 +354,7 @@ void AudioSystem::pump() {
         stats_.acked_epoch.load(std::memory_order_acquire) >= impl_->retired_epoch) {
         PatchBank* p = impl_->retired;
         while (p != nullptr) {
-            PatchBank* next = p->__chain_next;
+            PatchBank* next = p->retire_next;
             delete p;
             p = next;
         }
@@ -526,7 +526,7 @@ void AudioSystem::shutdown() {
     {
         PatchBank* p = impl_->retired;
         while (p != nullptr) {
-            PatchBank* next = p->__chain_next;
+            PatchBank* next = p->retire_next;
             delete p;
             p = next;
         }

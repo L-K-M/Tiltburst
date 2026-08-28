@@ -3,8 +3,11 @@
 #include "audio/audio_bank.h"
 #include "audio/sfx_synth.h"
 
+#include <nlohmann/json.hpp>
+
 #include <filesystem>
 #include <map>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -29,6 +32,10 @@ struct TableAudio {
     std::map<std::string, std::string> map;
     bool has_songs = false; // songs are parsed for shape and deferred to M14
 };
+
+// Parses one patch object (§5.1 keys/ranges) — public for the
+// assets-mirror sync test. Throws AudioLoadError.
+SfxPatch parse_patch_json(const nlohmann::ordered_json& obj, const std::string& pointer);
 
 // Parses <dir>/audio.json. Throws AudioLoadError on schema violations
 // (§5.1 ranges, unknown keys, sustain==0 && decay==0, illegal map keys,

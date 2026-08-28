@@ -346,10 +346,15 @@ TEST(AudioBank, AssetsMirrorMatchesBuiltIns) {
     ASSERT_EQ(bank->entries.size(), 24u);
     ASSERT_TRUE(doc.is_object());
     ASSERT_EQ(doc.size(), 24u);
-    // Key order == id order (5.5).
+    // Key order == id order (§5.5) AND every parameter matches the
+    // compiled table — a drift in either direction fails here.
+    const auto& params = audio::PatchBank::built_in_params();
+    ASSERT_EQ(params.size(), 24u);
     size_t i = 0;
     for (auto it = doc.begin(); it != doc.end(); ++it, ++i) {
         EXPECT_EQ(it.key(), bank->entries[i].name) << "id " << i;
+        const audio::SfxPatch parsed = audio::parse_patch_json(*it, "/" + it.key());
+        EXPECT_EQ(parsed, params[i].second) << "params for '" << it.key() << "'";
     }
 }
 

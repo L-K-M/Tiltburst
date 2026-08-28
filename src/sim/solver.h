@@ -109,11 +109,13 @@ struct SimState {
     // producer (owned by the app's AudioSystem), the patch name intern
     // table for tb.play_sound, and per-ball rate-limit stamps for
     // wall_hit/ball_ball (30 ms, §7.2). All default to "no audio".
-    static constexpr int kSoundPurposeCount = 19;
+    static constexpr int kSoundPurposeCount = int(SoundPurpose::Count);
     // -1 = disabled: with a queue attached but no bank published, every
-    // purpose must be silent, not patch 0 (cycle-1 review).
+    // purpose must be silent, not patch 0 (cycle-1 review). The array
+    // size binds to the enum's Count — the initializer must match.
     int sound_purpose_patch[kSoundPurposeCount] = {
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+    static_assert(kSoundPurposeCount == 19, "purpose array initializer count");
     SoundProducer* sound_queue = nullptr;
     const PatchIntern* patch_intern = nullptr;
     uint32_t patch_intern_n = 0;

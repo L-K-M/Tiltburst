@@ -156,8 +156,12 @@ bool decode_wav(const std::filesystem::path& dir,
     // absolute path always HAS a root path, so this subsumes it).
     // ".." is checked per COMPONENT: "foo..bar.wav" is a legal name,
     // only an actual parent traversal escapes.
+    // Normalize separators FIRST: on Windows the path iterator only
+    // splits on '\', so "foo/../bar" would be one component and the
+    // hop check would miss it (cycle-19 review). The generic format
+    // splits both separators.
     bool parent_hop = false;
-    for (const auto& part : rel_path) {
+    for (const auto& part : std::filesystem::path(rel_path.generic_string())) {
         if (part == "..") {
             parent_hop = true;
             break;
@@ -205,7 +209,13 @@ bool decode_wav(const std::filesystem::path& dir,
 bool load_audio_json(const std::filesystem::path& dir, TableAudio& out) {
     const std::filesystem::path file = dir / "audio.json";
     std::error_code ec;
-    if (!std::filesystem::exists(file, ec)) {
+    const bool present = std::filesystem::exists(file, ec);
+    if (ec || !present) {
+        if (ec) {
+            // A stat failure is not "missing": surface it rather than
+            // silently shipping built-ins for an unreadable pack.
+            fail("audio.json existence check failed: " + ec.message(), "/audio.json");
+        }
         return false; // optional file: built-ins cover everything (§6)
     }
     std::ifstream in(file);

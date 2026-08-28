@@ -1147,8 +1147,7 @@ int run(const CliOptions& cli) {
                     std::clamp(machine->player_count(), 1, decltype(snap.game)::kMaxPlayers);
                 snap.game.current_player =
                     std::clamp(machine->current_player(), 1, snap.game.player_count);
-                snap.game.ball_number =
-                    machine->player(snap.game.current_player).ball_number;
+                snap.game.ball_number = machine->player(snap.game.current_player).ball_number;
                 snap.game.game_state = uint8_t(machine->state());
                 for (int pi = 1; pi <= snap.game.player_count; ++pi) {
                     snap.game.scores[size_t(pi - 1)] = loaded_table->script.player_scores(pi).score;

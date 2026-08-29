@@ -4,6 +4,7 @@
 #include "render/art_renderer.h"
 #include "render/font_atlas.h"
 #include "render/particles.h"
+#include "render/segment_digits.h"
 #include "render/tbart.h"
 #include "support/data_path.h"
 
@@ -431,6 +432,46 @@ TEST(Bloom, DisabledFallbackRenders) {
     // (The full GPU path is the RenderSmoke suite's domain.)
     SUCCEED() << "Quality::Off contract covered by config plumbing + "
                  "shader uniform math (strength * 0 == 0)";
+}
+
+// ---- SegmentDigits: masks, ghost brightness, comma ----
+TEST(SegmentDigits, DigitMasksAndGhosting) {
+    // §14.2 masks verbatim.
+    EXPECT_EQ(render::SegmentDigits::kDigitMask('0'), 0x0C3F);
+    EXPECT_EQ(render::SegmentDigits::kDigitMask('1'), 0x0006);
+    EXPECT_EQ(render::SegmentDigits::kDigitMask('8'), 0x00FF);
+    EXPECT_EQ(render::SegmentDigits::kDigitMask(' '), 0x0000);
+    EXPECT_EQ(render::SegmentDigits::kDigitMask('A'), 0x0000); // fallback
+
+    std::vector<render::QuadInstance> quads;
+    // Lit 8: 14 segments.
+    render::SegmentDigits::emit('8', 0, 0, 64, 96, true, 1, 0.2f, 0.5f, &quads);
+    EXPECT_EQ(quads.size(), 14u);
+    // All at full brightness.
+    for (const auto& q : quads) {
+        EXPECT_FLOAT_EQ(q.a, 1.0f);
+    }
+    // Ghost: 6%.
+    quads.clear();
+    render::SegmentDigits::emit('8', 0, 0, 64, 96, false, 1, 0.2f, 0.5f, &quads);
+    EXPECT_EQ(quads.size(), 14u);
+    for (const auto& q : quads) {
+        EXPECT_NEAR(q.a, 0.06f, 1e-5f);
+    }
+    // 1: 2 segments.
+    quads.clear();
+    render::SegmentDigits::emit('1', 0, 0, 64, 96, true, 1, 1, 1, &quads);
+    EXPECT_EQ(quads.size(), 2u);
+    // Comma: 1 capsule below baseline right of cell.
+    quads.clear();
+    render::SegmentDigits::emit(',', 0, 0, 64, 96, true, 1, 1, 1, &quads);
+    ASSERT_EQ(quads.size(), 1u);
+    EXPECT_LT(quads[0].cy, 0.0f);         // below baseline
+    EXPECT_GT(quads[0].cx, 64.0f * 0.5f); // right of cell center
+    // Space: nothing.
+    quads.clear();
+    render::SegmentDigits::emit(' ', 0, 0, 64, 96, true, 1, 1, 1, &quads);
+    EXPECT_TRUE(quads.empty());
 }
 
 } // namespace

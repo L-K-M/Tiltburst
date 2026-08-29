@@ -8,6 +8,7 @@ add_library(tb_render STATIC
     font_atlas.cpp
     art_renderer.cpp
     bloom_chain.cpp
+    segment_digits.cpp
     render_renderer.cpp
     overlay.cpp
     pipeline_quad.cpp

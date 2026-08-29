@@ -285,9 +285,14 @@ TEST(DisplaysJson, PersistRoundTrip) {
     cfg.last_auto.playfield = "TV";
     cfg.last_auto.backglass = "NEC 1280";
 
+    cfg.last_auto.displays = {"TV", "NEC 1280"};
+
     const std::string text = platform::save_displays_json(cfg);
     const auto res = platform::load_displays_json(text);
     ASSERT_TRUE(res.loaded);
+    ASSERT_EQ(res.cfg.last_auto.displays.size(), 2u);
+    EXPECT_EQ(res.cfg.last_auto.displays[0], "TV");
+    EXPECT_EQ(res.cfg.last_auto.displays[1], "NEC 1280");
     EXPECT_EQ(res.cfg.playfield.match, "name:LG*");
     EXPECT_EQ(res.cfg.playfield.rotation, "270");
     EXPECT_FALSE(res.cfg.backglass.enabled);

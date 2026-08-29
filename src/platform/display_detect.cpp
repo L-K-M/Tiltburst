@@ -438,6 +438,13 @@ DisplaysFileResult load_displays_json(const std::string& text) {
         if (auto b = it->find("backglass"); b != it->end() && b->is_string()) {
             cfg.last_auto.backglass = b->get<std::string>();
         }
+        if (auto d = it->find("displays"); d != it->end() && d->is_array()) {
+            for (const auto& n : *d) {
+                if (n.is_string()) {
+                    cfg.last_auto.displays.push_back(n.get<std::string>());
+                }
+            }
+        }
     }
     res.loaded = true;
     res.cfg = cfg;
@@ -455,6 +462,13 @@ std::string save_displays_json(const DisplaysConfig& cfg) {
     last["playfield"] = cfg.last_auto.present ? cfg.last_auto.playfield : "";
     last["backglass"] =
         cfg.last_auto.present && !cfg.last_auto.backglass.empty() ? cfg.last_auto.backglass : "";
+    if (cfg.last_auto.present) {
+        json names = json::array();
+        for (const std::string& n : cfg.last_auto.displays) {
+            names.push_back(n);
+        }
+        last["displays"] = std::move(names);
+    }
     doc["last_auto"] = std::move(last);
     return doc.dump(2) + "\n";
 }

@@ -33,6 +33,11 @@ struct RoleConfig {
     bool enabled = true;           // backglass only
 };
 
+// Duplicate-name displays dedupe in the set comparison by design: the
+// gate asks whether this is the same rig as last time, and two
+// same-named monitors swapped between ports are indistinguishable to
+// name matching either way - resolve_match ambiguity warnings are the
+// escalation path for that rig.
 struct LastAuto {
     bool present = false;
     std::string playfield;

@@ -231,8 +231,8 @@ void PresentPass::add_pass(SDL_GPUCommandBuffer* cmd,
     const float identity[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
     SDL_PushGPUVertexUniformData(cmd, 0, identity, sizeof(identity));
 
-    // §12.5 composite uniform block (b1, space3): bloom strength,
-    // u_crt, u_scene_px.
+    // §12.5 composite uniform block (fragment slot 0): bloom
+    // strength, u_crt, u_scene_px.
     struct CompositeUniforms {
         float bloom_strength;
         float u_crt;
@@ -244,7 +244,7 @@ void PresentPass::add_pass(SDL_GPUCommandBuffer* cmd,
     uniforms.u_crt = crt ? 1.0f : 0.0f;
     uniforms.scene_px[0] = float(scene_w);
     uniforms.scene_px[1] = float(scene_h);
-    SDL_PushGPUFragmentUniformData(cmd, 1, &uniforms, sizeof(uniforms));
+    SDL_PushGPUFragmentUniformData(cmd, 0, &uniforms, sizeof(uniforms));
 
     SDL_GPUColorTargetInfo tgt{};
     tgt.texture = target;
@@ -256,12 +256,11 @@ void PresentPass::add_pass(SDL_GPUCommandBuffer* cmd,
     SDL_BindGPUGraphicsPipeline(pass, pipeline_);
     SDL_GPUTextureSamplerBinding bindings[2] = {
         {scene, sampler_},
-        {bloom != nullptr ? bloom : scene, sampler_}, // null bloom: sample black
-                                                      // via the scene? No — see below
+        {bloom != nullptr ? bloom : scene, sampler_},
     };
-    // Null bloom fallback: bind the scene to slot 1 too; the shader
-    // multiplies it by bloom_strength, and Quality::Off callers pass
-    // bloom_strength 0 (the term vanishes identically).
+    // Null bloom (Quality::Off): the SCENE binds to slot 1 so the
+    // sampler is always valid; the caller passes strength 0 so the
+    // term is identically zero.
     SDL_BindGPUFragmentSamplers(pass, 0, bindings, 2);
     SDL_GPUBufferBinding vb{vertices_, 0};
     SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);

@@ -1332,6 +1332,7 @@ int run(const CliOptions& cli) {
             } catch (const render::ArtError& e) {
                 TB_LOG_ERROR("main", "art load failed: {} ({})", e.what(), e.json_pointer);
                 log::flush_now();
+                SDL_Quit();
                 return 1;
             }
         }
@@ -1512,11 +1513,14 @@ int run(const CliOptions& cli) {
             // consumes below_/above_ between the scene draws).
             art_renderer.build(
                 render_scene.lights.data(), render_scene.lights.size(), snap.sim_time_s);
+            // .data() reads MEMBER vectors (stable, no temporaries).
             render::ArtInstances art_instances;
-            art_instances.below = art_renderer.below_ball().data();
-            art_instances.below_count = uint32_t(art_renderer.below_ball().size());
-            art_instances.above = art_renderer.above_ball().data();
-            art_instances.above_count = uint32_t(art_renderer.above_ball().size());
+            const auto& below = art_renderer.below_ball();
+            const auto& above = art_renderer.above_ball();
+            art_instances.below = below.data();
+            art_instances.below_count = uint32_t(below.size());
+            art_instances.above = above.data();
+            art_instances.above_count = uint32_t(above.size());
             frame.art = &art_instances;
             frame.lights = render_scene.lights.data();
             frame.light_count = uint32_t(render_scene.lights.size());

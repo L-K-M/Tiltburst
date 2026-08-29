@@ -140,9 +140,6 @@ bool SdlGpuRenderer::init(const RendererConfig& cfg) {
     rotation_ = cfg.playfield_rotation;
     bloom_strength_ = cfg.bloom_strength;
     crt_ = cfg.crt;
-    if (scene_w_ > 0 && scene_h_ > 0) {
-        bloom_.ensure_targets(scene_w_, scene_h_);
-    }
 
     const platform::SwapchainInit sc =
         platform::create_device_for_window(playfield_, cfg.debug_device, "auto");
@@ -347,7 +344,14 @@ void SdlGpuRenderer::render_playfield(const RenderFrame& frame) {
         bloom_.record(cmd, scene_);
     }
     present_.build_corners(view_, w, h);
-    present_.add_pass(cmd, scene_, bloom_.bloom0(), tex, bloom_strength_, crt_, scene_w_, scene_h_);
+    present_.add_pass(cmd,
+                      scene_,
+                      bloom_.bloom0(),
+                      tex,
+                      bloom_.quality() == BloomChain::Quality::Off ? 0.0f : bloom_strength_,
+                      crt_,
+                      scene_w_,
+                      scene_h_);
 
     SDL_SubmitGPUCommandBuffer(cmd);
 

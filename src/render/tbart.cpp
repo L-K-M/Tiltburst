@@ -457,10 +457,14 @@ std::vector<ArtPrim> expand_prefab(const std::string& prefab,
         const float h = float(param_f("h", 0.24));
         const int lines = int(param_f("lines", 8));
         const uint32_t color = param_color("color", "primary");
+        // Rows shrink geometrically toward the TOP; FAR rows (high i,
+        // small y) get color × 0.4 — the perspective depth cue
+        // (§4.5 "Top rows use color × 0.4"; cycle-1 fixed the fade
+        // and the verticals' convergence below).
         float y = h * 0.5f;
         float spacing = h / float(lines + 1);
         for (int i = 0; i < lines; ++i) {
-            spacing *= 0.78f; // geometric shrink toward the top
+            spacing *= 0.78f;
             y -= spacing;
             ArtPrim seg;
             seg.kind = ArtPrim::Kind::Segment;
@@ -468,22 +472,23 @@ std::vector<ArtPrim> expand_prefab(const std::string& prefab,
             seg.a[1] = y;
             seg.b[0] = w * 0.5f;
             seg.b[1] = y;
-            const float fade = i < lines / 2 ? 0.4f : 1.0f; // top rows × 0.4
+            const float fade = float(i) / float(lines - 1) * 0.6f; // 1.0 → 0.4
             const uint32_t c =
-                (color & 0xFFFFFF00u) | uint32_t(float((color >> 0) & 0xFFu) * fade); // × fade
+                (color & 0xFFFFFF00u) | uint32_t(float(color & 0xFFu) * (1.0f - fade));
             seg.stroke = {0.0012f, c};
             seg.glow = {0.004f, 0.8f, false, c};
             out.push_back(child_prim(base, seg));
         }
-        // 7 converging verticals.
+        // 7 verticals CONVERGING toward the vanishing point: the top
+        // endpoint pulls to center x=0 (cycle-1 — the original
+        // diverged outward).
         for (int i = 0; i < 7; ++i) {
             const float x = -w * 0.5f + w * float(i) / 6.0f;
-            const float spread = w * 0.5f * float(i) / 6.0f * 0.5f;
             ArtPrim seg;
             seg.kind = ArtPrim::Kind::Segment;
             seg.a[0] = x;
             seg.a[1] = h * 0.5f;
-            seg.b[0] = x < 0.0f ? x - spread : x + spread;
+            seg.b[0] = x * 0.15f;
             seg.b[1] = -h * 0.5f;
             seg.stroke = {0.0012f, (color & 0xFFFFFF00u) | 0x80u};
             out.push_back(child_prim(base, seg));
@@ -506,6 +511,9 @@ ArtPrim parse_prim(const json& p,
 
     if (kind == "decal") {
         prim.kind = ArtPrim::Kind::DecalGroup;
+        if (!p.contains("transform")) {
+            fail("decal missing transform", pointer + "/transform");
+        }
         const Transform base = parse_transform(p.at("transform"), pointer + "/transform");
         if (p.contains("prefab") == p.contains("image")) {
             fail("decal needs exactly one of prefab|image", pointer);

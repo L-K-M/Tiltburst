@@ -96,7 +96,6 @@ bool FontAtlas::bake(const std::filesystem::path& fonts_dir) {
                 stbtt_PackEnd(&pack);
                 return false;
             }
-            (void)oversample;
             for (int i = 0; i < 95; ++i) {
                 const auto& c = chars[size_t(i)];
                 Glyph g;
@@ -133,7 +132,7 @@ bool FontAtlas::bake(const std::filesystem::path& fonts_dir) {
 }
 
 const FontAtlas::Glyph* FontAtlas::glyph(Font font, uint32_t baked_size, uint32_t codepoint) const {
-    if (!baked_) {
+    if (!baked_ || int(font) < 0 || int(font) >= kFontCount) {
         return nullptr;
     }
     int si = -1;

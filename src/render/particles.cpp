@@ -21,7 +21,12 @@ uint32_t lerp_rgba(uint32_t a, uint32_t b, float t) {
 }
 
 uint32_t scale_rgba(uint32_t c, float f) {
-    const auto ch = [c, f](int shift) { return uint32_t(float((c >> shift) & 0xFFu) * f); };
+    // Clamp: brightness 1.4 on a 255 channel would wrap to ~102
+    // (uint32 truncation) — the clamp keeps it hot-white (cycle-1).
+    const auto ch = [c, f](int shift) {
+        const float v = float((c >> shift) & 0xFFu) * f;
+        return uint32_t(v > 255.0f ? 255.0f : v);
+    };
     return (ch(24) << 24) | (ch(16) << 16) | (ch(8) << 8) | ch(0);
 }
 
@@ -56,6 +61,7 @@ void ParticleSystem::set_palette(const uint32_t (&roles)[8]) {
 }
 
 int ParticleSystem::spawn(Effect effect, float x, float y, const float* dir) {
+    (void)dir; // cone shapes read cone_dir from the Emitter row
     // §13.4 canonical rows (binding). Role indices follow palette order.
     const int PRIMARY = 2, SECONDARY = 3, ACCENT1 = 4, WARM = 6, BG1 = 1, GLOW = 7, ACCENT2 = 5;
     Emitter e;
@@ -189,21 +195,16 @@ int ParticleSystem::spawn(Effect effect, float x, float y, const float* dir) {
         return 0;
     }
 
-    const int before = int(live_);
-    if (e.rate_mode) {
-        // Rate effects accumulate in update() via their callers feeding
-        // positions each frame; a direct spawn() call is a single
-        // particle (scripted EffectRequests use burst effects).
-        emit(e, x, y, dir);
-    } else {
-        for (int i = 0; i < e.burst; ++i) {
-            emit(e, x, y, dir);
-        }
+    // Burst effects spawn fully; rate effects spawn one per call (the
+    // caller invokes at its own cadence; M13b wires per-frame rates).
+    const int burst = e.rate_mode ? 1 : e.burst;
+    for (int i = 0; i < burst; ++i) {
+        emit(e, x, y);
     }
-    return int(live_) - before;
+    return burst;
 }
 
-void ParticleSystem::emit(const Emitter& e, float x, float y, const float* dir) {
+void ParticleSystem::emit(const Emitter& e, float x, float y) {
     // Steal the oldest when full (§13.1).
     uint32_t slot;
     if (live_ < kMaxParticles) {

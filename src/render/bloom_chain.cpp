@@ -100,10 +100,12 @@ bool BloomChain::init(SDL_GPUDevice* device,
         return false;
     }
 
-    bright_pipe_ = make_pipe(bright_frag_, scene_format, false);
-    down_pipe_ = make_pipe(down_frag_, scene_format, false);
-    blur_pipe_ = make_pipe(blur_frag_, scene_format, false);
-    up_pipe_ = make_pipe(up_frag_, scene_format, true);
+    // All bloom targets are RGBA16F (ensure_targets); the pipelines
+    // must match THAT format, not the scene format (cycle-1 blocker).
+    bright_pipe_ = make_pipe(bright_frag_, SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT, false);
+    down_pipe_ = make_pipe(down_frag_, SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT, false);
+    blur_pipe_ = make_pipe(blur_frag_, SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT, false);
+    up_pipe_ = make_pipe(up_frag_, SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT, true);
     if (!bright_pipe_ || !down_pipe_ || !blur_pipe_ || !up_pipe_) {
         TB_LOG_ERROR("render", "bloom pipeline creation failed: {}", SDL_GetError());
         shutdown();
@@ -193,10 +195,15 @@ bool BloomChain::ensure_targets(uint32_t scene_w, uint32_t scene_h) {
         lv.w = w;
         lv.h = h;
         changed = true;
+        if (lv.tex == nullptr || lv.blur == nullptr) {
+            TB_LOG_ERROR("render", "bloom target creation failed: {}", SDL_GetError());
+            return false;
+        }
     }
-    if (changed) {
-        SDL_WaitForGPUIdle(device_);
-    }
+    // No WaitGPUIdle: SDL_gpu defers released-texture destruction
+    // past in-flight command buffers, so a resize doesn't need a full
+    // device stall.
+    (void)changed;
     return true;
 }
 
@@ -209,6 +216,11 @@ void BloomChain::draw_fullscreen(SDL_GPURenderPass* pass) {
 void BloomChain::record(SDL_GPUCommandBuffer* cmd, SDL_GPUTexture* scene) {
     if (!device_ || quality_ == Quality::Off) {
         return;
+    }
+    for (const Level& lv : levels_) {
+        if (lv.tex == nullptr || lv.blur == nullptr) {
+            return; // ensure_targets failed: skip the chain entirely
+        }
     }
 
     // ---- §12.1 bright pass: scene → level0 ----
@@ -234,7 +246,7 @@ void BloomChain::record(SDL_GPUCommandBuffer* cmd, SDL_GPUTexture* scene) {
         SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(cmd, &tgt, 1, nullptr);
         SDL_BindGPUGraphicsPipeline(pass, down_pipe_);
         const float texel[2] = {1.0f / float(levels_[lv - 1].w), 1.0f / float(levels_[lv - 1].h)};
-        SDL_PushGPUFragmentUniformData(cmd, 1, texel, sizeof(texel));
+        SDL_PushGPUFragmentUniformData(cmd, 0, texel, sizeof(texel));
         SDL_GPUTextureSamplerBinding b{levels_[lv - 1].tex, sampler_};
         SDL_BindGPUFragmentSamplers(pass, 0, &b, 1);
         draw_fullscreen(pass);
@@ -256,7 +268,7 @@ void BloomChain::record(SDL_GPUCommandBuffer* cmd, SDL_GPUTexture* scene) {
             SDL_BindGPUGraphicsPipeline(pass, blur_pipe_);
             // u_dir = texel step * axis (§12.3).
             const float u_dir[2] = {dir == 0 ? texel[0] : 0.0f, dir == 0 ? 0.0f : texel[1]};
-            SDL_PushGPUFragmentUniformData(cmd, 1, u_dir, sizeof(u_dir));
+            SDL_PushGPUFragmentUniformData(cmd, 0, u_dir, sizeof(u_dir));
             SDL_GPUTextureSamplerBinding b{src, sampler_};
             SDL_BindGPUFragmentSamplers(pass, 0, &b, 1);
             draw_fullscreen(pass);

@@ -53,9 +53,9 @@ public:
     // indices follow the Palette role order (bg0..glow_white).
     void set_palette(const uint32_t (&roles)[8]);
 
-    // Spawns `effect` at table-space (x, y); cone/sling variants take a
-    // direction (unit, table space). Returns the number spawned (the
-    // pool may steal).
+    // Spawns `effect` at table-space (x, y); cone/sling variants take
+    // a direction (unit, table space). Returns the burst count
+    // spawned (the pool may steal slots when full).
     int spawn(Effect effect, float x, float y, const float* dir = nullptr);
 
     // §13.1 integration; dt clamped to 33 ms by the caller contract.
@@ -89,7 +89,7 @@ public:
     uint32_t stolen_total() const { return stolen_total_; }
 
 private:
-    void emit(const Emitter& e, float x, float y, const float* dir);
+    void emit(const Emitter& e, float x, float y);
 
     // SoA columns (packed to `live_`).
     float pos_x_[kMaxParticles];
@@ -113,11 +113,6 @@ private:
     uint64_t spawned_total_ = 0;
     uint64_t stolen_total_ = 0;
     bool flash_reduction_ = false;
-
-    // Rate-mode accumulators for the continuous effects.
-    float ramp_accum_ = 0.0f;
-    float ball_accum_ = 0.0f;
-    float magnet_accum_ = 0.0f;
 
     uint32_t palette_[8] = {}; // current role colors
 

@@ -128,7 +128,8 @@ void ArtRenderer::emit_prim(const ArtPrim& prim,
     }
     // Gradient fields: xy dir, z len|radius, w mode.
     if (prim.fill.kind == Fill::Kind::Linear) {
-        const float a = prim.fill.angle_deg * kPiF / 180.0f;
+        // Authored angle is LOCAL; rotate with the prim transform.
+        const float a = (prim.fill.angle_deg + prim.transform.rot_deg) * kPiF / 180.0f;
         inst.grad[0] = std::cos(a);
         inst.grad[1] = std::sin(a);
         inst.grad[2] = prim.fill.length * sc;
@@ -228,14 +229,17 @@ void ArtRenderer::emit_prim(const ArtPrim& prim,
         inst.kind = kSdfArc;
         inst.cx = tx;
         inst.cy = ty;
-        inst.rot = prim.start_deg * kPiF / 180.0f;
+        // The SDF arc shader takes ABSOLUTE start/end; rot stays 0
+        // (cycle-1: the start angle was applied twice).
+        inst.rot = 0.0f;
         const float r = prim.r * sc;
         const float pad = prim.glow.radius * sc;
         inst.hx = inst.hy = r + prim.thickness * 0.5f * sc + pad;
         inst.p0 = r;
         inst.p1 = prim.thickness * 0.5f * sc;
         inst.p2 = prim.start_deg * kPiF / 180.0f;
-        inst.p3 = prim.end_deg * kPiF / 180.0f;
+        inst.p3 = prim.end_deg * kPiF / 180.0f; // absolute; rot == 0 for
+                                                // unrotated arcs
         break;
     }
     case ArtPrim::Kind::Polyline: {
@@ -271,13 +275,16 @@ void ArtRenderer::emit_prim(const ArtPrim& prim,
         // §8.6 ear-clipped mesh path is a GPU milestone; v1 renders
         // the polygon as its stroke lowered to capsules (matches the
         // neon-outline style: shapes read by their glowing edges).
-        for (size_t i = 0; i + 3 < prim.points.size() && out.size() < kMaxInstances; i += 2) {
+        // Closed polygons emit the closing edge (cycle-1 review); the
+        // stroke IS the fill — inst's fill/gradient must not leak.
+        const size_t n_pts = prim.points.size() / 2;
+        const size_t n_segs = prim.closed ? n_pts : n_pts - 1;
+        for (size_t s = 0; s < n_segs && out.size() < kMaxInstances; ++s) {
             SdfInstance seg = inst;
             seg.kind = kSdfCapsule;
             float ax, ay, bx, by;
-            map_pt(prim.points[i], prim.points[i + 1], ax, ay);
-            const size_t j = prim.closed ? (i + 2) % prim.points.size()
-                                         : std::min(i + 2, prim.points.size() - 2);
+            map_pt(prim.points[s * 2], prim.points[s * 2 + 1], ax, ay);
+            const size_t j = ((s + 1) % n_pts) * 2;
             map_pt(prim.points[j], prim.points[j + 1], bx, by);
             const float r = std::max(prim.stroke.width * 0.5f, 0.0008f) * sc;
             seg.cx = (ax + bx) * 0.5f;
@@ -287,6 +294,12 @@ void ArtRenderer::emit_prim(const ArtPrim& prim,
             seg.hx = std::sqrt(dx * dx + dy * dy) + r;
             seg.hy = r;
             seg.p0 = r;
+            for (int k = 0; k < 4; ++k) {
+                seg.fill0[k] = stroke_rgba[k];
+                seg.fill1[k] = stroke_rgba[k];
+            }
+            seg.stroke[3] = 0.0f;
+            seg.grad[3] = 0.0f; // solid
             out.push_back(seg);
         }
         return;

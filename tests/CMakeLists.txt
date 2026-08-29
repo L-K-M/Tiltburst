@@ -18,6 +18,7 @@ add_executable(tb_tests
     sim/ramp_test.cpp
     sim/script_test.cpp
     table/table_test.cpp
+    render/art_test.cpp
     render/font_assets_test.cpp
     render/projection_test.cpp
     render/render_smoke_test.cpp

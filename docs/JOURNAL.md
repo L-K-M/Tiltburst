@@ -564,3 +564,36 @@ corrections are new entries. Format: 03-process.md §3.1.
   earlier 'every replace must assert' lesson was insufficient — the
   failure mode is batch-partial application, which asserts alone
   cannot catch.
+
+## M13a — Art system engine (2026-08-29, in flight)
+
+- Scope per 04 §M13 pre-authorized split: TBArt schema + loader with
+  prefab expansion (starburst/dotted_circle/chevron_row/
+  lightning_bolt/tube_outline/grid_horizon; the remaining prefabs join
+  with the renderer integration), particles (SoA pool 8192, §13.4
+  canonical effects, steal-oldest, flash-reduction), the font atlas
+  (stb_truetype 2048² R8, three faces × 24/48/96 px, ASCII+Latin-1),
+  and the CRT-branch math restated as CPU-verifiable values (0.88
+  dark-row / 0.85 corner / 0.748 both — 13 §10 verbatim; the shader
+  uniform branch lands with the composite integration).
+- Layering: art.json parses to concrete primitives at LOAD (stars→
+  polygons, decals→children composed through the instance transform);
+  the renderer never sees a prefab name. Light binding resolves through
+  the caller's element-id map so a "light" field naming an unknown id
+  is a load error (validated). Palette: five canon tables compiled in,
+  custom 8-role objects accepted.
+- ChakraPetch-Bold substitutes the "orbitron" HUD role per the M0
+  substitution ADR (assets/fonts/SOURCES.md) — the font enum keeps the
+  ROLE names (hud/monoton/righteous) so authored art is
+  substitution-agnostic.
+- 8 new tests: schema round-trip (every primitive kind + gradient +
+  hex-alpha + decal + star expansion + ball config), unknown
+  primitive/palette/z errors, missing-file-is-greybox, light-id
+  validation, pool cap under a spawn storm + expiry, the §17.1
+  1.5 ms-budget perf gate (600 frames at 60 Hz with ≥ 2000 live),
+  glyph-metric invariants, CRT value math. 158/158 total.
+- Pending for the full M13a PR: renderer integration (layer →
+  SdfInstance build each frame with live light brightness), the bloom
+  chain (§12.1–12.4: bright/downsample/blur/upsample — 11 post
+  passes), the CRT uniform in composite.frag + present_pass plumbing,
+  and the segmented score digits (§14.2).

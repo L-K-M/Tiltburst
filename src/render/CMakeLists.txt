@@ -3,6 +3,9 @@ find_package(Stb REQUIRED)
 
 add_library(tb_render STATIC
     backglass_renderer.cpp
+    tbart.cpp
+    particles.cpp
+    font_atlas.cpp
     render_renderer.cpp
     overlay.cpp
     pipeline_quad.cpp

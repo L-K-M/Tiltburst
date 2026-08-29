@@ -22,9 +22,7 @@ public:
     BloomChain(const BloomChain&) = delete;
     BloomChain& operator=(const BloomChain&) = delete;
 
-    bool init(SDL_GPUDevice* device,
-              SDL_GPUTextureFormat scene_format,
-              const std::filesystem::path& shader_dir);
+    bool init(SDL_GPUDevice* device, const std::filesystem::path& shader_dir);
     void shutdown();
 
     // (Re)creates the level targets for a scene size change. Must be

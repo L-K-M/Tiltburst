@@ -170,7 +170,7 @@ bool SdlGpuRenderer::init(const RendererConfig& cfg) {
     // §12: the bloom chain is best-effort — a missing blob degrades
     // to Quality::Off (the composite's bloom term is multiplied by 0
     // via a null bind, so the plain path renders).
-    if (!bloom_.init(device_, SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT, dir)) {
+    if (!bloom_.init(device_, dir)) {
         TB_LOG_WARN("render", "bloom chain unavailable; Quality::Off fallback");
         bloom_.set_quality(BloomChain::Quality::Off);
     }

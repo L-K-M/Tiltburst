@@ -478,6 +478,33 @@ TEST(ArtRenderer, LayerSplitAndLightBinding) {
     std::filesystem::remove_all(dir, ec);
 }
 
+TEST(ArtRenderer, BudgetTruncatesAndReports) {
+    // 100 polylines × 128 points → far beyond the 8192-instance budget:
+    // build() returns false (truncated) and the count never exceeds it.
+    render::TbArt art;
+    art.palette_name = "sunset-synth";
+    render::ArtLayer layer;
+    layer.z = 0;
+    for (int p = 0; p < 100; ++p) {
+        render::ArtPrim prim;
+        prim.kind = render::ArtPrim::Kind::Polyline;
+        prim.stroke = {0.002f, 0xFF2975FF};
+        for (int i = 0; i < 128; ++i) {
+            prim.points.push_back(0.01f + float(i) * 0.001f);
+            prim.points.push_back(0.01f + float(p) * 0.001f);
+        }
+        layer.prims.push_back(prim);
+    }
+    art.layers.push_back(layer);
+
+    render::ArtRenderer ar;
+    ar.set_art(&art);
+    const bool ok = ar.build(nullptr, 0, 0.0f);
+    EXPECT_FALSE(ok); // truncated
+    EXPECT_LE(ar.below_ball().size(), render::ArtRenderer::kMaxInstances);
+    EXPECT_GT(ar.below_ball().size(), 1000u); // substantially built
+}
+
 TEST(ArtRenderer, NullArtBuildsEmpty) {
     render::ArtRenderer ar;
     EXPECT_TRUE(ar.build(nullptr, 0, 0.0f));

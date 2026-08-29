@@ -85,9 +85,7 @@ BloomChain::make_pipe(SDL_GPUShader* frag, SDL_GPUTextureFormat format, bool add
     return SDL_CreateGPUGraphicsPipeline(device_, &pi);
 }
 
-bool BloomChain::init(SDL_GPUDevice* device,
-                      SDL_GPUTextureFormat scene_format,
-                      const std::filesystem::path& shader_dir) {
+bool BloomChain::init(SDL_GPUDevice* device, const std::filesystem::path& shader_dir) {
     device_ = device;
     vert_ = load_shader(device_, ShaderStage::Vertex, shader_dir, "bloom.vert", 0);
     bright_frag_ = load_shader(device_, ShaderStage::Fragment, shader_dir, "bloom_bright.frag", 0);

@@ -505,9 +505,9 @@ std::vector<ArtPrim> expand_prefab(const std::string& prefab,
         const uint32_t color_b = param_color("color_b", "glow_white");
         // Upper bound too: 1e-7 cell → millions of columns. Cap at a
         // physically meaningful density (cell ≥ 0.5 mm, ≤ 200 cols).
-        // >= not >: exactly 200 columns is legal; the float divide
-        // is padded with epsilon so a clean w/cell == 200 never
-        // trips on rounding.
+        // The epsilon pad makes exactly w/cell == 200 pass (the
+        // comparison stays >, not >= — a strict >= would reject
+        // the exact-200 case the epsilon exists to protect).
         if (!(cell > 0.0f) || cell < 0.0005f || w / cell > 200.0f + 1e-3f) {
             fail("checkerboard cell must be >= 0.0005 and yield <= 200 columns",
                  pointer + "/params/cell");

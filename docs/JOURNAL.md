@@ -667,7 +667,8 @@ corrections are new entries. Format: 03-process.md §3.1.
   §4.4, neon_arrow §4.6) join tbart.cpp — the art.json's use exposed
   the gap (the shipped test would not load without them).
 - The loader test asserts 6 unique-z layers, sunset-synth, ball trail,
-  and ≥ 3 light-bound inserts. 165/165.
+  and exactly 3 light-bound inserts (the RPM lanes — the test pins
+  the exact count). 165/165.
 - M13b still owes: the RenderSmoke.NeonDriftArtFrame GPU test, the
   backglass art pass, the attract/title text pass, and the style-
   checklist PR walk.

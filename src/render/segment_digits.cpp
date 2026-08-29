@@ -78,8 +78,11 @@ void SegmentDigits::emit(char c,
         float bx = sgn.bx * w;
         float by = sgn.by * h;
         // Italic skew BEFORE positioning (§14.2).
-        ax += kItalic * sgn.ay * w;
-        bx += kItalic * sgn.by * w;
+        // The 8° slant is angle-based: the shear is 0.14 × the
+        // HEIGHT fraction × cell height (invariant of w — cycle-14
+        // review: 0.14 × y_norm × w produced ~4° on a 1:2 cell).
+        ax += kItalic * (sgn.ay * h);
+        bx += kItalic * (sgn.by * h);
 
         // Capsule center + half-extents.
         const float cx = x + (ax + bx) * 0.5f;

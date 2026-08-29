@@ -42,8 +42,10 @@ public:
     static constexpr float kItalicDeg = 8.0f;
 
     // Appends capsule instances for one digit (or ghost row) at pixel
-    // (x, y) with cell size (w, h). `lit` false draws all segments at
-    // 6% with no glow. The comma (§14.2: small capsule below the
+    // (x, y) with cell size (w, h). `lit` false draws the MASK'S
+    // segments at 6% with no glow (a ghost digit shows its own
+    // segments — a full 14-segment ghost grid would need the raw
+    // endpoints; that rides the SDF migration). The comma (§14.2: small capsule below the
     // baseline right of the cell) draws when c == ','.
     static void emit(char c,
                      float x,

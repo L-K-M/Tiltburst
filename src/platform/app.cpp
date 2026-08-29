@@ -1511,8 +1511,10 @@ int run(const CliOptions& cli) {
 
             // M13a: art instances from live light state (the renderer
             // consumes below_/above_ between the scene draws).
-            art_renderer.build(
-                render_scene.lights.data(), render_scene.lights.size(), snap.sim_time_s);
+            if (!art_renderer.build(
+                    render_scene.lights.data(), render_scene.lights.size(), snap.sim_time_s)) {
+                TB_LOG_WARN_RATELIMITED("main", "art instance budget exceeded; art truncated");
+            }
             // .data() reads MEMBER vectors (stable, no temporaries).
             render::ArtInstances art_instances;
             const auto& below = art_renderer.below_ball();

@@ -527,4 +527,63 @@ TEST(ArtRenderer, NullArtBuildsEmpty) {
     EXPECT_TRUE(ar.above_ball().empty());
 }
 
+// ---- The shipped Neon Drift art loads ----
+TEST(TbArt, NeonDriftArtLoads) {
+    const auto result =
+        render::load_art(tb::test::data_path("tables/neon-drift"),
+                         {{"light_rpm_r", 0}, {"light_rpm_p", 1}, {"light_rpm_m", 2}});
+    ASSERT_TRUE(result.loaded);
+    EXPECT_EQ(result.art.palette_name, "sunset-synth");
+    EXPECT_TRUE(result.art.ball_trail);
+    // 6 layers: ground, deco, inserts, guides, logo, wire.
+    ASSERT_EQ(result.art.layers.size(), 6u);
+    // Pin EVERY z: 0, 20, 50, 70, 90, 140.
+    const int expected_z[6] = {0, 20, 50, 70, 90, 140};
+    for (int i = 0; i < 6; ++i) {
+        EXPECT_EQ(result.art.layers[size_t(i)].z, expected_z[i]) << "layer " << i;
+    }
+    EXPECT_TRUE(result.art.layers[5].additive);
+    // No duplicate z.
+    for (size_t i = 0; i < result.art.layers.size(); ++i) {
+        for (size_t j = i + 1; j < result.art.layers.size(); ++j) {
+            EXPECT_NE(result.art.layers[i].z, result.art.layers[j].z);
+        }
+    }
+    // Prefab expansions produce children: the wire layer's
+    // tube_outline decals each expand to tube + specular children
+    // (the layer may carry other kinds later — check the DecalGroups
+    // we know about, not exhaustively).
+    const auto& wire = result.art.layers[5];
+    ASSERT_FALSE(wire.prims.empty());
+    int wire_decals = 0;
+    for (const auto& prim : wire.prims) {
+        if (prim.kind == render::ArtPrim::Kind::DecalGroup) {
+            EXPECT_GE(prim.children.size(), 2u) << "tube_outline tube+specular";
+            ++wire_decals;
+        }
+    }
+    EXPECT_EQ(wire_decals, 2); // both ramp wireforms
+    // The guides layer has neon_arrow decals (head+shaft children) and
+    // the tach arcs.
+    int arrows = 0;
+    for (const auto& prim : result.art.layers[3].prims) {
+        if (prim.kind == render::ArtPrim::Kind::DecalGroup) {
+            EXPECT_GE(prim.children.size(), 2u) << "neon_arrow head+shaft";
+            ++arrows;
+        }
+    }
+    EXPECT_EQ(arrows, 2); // both ramp entrances
+
+    // Light-bound inserts resolve.
+    int bound = 0;
+    for (const auto& layer : result.art.layers) {
+        for (const auto& prim : layer.prims) {
+            if (prim.light_index >= 0) {
+                ++bound;
+            }
+        }
+    }
+    EXPECT_EQ(bound, 3); // exactly the three RPM lane inserts
+}
+
 } // namespace

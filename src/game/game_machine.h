@@ -107,7 +107,11 @@ public:
         if (music_sink_ != nullptr && music_sink_ != sink) {
             music_sink_->stop_music();
         }
+        const bool changed = music_sink_ != sink;
         music_sink_ = sink;
+        if (!changed) {
+            return; // re-wiring the SAME sink is a no-op (no restart)
+        }
         if (sink != nullptr && state_ == GameState::Attract) {
             sink->play_music("attract");
         }

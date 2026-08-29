@@ -68,7 +68,8 @@ struct TrackerSong {
     std::vector<std::pair<std::string, TrackerPattern>> patterns;
     std::vector<std::string> order; // 1..128 names
 
-    double samples_per_tick() const { return 48000.0 * 2.5 / double(bpm); }
+    // §8.4: samples_per_tick = rate * 2.5 / bpm.
+    double samples_per_tick() const { return double(kTrackerRate) * 2.5 / double(bpm); }
 
     uint32_t rows_per_pattern() const {
         return patterns.empty() ? 16 : patterns.front().second.rows;
@@ -120,7 +121,7 @@ private:
         float slide_per_tick = 1.0f;
         bool arp_this_row = false;
         uint8_t arp_n = 0;
-        std::array<uint8_t, 8> arp = {};
+        std::array<uint8_t, TrackerCell::kArpCap> arp = {};
         // Retrigger fade of the previous signal (§8.1).
         uint32_t fade_pos = kFadeSamples; // == kFadeSamples: done
         double old_phase = 0.0;

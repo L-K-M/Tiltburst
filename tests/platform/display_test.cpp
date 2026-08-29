@@ -127,7 +127,7 @@ TEST(DisplayAssign, OverrideBeatsHeuristic) {
     const auto a = platform::detect(ds, cfg);
     EXPECT_EQ(a.playfield, 1);
     EXPECT_EQ(a.backglass, 0);
-    EXPECT_EQ(a.pf_rotation, 0); // 1280x1024 playfield: h < w? no, portrait-ish
+    EXPECT_EQ(a.pf_rotation, 0); // backglass 1920×1080 squareness 0.5625 < 0.70
 }
 
 // ---- T9: stale name falls back with the warning ----
@@ -350,6 +350,13 @@ TEST(BackglassLayout, BuildsContentForBothModes) {
     sim::BackglassModel model;
     layout.build(attract, model, font, &quads);
     EXPECT_GT(quads.size(), 4u); // bg + title + 2 rows
+    // Attract layout is bounds-checked too (cycle-18 review).
+    for (const auto& q : quads) {
+        EXPECT_GE(q.cx - q.hx, -1.0f);
+        EXPECT_LE(q.cx + q.hx, float(render::BackglassFrame::kCanvasW) + 1.0f);
+        EXPECT_GE(q.cy - q.hy, -1.0f);
+        EXPECT_LE(q.cy + q.hy, float(render::BackglassFrame::kCanvasH) + 1.0f);
+    }
 
     quads.clear();
     render::BackglassContent play;

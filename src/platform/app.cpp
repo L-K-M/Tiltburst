@@ -772,21 +772,34 @@ int run(const CliOptions& cli) {
             // displays.json loads ONLY on this path — headless and
             // windowed runs never read a config they cannot consume.
             platform::DisplaysConfig displays_cfg;
-            bool displays_cfg_corrupt = false;
+            bool displays_cfg_no_write = false; // corrupt OR unreadable:
+                                                // never clobber it
             {
                 const std::filesystem::path cfg_path =
                     paths::pref() / "displays.json"; // --display-config: M18
-                std::ifstream cfg_in(cfg_path);
-                if (cfg_in.good()) {
-                    const auto parsed = platform::load_displays_json(std::string(
-                        std::istreambuf_iterator<char>(cfg_in), std::istreambuf_iterator<char>()));
-                    if (parsed.corrupt) {
+                std::error_code cfg_ec;
+                const bool present = std::filesystem::exists(cfg_path, cfg_ec);
+                if (cfg_ec) {
+                    TB_LOG_WARN("main", "displays.json stat failed: {}", cfg_ec.message());
+                } else if (present) {
+                    std::ifstream cfg_in(cfg_path);
+                    if (!cfg_in.good()) {
                         TB_LOG_WARN("main",
-                                    "displays.json corrupt; using heuristics "
-                                    "(auto-write skipped — fix the file)");
-                        displays_cfg_corrupt = true;
-                    } else if (parsed.loaded) {
-                        displays_cfg = parsed.cfg;
+                                    "displays.json exists but cannot be read; using "
+                                    "heuristics (auto-write skipped — fix permissions)");
+                        displays_cfg_no_write = true;
+                    } else {
+                        const auto parsed = platform::load_displays_json(
+                            std::string(std::istreambuf_iterator<char>(cfg_in),
+                                        std::istreambuf_iterator<char>()));
+                        if (parsed.corrupt) {
+                            TB_LOG_WARN("main",
+                                        "displays.json corrupt; using heuristics "
+                                        "(auto-write skipped — fix the file)");
+                            displays_cfg_no_write = true;
+                        } else if (parsed.loaded) {
+                            displays_cfg = parsed.cfg;
+                        }
                     }
                 }
             }
@@ -804,7 +817,7 @@ int run(const CliOptions& cli) {
                 // read-only integration made the feature inert).
                 const bool auto_playfield =
                     displays_cfg.playfield.match.empty() || displays_cfg.playfield.match == "auto";
-                if (auto_playfield && !displays_cfg_corrupt && !assign.stability_reused &&
+                if (auto_playfield && !displays_cfg_no_write && !assign.stability_reused &&
                     assign.playfield >= 0) {
                     displays_cfg.last_auto.present = true;
                     displays_cfg.last_auto.playfield = displays[size_t(assign.playfield)].name;

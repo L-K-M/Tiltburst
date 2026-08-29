@@ -43,6 +43,7 @@ const char* font_file(FontAtlas::Font f) {
 } // namespace
 
 bool FontAtlas::bake(const std::filesystem::path& fonts_dir) {
+    baked_ = false; // invalidate any prior bake
     pixels_.assign(size_t(kAtlasSize) * kAtlasSize, 0);
     stbtt_pack_context pack;
     if (stbtt_PackBegin(&pack, pixels_.data(), int(kAtlasSize), int(kAtlasSize), 0, 1, nullptr) ==

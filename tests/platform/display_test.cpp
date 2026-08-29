@@ -502,4 +502,16 @@ TEST(DisplayAssign, HeuristicPlayfieldSkipsExplicitBackglass) {
     EXPECT_EQ(a.pf_rotation, 0);
 }
 
+// Single-display rig with that display explicitly the backglass: the
+// pool degradation keeps detection total.
+TEST(DisplayAssign, SingleDisplayExplicitBackglassDegrades) {
+    std::vector<platform::DisplayInfo> ds = {make_display(0, 1920, 1080, 60, "TV")};
+    platform::DisplaysConfig cfg;
+    cfg.backglass.match = "index:0";
+    const auto a = platform::detect(ds, cfg);
+    // The same-display drop in step 1 resolves the collision.
+    EXPECT_EQ(a.backglass, -1);
+    EXPECT_EQ(a.playfield, 0);
+}
+
 } // namespace

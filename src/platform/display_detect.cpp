@@ -253,9 +253,11 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
                 a.playfield = pf_by_name;
                 a.backglass = cfg.backglass.enabled ? bg_by_name : -1;
                 a.stability_reused = true;
-                a.pf_rotation = cfg.playfield.rotation != "auto"
-                                    ? parse_rotation(cfg.playfield.rotation)
-                                    : auto_pf_rotation(*pf_disp, a.backglass, displays);
+                a.pf_rotation =
+                    cfg.playfield.rotation != "auto"
+                        ? parse_rotation(cfg.playfield.rotation)
+                        : (pf_disp != nullptr ? auto_pf_rotation(*pf_disp, a.backglass, displays)
+                                              : 0);
                 a.bg_rotation = parse_rotation(cfg.backglass.rotation);
                 return a;
             }
@@ -289,6 +291,16 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
         if (pool->empty()) {
             for (const DisplayInfo& d : displays) {
                 if (d.index != pf_pool_exclusion) {
+                    everything.push_back(&d);
+                }
+            }
+            if (everything.empty()) {
+                // Degenerate: the only display IS the explicit
+                // backglass (single-monitor rig). Degrade to the
+                // pre-exclusion pool rather than an empty one
+                // (cycle-25 review) — the same-display drop in step 1
+                // then resolves the collision.
+                for (const DisplayInfo& d : displays) {
                     everything.push_back(&d);
                 }
             }

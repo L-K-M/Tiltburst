@@ -549,6 +549,25 @@ TEST(TbArt, NeonDriftArtLoads) {
             EXPECT_NE(result.art.layers[i].z, result.art.layers[j].z);
         }
     }
+    // Prefab expansions produce children: the wire layer's
+    // tube_outline decals each expand to tube + specular children.
+    const auto& wire = result.art.layers[5];
+    ASSERT_FALSE(wire.prims.empty());
+    for (const auto& prim : wire.prims) {
+        ASSERT_EQ(prim.kind, render::ArtPrim::Kind::DecalGroup);
+        EXPECT_GE(prim.children.size(), 2u) << "tube_outline has tube+specular";
+    }
+    // The guides layer has neon_arrow decals (head+shaft children) and
+    // the tach arcs.
+    int arrows = 0;
+    for (const auto& prim : result.art.layers[3].prims) {
+        if (prim.kind == render::ArtPrim::Kind::DecalGroup) {
+            EXPECT_GE(prim.children.size(), 2u) << "neon_arrow head+shaft";
+            ++arrows;
+        }
+    }
+    EXPECT_EQ(arrows, 2); // both ramp entrances
+
     // Light-bound inserts resolve.
     int bound = 0;
     for (const auto& layer : result.art.layers) {

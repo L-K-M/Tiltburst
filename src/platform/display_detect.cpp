@@ -330,6 +330,15 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
         bg = best != nullptr ? best->index : -1;
     }
 
+    // Post-heuristic collision: the heuristic playfield can land on
+    // the explicitly matched backglass (single-display degradation);
+    // the playfield wins and the backglass drops — same resolution as
+    // the step-1 explicit-explicit collision.
+    if (pf != -1 && pf == bg) {
+        a.warnings.push_back("playfield and backglass match the same display; backglass dropped");
+        bg = -1;
+    }
+
     // --- 4. rotation resolution ---
     a.playfield = pf;
     a.backglass = bg;

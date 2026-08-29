@@ -230,7 +230,12 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
             v.erase(std::unique(v.begin(), v.end()), v.end());
             return v;
         };
-        const bool all_present = !last_names.empty() && set_of(names) == set_of(last_names);
+        // The recorded FULL topology gates the reuse (§3 step 2's own
+        // set semantics); the role-subset remains only as the legacy
+        // fallback for files written before the field existed.
+        const bool all_present = !cfg.last_auto.displays.empty()
+                                     ? set_of(names) == set_of(cfg.last_auto.displays)
+                                     : (!last_names.empty() && set_of(names) == set_of(last_names));
         if (all_present) {
             // Resolve by name against the CURRENT indices, capturing
             // the elements directly — never re-index the vector by a

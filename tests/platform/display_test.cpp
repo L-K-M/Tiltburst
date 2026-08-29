@@ -533,4 +533,40 @@ TEST(DisplayAssign, EmptyRecordingWithDuplicateNamesFallsThrough) {
     EXPECT_EQ(a.backglass, 1); // and binds the spare display
 }
 
+// A 3-display rig (one unassigned) reuses via the recorded topology.
+TEST(DisplayAssign, ThirdDisplayDoesNotBreakReuse) {
+    std::vector<platform::DisplayInfo> ds = {
+        make_display(0, 1920, 1080, 60, "TV"),
+        make_display(1, 1280, 1024, 60, "NEC"),
+        make_display(2, 1920, 1080, 60, "DMD"), // never assigned a role
+    };
+    platform::DisplaysConfig cfg;
+    cfg.last_auto.present = true;
+    cfg.last_auto.playfield = "TV";
+    cfg.last_auto.backglass = "NEC";
+    cfg.last_auto.displays = {"TV", "NEC", "DMD"}; // full topology
+    const auto a = platform::detect(ds, cfg);
+    EXPECT_EQ(a.playfield, 0);
+    EXPECT_EQ(a.backglass, 1);
+    EXPECT_TRUE(a.stability_reused);
+}
+
+// Disabled backglass on a 2-monitor rig: the playfield still reuses.
+TEST(DisplayAssign, DisabledBackglassTwoMonitorsReusesPlayfield) {
+    std::vector<platform::DisplayInfo> ds = {
+        make_display(0, 1920, 1080, 60, "TV"),
+        make_display(1, 1280, 1024, 60, "NEC"),
+    };
+    platform::DisplaysConfig cfg;
+    cfg.backglass.enabled = false;
+    cfg.last_auto.present = true;
+    cfg.last_auto.playfield = "TV";
+    cfg.last_auto.backglass = "";           // none recorded
+    cfg.last_auto.displays = {"TV", "NEC"}; // topology recorded
+    const auto a = platform::detect(ds, cfg);
+    EXPECT_EQ(a.playfield, 0);
+    EXPECT_EQ(a.backglass, -1);
+    EXPECT_TRUE(a.stability_reused);
+}
+
 } // namespace

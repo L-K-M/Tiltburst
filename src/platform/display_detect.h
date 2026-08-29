@@ -37,6 +37,10 @@ struct LastAuto {
     bool present = false;
     std::string playfield;
     std::string backglass; // empty = none
+    // The FULL topology recorded at assignment time (every attached
+    // display's name) — §3 step 2's set equality needs it; the two
+    // role names alone only cover role-bearing displays (cycle-32).
+    std::vector<std::string> displays; // empty in pre-cycle-32 files
 };
 
 struct DisplaysConfig {

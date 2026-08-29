@@ -825,6 +825,12 @@ int run(const CliOptions& cli) {
                     displays_cfg.last_auto.playfield = displays[size_t(assign.playfield)].name;
                     displays_cfg.last_auto.backglass =
                         assign.backglass >= 0 ? displays[size_t(assign.backglass)].name : "";
+                    // The full topology gates the next run's reuse
+                    // (cycle-32): every attached display's name.
+                    displays_cfg.last_auto.displays.clear();
+                    for (const platform::DisplayInfo& d : displays) {
+                        displays_cfg.last_auto.displays.push_back(d.name);
+                    }
                     std::error_code write_ec;
                     std::filesystem::create_directories(paths::pref(), write_ec);
                     const std::string text = platform::save_displays_json(displays_cfg);

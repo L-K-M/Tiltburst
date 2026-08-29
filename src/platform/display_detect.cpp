@@ -249,7 +249,11 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
                     bg_by_name = d.index;
                 }
             }
-            if (pf_by_name != -1 && pf_by_name != bg_by_name) {
+            // Fall through to the heuristic when an ENABLED backglass
+            // has no recording (duplicate-name rigs where set equality
+            // holds despite a second display) — cycle-29 review.
+            if (pf_by_name != -1 && pf_by_name != bg_by_name &&
+                (!cfg.backglass.enabled || bg_by_name != -1)) {
                 a.playfield = pf_by_name;
                 a.backglass = cfg.backglass.enabled ? bg_by_name : -1;
                 a.stability_reused = true;

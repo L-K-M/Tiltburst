@@ -517,4 +517,20 @@ TEST(DisplayAssign, SingleDisplayExplicitBackglassDegrades) {
     EXPECT_NE(a.warnings[0].find("same display"), std::string::npos);
 }
 
+// Duplicate names + enabled backglass + empty recording: the reuse
+// falls through and the heuristic binds the spare display.
+TEST(DisplayAssign, EmptyRecordingWithDuplicateNamesFallsThrough) {
+    std::vector<platform::DisplayInfo> ds = {
+        make_display(0, 1080, 1920, 60, "AOC"),
+        make_display(1, 1280, 1024, 60, "AOC"), // same name: set stays {AOC}
+    };
+    platform::DisplaysConfig cfg;
+    cfg.last_auto.present = true;
+    cfg.last_auto.playfield = "AOC";
+    cfg.last_auto.backglass = ""; // nothing recorded
+    const auto a = platform::detect(ds, cfg);
+    EXPECT_EQ(a.playfield, 0); // heuristic re-derives the same pick
+    EXPECT_EQ(a.backglass, 1); // and binds the spare display
+}
+
 } // namespace

@@ -1586,171 +1586,170 @@ int run(const CliOptions& cli) {
                     render_scene.lights[i].on = snap.light_on(i);
                 }
             }
-        }
 
-        if (debug_level >= 1) {
-            // Insert lights drawn as debug circles (04-milestones.md M5).
-            for (const auto& light : render_scene.lights) {
-                const float s = light.size * 0.5f;
-                quads.push_back(tb::render::QuadInstance{light.pos.x * 1000.f,
-                                                         light.pos.y * 1000.f,
-                                                         s * 1000.f,
-                                                         s * 1000.f,
-                                                         0.0f,
-                                                         0.9f,
-                                                         0.6f,
-                                                         0.5f});
+            if (debug_level >= 1) {
+                // Insert lights drawn as debug circles (04-milestones.md M5).
+                for (const auto& light : render_scene.lights) {
+                    const float s = light.size * 0.5f;
+                    quads.push_back(tb::render::QuadInstance{light.pos.x * 1000.f,
+                                                             light.pos.y * 1000.f,
+                                                             s * 1000.f,
+                                                             s * 1000.f,
+                                                             0.0f,
+                                                             0.9f,
+                                                             0.6f,
+                                                             0.5f});
+                }
             }
-        }
 
-        // M13a: art instances from live light state (the renderer
-        // consumes below_/above_ between the scene draws).
-        if (!art_renderer.build(
-                render_scene.lights.data(), render_scene.lights.size(), snap.sim_time_s)) {
-            TB_LOG_WARN_RATELIMITED("main", "art instance budget exceeded; art truncated");
-        }
-        // .data() reads MEMBER vectors (stable, no temporaries).
-        render::ArtInstances art_instances;
-        const auto& below = art_renderer.below_ball();
-        const auto& above = art_renderer.above_ball();
-        art_instances.below = below.data();
-        art_instances.below_count = uint32_t(below.size());
-        art_instances.above = above.data();
-        art_instances.above_count = uint32_t(above.size());
-        frame.art = &art_instances;
-        frame.lights = render_scene.lights.data();
-        frame.light_count = uint32_t(render_scene.lights.size());
+            // M13a: art instances from live light state (the renderer
+            // consumes below_/above_ between the scene draws).
+            if (!art_renderer.build(
+                    render_scene.lights.data(), render_scene.lights.size(), snap.sim_time_s)) {
+                TB_LOG_WARN_RATELIMITED("main", "art instance budget exceeded; art truncated");
+            }
+            // .data() reads MEMBER vectors (stable, no temporaries).
+            render::ArtInstances art_instances;
+            const auto& below = art_renderer.below_ball();
+            const auto& above = art_renderer.above_ball();
+            art_instances.below = below.data();
+            art_instances.below_count = uint32_t(below.size());
+            art_instances.above = above.data();
+            art_instances.above_count = uint32_t(above.size());
+            frame.art = &art_instances;
+            frame.lights = render_scene.lights.data();
+            frame.light_count = uint32_t(render_scene.lights.size());
 
-        frame.quads = quads.data();
-        frame.quad_count = uint32_t(quads.size());
-        frame.show_colliders = debug_level >= 1;
-        frame.debug_colliders = render_scene.colliders.data();
-        frame.debug_collider_count = uint32_t(render_scene.colliders.size());
+            frame.quads = quads.data();
+            frame.quad_count = uint32_t(quads.size());
+            frame.show_colliders = debug_level >= 1;
+            frame.debug_colliders = render_scene.colliders.data();
+            frame.debug_collider_count = uint32_t(render_scene.colliders.size());
 
-        renderer->render_playfield(frame);
+            renderer->render_playfield(frame);
 
-        // Backglass at ~30 Hz, non-blocking (07 §8): the attempt
-        // cadence is deadline-driven; a skipped acquire retries
-        // next playfield frame without advancing the deadline.
-        if (backglass_window) {
-            const uint64_t now_bg = tb_now_ns();
-            if (bg_pacer.should_attempt(now_bg)) {
-                bg_built.clear();
-                // Everything below reads the SNAPSHOT — including
-                // the attract top-10 — no live game objects on this
-                // thread at all.
-                render::BackglassContent content;
-                content.in_attract = snap.game.player_count <= 0 ||
-                                     snap.game.game_state == uint8_t(game::GameState::Attract);
-                // Attract page machine (§8.2) + the static table
-                // data the pages show (logo name, rules card).
-                content.attract_page = int(snap.game.attract_page);
-                content.attract_page_time_s = snap.game.attract_page_time_s;
-                if (loaded_table != nullptr) {
-                    content.table_name = loaded_table->def.name;
-                    // §8.2 rules card: meta.rules_card lines. The
-                    // table object is immutable at runtime (loads
-                    // and F5 reloads happen with the sim stopped).
-                    std::istringstream card(loaded_table->def.rules_card);
-                    std::string line;
-                    while (std::getline(card, line)) {
-                        if (!line.empty() && line.back() == '\r') {
-                            line.pop_back();
-                        }
-                        content.rules_lines.push_back(line);
-                        if (content.rules_lines.size() >= 8) {
-                            break; // card cap; more is M15 polish
+            // Backglass at ~30 Hz, non-blocking (07 §8): the attempt
+            // cadence is deadline-driven; a skipped acquire retries
+            // next playfield frame without advancing the deadline.
+            if (backglass_window) {
+                const uint64_t now_bg = tb_now_ns();
+                if (bg_pacer.should_attempt(now_bg)) {
+                    bg_built.clear();
+                    // Everything below reads the SNAPSHOT — including
+                    // the attract top-10 — no live game objects on this
+                    // thread at all.
+                    render::BackglassContent content;
+                    content.in_attract = snap.game.player_count <= 0 ||
+                                         snap.game.game_state == uint8_t(game::GameState::Attract);
+                    // Attract page machine (§8.2) + the static table
+                    // data the pages show (logo name, rules card).
+                    content.attract_page = int(snap.game.attract_page);
+                    content.attract_page_time_s = snap.game.attract_page_time_s;
+                    if (loaded_table != nullptr) {
+                        content.table_name = loaded_table->def.name;
+                        // §8.2 rules card: meta.rules_card lines. The
+                        // table object is immutable at runtime (loads
+                        // and F5 reloads happen with the sim stopped).
+                        std::istringstream card(loaded_table->def.rules_card);
+                        std::string line;
+                        while (std::getline(card, line)) {
+                            if (!line.empty() && line.back() == '\r') {
+                                line.pop_back();
+                            }
+                            content.rules_lines.push_back(line);
+                            if (content.rules_lines.size() >= 8) {
+                                break; // card cap; more is M15 polish
+                            }
                         }
                     }
-                }
-                // Both bounds: >4 would write past content.scores,
-                // and the publisher-side clamp is a convention, not
-                // a type guarantee (cycle-26 review).
-                content.player_count =
-                    std::clamp(snap.game.player_count, 1, decltype(snap.game)::kMaxPlayers);
-                content.current_player =
-                    std::clamp(snap.game.current_player, 1, content.player_count);
-                content.ball_number = snap.game.ball_number;
-                for (int pi = 0; pi < content.player_count; ++pi) {
-                    content.scores[size_t(pi)] = snap.game.scores[size_t(pi)];
-                }
-                // Attract top-10 from the snapshot copy — the
-                // table itself mutates on the same (sim) thread
-                // that fills the copy, never here.
-                content.high_score_count = std::min<uint32_t>(snap.game.high_score_count,
-                                                              decltype(snap.game)::kHighScoreCap);
-                for (uint32_t i = 0; i < content.high_score_count; ++i) {
-                    content.high_scores[i] = {{snap.game.high_scores[i].initials[0],
-                                               snap.game.high_scores[i].initials[1],
-                                               snap.game.high_scores[i].initials[2]},
-                                              snap.game.high_scores[i].score};
-                }
-                sim::BackglassModel model; // rebuilt from the snapshot copy
-                model.layout = snap.game.layout;
-                model.focus_player = snap.game.focus_player;
-                model.message_style = snap.game.message_style;
-                const uint32_t msg_len =
-                    uint32_t(std::min(size_t(snap.game.message_len), sizeof(model.message) - 1));
-                model.message_len = msg_len;
-                std::memcpy(model.message, snap.game.message, msg_len);
-                model.message[msg_len] = '\0';
-                bg_layout.build(content, model, bg_font, &bg_built);
-                render::BackglassFrame bframe;
-                bframe.quads = bg_built.data();
-                bframe.quad_count = uint32_t(bg_built.size());
-                if (renderer->render_backglass(bframe)) {
-                    bg_pacer.report_drawn(now_bg);
-                } else {
-                    bg_pacer.report_skipped();
-                }
-            }
-        }
-
-        // §14.1 stages 4–5 on the record matching the rendered snapshot.
-        input.ring.complete_main(snap.tick, frame_start_ns, tb_now_ns());
-
-        const float ms = float(tb_now_ns() - frame_start_ns) / 1e6f;
-        ring.push_back(ms);
-        while (ring.size() > kFrameRing) {
-            ring.pop_front();
-        }
-
-        log::drain_to_file();
-
-        // Frame cap (§5.1): default matches the display refresh
-        // (unknown refresh ⇒ 60); -1 disables the cap entirely.
-        if (settings.max_fps != -1) {
-            double refresh_hz = settings.max_fps > 0 ? double(settings.max_fps) : 60.0;
-            if (settings.max_fps == 0) {
-                SDL_DisplayID display = SDL_GetDisplayForWindow(window.get());
-                if (const SDL_DisplayMode* mode = SDL_GetDesktopDisplayMode(display)) {
-                    if (mode->refresh_rate > 0) {
-                        refresh_hz = mode->refresh_rate;
+                    // Both bounds: >4 would write past content.scores,
+                    // and the publisher-side clamp is a convention, not
+                    // a type guarantee (cycle-26 review).
+                    content.player_count =
+                        std::clamp(snap.game.player_count, 1, decltype(snap.game)::kMaxPlayers);
+                    content.current_player =
+                        std::clamp(snap.game.current_player, 1, content.player_count);
+                    content.ball_number = snap.game.ball_number;
+                    for (int pi = 0; pi < content.player_count; ++pi) {
+                        content.scores[size_t(pi)] = snap.game.scores[size_t(pi)];
+                    }
+                    // Attract top-10 from the snapshot copy — the
+                    // table itself mutates on the same (sim) thread
+                    // that fills the copy, never here.
+                    content.high_score_count = std::min<uint32_t>(
+                        snap.game.high_score_count, decltype(snap.game)::kHighScoreCap);
+                    for (uint32_t i = 0; i < content.high_score_count; ++i) {
+                        content.high_scores[i] = {{snap.game.high_scores[i].initials[0],
+                                                   snap.game.high_scores[i].initials[1],
+                                                   snap.game.high_scores[i].initials[2]},
+                                                  snap.game.high_scores[i].score};
+                    }
+                    sim::BackglassModel model; // rebuilt from the snapshot copy
+                    model.layout = snap.game.layout;
+                    model.focus_player = snap.game.focus_player;
+                    model.message_style = snap.game.message_style;
+                    const uint32_t msg_len = uint32_t(
+                        std::min(size_t(snap.game.message_len), sizeof(model.message) - 1));
+                    model.message_len = msg_len;
+                    std::memcpy(model.message, snap.game.message, msg_len);
+                    model.message[msg_len] = '\0';
+                    bg_layout.build(content, model, bg_font, &bg_built);
+                    render::BackglassFrame bframe;
+                    bframe.quads = bg_built.data();
+                    bframe.quad_count = uint32_t(bg_built.size());
+                    if (renderer->render_backglass(bframe)) {
+                        bg_pacer.report_drawn(now_bg);
+                    } else {
+                        bg_pacer.report_skipped();
                     }
                 }
             }
-            const uint64_t cap_ns = uint64_t(1e9 / refresh_hz);
-            next_cap_ns = std::max(next_cap_ns + cap_ns, frame_start_ns);
-            if (uint64_t now = tb_now_ns(); now < next_cap_ns) {
-                sleep_until_ns(next_cap_ns);
+
+            // §14.1 stages 4–5 on the record matching the rendered snapshot.
+            input.ring.complete_main(snap.tick, frame_start_ns, tb_now_ns());
+
+            const float ms = float(tb_now_ns() - frame_start_ns) / 1e6f;
+            ring.push_back(ms);
+            while (ring.size() > kFrameRing) {
+                ring.pop_front();
             }
+
+            log::drain_to_file();
+
+            // Frame cap (§5.1): default matches the display refresh
+            // (unknown refresh ⇒ 60); -1 disables the cap entirely.
+            if (settings.max_fps != -1) {
+                double refresh_hz = settings.max_fps > 0 ? double(settings.max_fps) : 60.0;
+                if (settings.max_fps == 0) {
+                    SDL_DisplayID display = SDL_GetDisplayForWindow(window.get());
+                    if (const SDL_DisplayMode* mode = SDL_GetDesktopDisplayMode(display)) {
+                        if (mode->refresh_rate > 0) {
+                            refresh_hz = mode->refresh_rate;
+                        }
+                    }
+                }
+                const uint64_t cap_ns = uint64_t(1e9 / refresh_hz);
+                next_cap_ns = std::max(next_cap_ns + cap_ns, frame_start_ns);
+                if (uint64_t now = tb_now_ns(); now < next_cap_ns) {
+                    sleep_until_ns(next_cap_ns);
+                }
+            }
+        }
+
+        sim.request_stop();
+        sim.join();
+        input.stop();
+        renderer->shutdown();
+        window.reset();
+
+        if (!paths::pref().empty()) {
+            settings.save(paths::pref() / "settings.json");
         }
     }
 
-    sim.request_stop();
-    sim.join();
-    input.stop();
-    renderer->shutdown();
-    window.reset();
-
-    if (!paths::pref().empty()) {
-        settings.save(paths::pref() / "settings.json");
-    }
-}
-
-log::shutdown();
-SDL_Quit();
-return code;
+    log::shutdown();
+    SDL_Quit();
+    return code;
 }
 
 } // namespace tb::app

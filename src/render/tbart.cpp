@@ -503,12 +503,15 @@ std::vector<ArtPrim> expand_prefab(const std::string& prefab,
         const float cell = float(param_f("cell", 0.006));
         const uint32_t color_a = param_color("color_a", "bg1");
         const uint32_t color_b = param_color("color_b", "glow_white");
+        if (!(cell > 0.0f)) {
+            fail("checkerboard cell must be > 0", pointer + "/params/cell");
+        }
         const int cols = std::max(1, int(w / cell));
         const float cw = w / float(cols);
         for (int row = 0; row < 2; ++row) {
             for (int col = 0; col < cols; ++col) {
                 if ((row + col) % 2 == 0) {
-                    continue; // alternate
+                    continue; // the alternating gap
                 }
                 ArtPrim r;
                 r.kind = ArtPrim::Kind::Rect;
@@ -516,6 +519,11 @@ std::vector<ArtPrim> expand_prefab(const std::string& prefab,
                 r.transform.pos[1] = (row == 0 ? 1.0f : -1.0f) * h * 0.25f;
                 r.w = cw;
                 r.h = h * 0.5f;
+                // Alternate WITHIN each row: (row+col)%2==1 cells draw
+                // color_a on the top row, color_b on the bottom — the
+                // two rows are offset, so the classic checkerboard
+                // emerges. (Cycle-1 review: the original used one color
+                // per row.)
                 r.fill.color0 = row == 0 ? color_a : color_b;
                 // No glow (§4.4: "No glow").
                 out.push_back(child_prim(base, r));
@@ -532,6 +540,10 @@ std::vector<ArtPrim> expand_prefab(const std::string& prefab,
         const uint32_t color = param_color("color", "primary");
         const float gi = float(param_f("glow_intensity", 1.4));
         const bool outline_only = params.value("outline_only", true);
+        // 15%-alpha fill helper: art colors pack 0xRRGGBBAA (§3.2).
+        const auto fill_15 = [color]() {
+            return (color & 0xFFFFFF00u) | 0x26u; // 38 ≈ 15% of 255
+        };
 
         // Head: triangle pointing +y.
         ArtPrim head;
@@ -539,7 +551,7 @@ std::vector<ArtPrim> expand_prefab(const std::string& prefab,
         head.points = {0.0f, len * 0.5f, -w * 0.5f, 0.0f, w * 0.5f, 0.0f};
         head.stroke = {0.0015f, color};
         head.glow = {len * 0.15f, gi, false, color};
-        head.fill.color0 = (color & 0xFFFFFF00u) | 0x26u; // 15%
+        head.fill.color0 = fill_15();
         if (!outline_only) {
             head.fill.color0 = color;
         }
@@ -553,7 +565,7 @@ std::vector<ArtPrim> expand_prefab(const std::string& prefab,
         shaft.h = len * 0.5f;
         shaft.stroke = {0.0015f, color};
         shaft.glow = {w * 0.3f, gi * 0.8f, false, color};
-        shaft.fill.color0 = (color & 0xFFFFFF00u) | 0x26u;
+        shaft.fill.color0 = fill_15();
         if (!outline_only) {
             shaft.fill.color0 = color;
         }

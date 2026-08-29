@@ -116,7 +116,8 @@
         "fill": "primary",
         "glow": { "radius": 0.008, "intensity": 1.0 } },
 
-      // Gear bank tach arcs (motif 3): 5 segments, 1 per gear.
+      // Gear bank tach arcs (motif 3): 4 segments, 1 per target
+      // (the bank has 4 physical drop targets; 15 s1.3).
       { "kind": "arc", "transform": { "pos": [0.348, 0.695] },
         "r": 0.048, "thickness": 0.004, "start_deg": 200, "end_deg": 232,
         "fill": "primary",

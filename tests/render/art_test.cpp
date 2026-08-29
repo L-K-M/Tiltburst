@@ -556,7 +556,7 @@ TEST(TbArt, NeonDriftArtLoads) {
             }
         }
     }
-    EXPECT_GE(bound, 3); // the three RPM lane inserts
+    EXPECT_EQ(bound, 3); // exactly the three RPM lane inserts
 }
 
 } // namespace

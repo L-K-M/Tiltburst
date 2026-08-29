@@ -592,8 +592,16 @@ corrections are new entries. Format: 03-process.md §3.1.
   validation, pool cap under a spawn storm + expiry, the §17.1
   1.5 ms-budget perf gate (600 frames at 60 Hz with ≥ 2000 live),
   glyph-metric invariants, CRT value math. 158/158 total.
-- Pending for the full M13a PR: renderer integration (layer →
-  SdfInstance build each frame with live light brightness), the bloom
-  chain (§12.1–12.4: bright/downsample/blur/upsample — 11 post
-  passes), the CRT uniform in composite.frag + present_pass plumbing,
-  and the segmented score digits (§14.2).
+- Parts 2-3 on the branch: ArtRenderer (layer → SdfInstance build,
+  below/above-ball split, live light brightness with the 15% ghost
+  floor, polyline/polygon lowered to stroked capsules, decal children
+  through composed world transforms, 8192-instance budget) and the
+  bloom-chain HLSL sources (bright/downsample/blur/upsample per §12.1–
+  12.4 verbatim weights). present.frag deliberately stays bloomless
+  until its C++ plumbing exists — the shader blobs and the C++ side
+  must land together (ADR-012 discipline).
+- Still pending for the full M13a PR: present_pass bloom/CRT wiring
+  (the u_crt uniform + bloom texture bind in ONE commit with the
+  present.frag change), the segmented score digits (§14.2), app-layer
+  art.json loading + light plumbing into the renderer, and the
+  NeonDriftArtFrame smoke test.

@@ -40,6 +40,7 @@
 #include <deque>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <sstream>
 #include <vector>
 

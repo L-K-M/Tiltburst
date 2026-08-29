@@ -537,9 +537,11 @@ TEST(TbArt, NeonDriftArtLoads) {
     EXPECT_TRUE(result.art.ball_trail);
     // 6 layers: ground, deco, inserts, guides, logo, wire.
     ASSERT_EQ(result.art.layers.size(), 6u);
-    // Layer z values: 0, 20, 50, 70, 90, 140 (unique, sorted).
-    EXPECT_EQ(result.art.layers[0].z, 0);
-    EXPECT_EQ(result.art.layers[5].z, 140);
+    // Pin EVERY z: 0, 20, 50, 70, 90, 140.
+    const int expected_z[6] = {0, 20, 50, 70, 90, 140};
+    for (int i = 0; i < 6; ++i) {
+        EXPECT_EQ(result.art.layers[size_t(i)].z, expected_z[i]) << "layer " << i;
+    }
     EXPECT_TRUE(result.art.layers[5].additive);
     // No duplicate z.
     for (size_t i = 0; i < result.art.layers.size(); ++i) {

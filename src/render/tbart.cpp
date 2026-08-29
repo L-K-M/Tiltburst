@@ -522,11 +522,9 @@ std::vector<ArtPrim> expand_prefab(const std::string& prefab,
                 r.transform.pos[1] = (row == 0 ? 1.0f : -1.0f) * h * 0.25f;
                 r.w = cw;
                 r.h = h * 0.5f;
-                // The classic checkerboard: ALL cells draw, alternating
-                // color by (row+col)%2 — adjacent cells differ within
-                // each row, and the rows are offset. (The skip-half
-                // version from cycles 1-3 gave one color per row of
-                // dashes; cycle-6 review.)
+                // The classic checkerboard: ALL cells draw,
+                // alternating by (row+col)%2 — adjacent cells differ
+                // within each row, and the rows are offset.
                 r.fill.color0 = (row + col) % 2 == 0 ? color_a : color_b;
                 // No glow (§4.4: "No glow").
                 out.push_back(child_prim(base, r));

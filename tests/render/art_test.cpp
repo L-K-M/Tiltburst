@@ -156,7 +156,10 @@ TEST(TbArt, MissingLayersThrowsArtError) {
     std::filesystem::create_directories(dir);
     { std::ofstream(dir / "art.json") << R"json({ "palette": "sunset-synth" })json"; }
     EXPECT_THROW(render::load_art(dir, {}), render::ArtError);
-    { std::ofstream(dir / "art.json") << R"json({ "palette": "x", "layers": [5] })json"; }
+    {
+        std::ofstream(dir / "art.json")
+            << R"json({ "palette": "sunset-synth", "layers": [5] })json";
+    }
     EXPECT_THROW(render::load_art(dir, {}), render::ArtError);
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);

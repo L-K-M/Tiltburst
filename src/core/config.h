@@ -20,7 +20,8 @@ struct Settings {
     // render (consumed from M13)
     bool bloom_enabled = true;
     float bloom_threshold = 1.0f;
-    float bloom_knee = 0.5f;
+    float bloom_knee = 0.6f;     // §12.1 binding value (the shader hardcodes it; threshold/knee
+                                 // uniforms are M13b wiring)
     float bloom_strength = 0.6f; // render.bloom_strength, 0-2 (06 §12.5)
     bool crt = false;            // render.crt, user-only (13 §10)
 

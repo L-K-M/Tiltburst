@@ -1330,10 +1330,10 @@ int run(const CliOptions& cli) {
                     TB_LOG_INFO("main", "art.json loaded: {} layers", table_art.layers.size());
                 }
             } catch (const render::ArtError& e) {
-                TB_LOG_ERROR("main", "art load failed: {} ({})", e.what(), e.json_pointer);
-                log::flush_now();
-                SDL_Quit();
-                return 1;
+                // User-editable content: warn + greybox (the M11
+                // audio.json policy), never fatal at startup.
+                TB_LOG_WARN(
+                    "main", "art.json corrupt ({} at {}); greybox", e.what(), e.json_pointer);
             }
         }
         render::ArtRenderer art_renderer;

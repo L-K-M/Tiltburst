@@ -600,8 +600,21 @@ corrections are new entries. Format: 03-process.md §3.1.
   12.4 verbatim weights). present.frag deliberately stays bloomless
   until its C++ plumbing exists — the shader blobs and the C++ side
   must land together (ADR-012 discipline).
-- Still pending for the full M13a PR: present_pass bloom/CRT wiring
-  (the u_crt uniform + bloom texture bind in ONE commit with the
-  present.frag change), the segmented score digits (§14.2), app-layer
-  art.json loading + light plumbing into the renderer, and the
-  NeonDriftArtFrame smoke test.
+- Parts 4-6 on the branch: the bloom chain GPU wiring + §12.5
+  composite (present.frag carries the bloom sample, saturation clamp,
+  and the u_crt branch IN THE SAME COMMIT as its present_pass.cpp
+  plumbing — the blob/C++ divergence discipline from part 3); the
+  segmented score digits (§14.2 verbatim endpoints + masks, ghost 6%,
+  comma capsule, italic skew — the quad fallback emits bounding boxes
+  until the backglass migrates to the SDF pipeline); and the app-layer
+  integration (art.json loads beside the table, light ids validate,
+  ArtRenderer builds per frame from live LightState, RenderFrame
+  carries the typed instance views, draw_scene pushes below-ball
+  before the debug draw and above-ball after the ball). Settings:
+  render.crt (user-only, default false) + render.bloom_strength wired
+  through RendererConfig.
+- Remaining for the M13a PR: the NeonDriftArtFrame smoke test (needs
+  an art.json on a shipped table — M13b content makes that real) and
+  the committed present.frag blob refresh (CI compile loop covers it;
+  the local fallback blobs are stale until then, which is exactly the
+  ADR-012 degrade path).

@@ -794,6 +794,37 @@ int run(const CliOptions& cli) {
                 for (const std::string& w : assign.warnings) {
                     TB_LOG_WARN("main", "displays: {}", w);
                 }
+                // 07 §5: the engine writes last_auto (and only
+                // last_auto) after every successful auto-detection, so
+                // stability survives restarts (cycle-11 review: the
+                // read-only integration made the feature inert).
+                if (!assign.stability_reused && assign.playfield >= 0) {
+                    displays_cfg.last_auto.present = true;
+                    displays_cfg.last_auto.playfield = displays[size_t(assign.playfield)].name;
+                    displays_cfg.last_auto.backglass =
+                        assign.backglass >= 0 ? displays[size_t(assign.backglass)].name : "";
+                    std::error_code write_ec;
+                    std::filesystem::create_directories(paths::pref(), write_ec);
+                    const std::string text = platform::save_displays_json(displays_cfg);
+                    const std::filesystem::path tmp = paths::pref() / "displays.json.tmp";
+                    const std::filesystem::path dst = paths::pref() / "displays.json";
+                    std::ofstream out(tmp, std::ios::binary);
+                    out.write(text.data(), std::streamsize(text.size()));
+                    out.flush();
+                    if (out.good()) {
+                        out.close();
+                        std::filesystem::rename(tmp, dst, write_ec);
+                        if (write_ec) {
+                            TB_LOG_WARN(
+                                "main", "displays.json rename failed: {}", write_ec.message());
+                        }
+                    } else {
+                        out.close();
+                        TB_LOG_WARN("main", "displays.json write failed");
+                        std::error_code rm_ec;
+                        std::filesystem::remove(tmp, rm_ec);
+                    }
+                }
                 // T13: single landscape display without a square
                 // backglass reads as a desktop — say how to override.
                 if (assign.backglass == -1 && assign.playfield >= 0 &&

@@ -3,9 +3,12 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cerrno>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <limits>
 
 namespace tb::platform {
 
@@ -243,7 +246,7 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
                 a.pf_rotation =
                     cfg.playfield.rotation != "auto"
                         ? parse_rotation(cfg.playfield.rotation)
-                        : auto_pf_rotation(displays[size_t(pf_by_name)], bg_by_name, displays);
+                        : auto_pf_rotation(displays[size_t(pf_by_name)], a.backglass, displays);
                 a.bg_rotation = parse_rotation(cfg.backglass.rotation);
                 return a;
             }

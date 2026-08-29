@@ -403,7 +403,9 @@ bool AudioSystem::play_music(const std::string& song_id) {
     AudioCommand cmd;
     cmd.kind = AudioCommand::Kind::PlaySong;
     cmd.patch = uint16_t(idx);
-    cmd.epoch = bank->epoch;                        // the exact snapshot idx resolved against
+    cmd.epoch = uint16_t(bank->epoch);              // the snapshot's own epoch, in the
+                                                    // field's 16 bits (compared modulo
+                                                    // the same width at the handler)
     cmd.value = song_id == "attract" ? 1.0f : 0.0f; // §9 offset flag
     return impl_->commands.push(cmd);
 }
@@ -786,7 +788,7 @@ void AudioSystem::mix(float* out, uint32_t frames) {
             // song list. Compared against the SNAPSHOT's own epoch
             // field — the same acquire-loaded object being indexed —
             // so index and epoch can never disagree (cycle-3 review).
-            if (cmd.epoch != bank->epoch) {
+            if (cmd.epoch != uint16_t(bank->epoch)) {
                 break;
             }
             impl_->attract_target = cmd.value > 0.5f ? kAttractFloor : 1.0f;

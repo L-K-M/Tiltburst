@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <string>
 #include <vector>
 
 namespace tb::render {
@@ -38,6 +39,8 @@ public:
 
     // Glyph lookup for (font, baked-size, codepoint); nullptr when the
     // codepoint is not in the atlas (Monoton's lowercase, per §5.1).
+    // codepoint is a UNICODE SCALAR VALUE in U+0020-U+00FF (the
+    // atlas'"'"'s exact coverage; Latin-1 == byte identity).
     const Glyph* glyph(Font font, uint32_t baked_size, uint32_t codepoint) const;
 
     // The baked pixels (R8, kAtlasSize²) — uploaded by the renderer.

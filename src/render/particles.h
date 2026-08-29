@@ -9,7 +9,7 @@ namespace tb::render {
 // CPU particle system (06-rendering.md §13). Fixed SoA pool, capacity
 // 8192 (TB_MAX_PARTICLES); when full, new spawns steal the oldest live
 // particle. Updated on the main thread at render rate; visual-only,
-// never feeds the sim. RNG is a render-owned PCG32 seeded from the
+// never feeds the sim. RNG is a render-owned xorshift64* seeded from the
 // wall clock — not tb.rng.
 class ParticleSystem {
 public:

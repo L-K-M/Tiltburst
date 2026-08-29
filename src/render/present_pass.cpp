@@ -34,7 +34,7 @@ load(SDL_GPUDevice* dev, ShaderStage stage, const std::filesystem::path& dir, co
         ci.num_storage_buffers = 0;
         ci.num_storage_textures = 0;
         ci.num_samplers = stage == ShaderStage::Fragment ? 2 : 0;
-        ci.num_uniform_buffers = stage == ShaderStage::Vertex ? 1 : 1;
+        ci.num_uniform_buffers = 1; // both stages: vertex matrix + fragment composite
         if (SDL_GPUShader* sh = SDL_CreateGPUShader(dev, &ci)) {
             return sh;
         }

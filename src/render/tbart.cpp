@@ -516,21 +516,18 @@ std::vector<ArtPrim> expand_prefab(const std::string& prefab,
         const float cw = w / float(cols);
         for (int row = 0; row < 2; ++row) {
             for (int col = 0; col < cols; ++col) {
-                if ((row + col) % 2 == 0) {
-                    continue; // the alternating gap
-                }
                 ArtPrim r;
                 r.kind = ArtPrim::Kind::Rect;
                 r.transform.pos[0] = -w * 0.5f + cw * (float(col) + 0.5f);
                 r.transform.pos[1] = (row == 0 ? 1.0f : -1.0f) * h * 0.25f;
                 r.w = cw;
                 r.h = h * 0.5f;
-                // Alternate WITHIN each row: (row+col)%2==1 cells draw
-                // color_a on the top row, color_b on the bottom — the
-                // two rows are offset, so the classic checkerboard
-                // emerges. (Cycle-1 review: the original used one color
-                // per row.)
-                r.fill.color0 = row == 0 ? color_a : color_b;
+                // The classic checkerboard: ALL cells draw, alternating
+                // color by (row+col)%2 — adjacent cells differ within
+                // each row, and the rows are offset. (The skip-half
+                // version from cycles 1-3 gave one color per row of
+                // dashes; cycle-6 review.)
+                r.fill.color0 = (row + col) % 2 == 0 ? color_a : color_b;
                 // No glow (§4.4: "No glow").
                 out.push_back(child_prim(base, r));
             }

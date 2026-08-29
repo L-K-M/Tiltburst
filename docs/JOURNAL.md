@@ -530,7 +530,37 @@ corrections are new entries. Format: 03-process.md §3.1.
   T15's backglass expectation: the NEC (5:4, squareness 0.80) beats the
   leftover 16:9 on the (squareness, area, -index) key — my test comment
   had rationalized the wrong pick.
-- tests: 22 new (T1-T15 incl. stability, stale-match warnings, glob
-  ambiguity, same-display drop, empty list; JSON round-trip with
-  comments/corrupt/missing; pacer draw/skip/retry/hitch semantics;
-  layout content + canvas bounds). 137/137 total.
+- tests: 30 display tests by merge (T1-T15 plus cycle-driven
+  regressions: failed-match fallback, empty-recording fall-through,
+  collision drops, pool degradation, topology-gated reuse, overflow
+  parses, JSON round-trip incl. the full-topology array; pacer
+  semantics; layout content + canvas bounds + control-byte
+  sanitize). 150/150 total.
+- Review saga: 35 cycles to steady state — the longest yet. The real
+  catches: the pacer hitch-resync unsigned underflow (cadence
+  collapsed to per-frame — my own test caught it), the backglass
+  render block reading LIVE ScriptHost/GameMachine state (moved to
+  the snapshot's Game sub-struct), the attract top-10 racing the
+  sim-thread insert (copied into the snapshot), the stability path's
+  four successive gating defects (subset equality blocking discovery,
+  disabled-bg killing playfield stability, empty recordings never
+  binding, and finally the role-name subset never matching any rig
+  with an unassigned display — fixed by recording the FULL topology),
+  the post-heuristic role collision my own degradation test exposed,
+  and the last_auto persistence that was missing entirely until
+  cycle 11.
+- PROCESS FAILURE, five times over: python string-replace edits kept
+  silently dying mid-batch when an assert failed AFTER earlier
+  replaces had matched — each run of the script lost every edit from
+  the failed assert onward, and four separate fix batches (strtol,
+  clamps, save/parse, ownership comments) vanished this way, with the
+  reviewer re-raising them cycles later and the splice-loss pattern
+  only becoming undeniable at cycle 26 (clamped read vs unclamped
+  write of the same loop). Countermeasures applied mid-PR: whole-
+  block rewrites over incremental anchors, per-edit OK/MISS
+  reporting, forced rebuilds after every batch (twice the static lib
+  had gone stale with passing tests against old code), and post-edit
+  grep verification of the fix's own marker text. The journal's
+  earlier 'every replace must assert' lesson was insufficient — the
+  failure mode is batch-partial application, which asserts alone
+  cannot catch.

@@ -406,7 +406,13 @@ TEST(Tracker, RetriggerTailContinuity) {
     // ring (~6x the 0.16 tail once the fade clears) — a retrigger that
     // only fades the old note, or mis-scales the new one, stays quiet.
     const float after = stereo_rms(buf, 2 * (rt + 2000), 2 * (rt + 4000));
-    EXPECT_GT(after / before, 2.0f) << "the vol-15 retrigger must sound";
+    // The render is bit-deterministic (LUT-only, fp-contract off), so
+    // these ratios are fixed constants: after/before is exactly the
+    // square-law volume ratio (15/6)^2 = 6.25, and the fade window
+    // sits at ~0.81 of the old level. Tight bands catch PARTIAL
+    // mis-scales (a new voice stalled at half gain would read ~3.1).
+    EXPECT_NEAR(tail / before, 0.81f, 0.26f);
+    EXPECT_NEAR(after / before, 6.25f, 0.65f);
 }
 
 TEST(Music, PlaySongStartsAndNoOpsSameId) {

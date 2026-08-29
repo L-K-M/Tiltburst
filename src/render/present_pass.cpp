@@ -30,7 +30,6 @@ load(SDL_GPUDevice* dev, ShaderStage stage, const std::filesystem::path& dir, co
         ci.stage = stage == ShaderStage::Vertex ? SDL_GPU_SHADERSTAGE_VERTEX
                                                 : SDL_GPU_SHADERSTAGE_FRAGMENT;
         ci.entrypoint = "main";
-        ci.num_samplers = stage == ShaderStage::Fragment ? 1 : 0;
         ci.num_storage_buffers = 0;
         ci.num_storage_textures = 0;
         ci.num_samplers = stage == ShaderStage::Fragment ? 2 : 0;

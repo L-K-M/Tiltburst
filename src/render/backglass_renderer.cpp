@@ -164,10 +164,18 @@ void BackglassLayout::build(const BackglassContent& content,
         const uint32_t style =
             uint32_t(model.message_style) < 4 ? uint32_t(model.message_style) : 0;
         quad(W * 0.5f, H - 40.0f, W * 0.5f - 16.0f, 20.0f, 0.10f, 0.11f, 0.16f, 1.0f, out);
+        // Sanitize like the initials: control bytes corrupt the
+        // bitmap-font row (cycle-33 review — same trust level).
+        std::string ticker(model.message, msg_len);
+        for (char& c : ticker) {
+            if (static_cast<unsigned char>(c) < 0x20u) {
+                c = ' ';
+            }
+        }
         text(font,
              28.0f,
              H - 34.0f,
-             std::string(model.message, msg_len),
+             ticker,
              kMsgStyle[style][0],
              kMsgStyle[style][1],
              kMsgStyle[style][2],

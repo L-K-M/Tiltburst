@@ -27,6 +27,7 @@ struct RenderStats {
     uint32_t frames = 0;
     float frame_ms_avg = 0.0f;
     uint32_t playfield_skips = 0;
+    uint32_t backglass_skips = 0; // F3 overlay (07 §8)
     uint32_t sdf_instances = 0;
 };
 
@@ -45,7 +46,7 @@ public:
     void unload_table() override {}
 
     void render_playfield(const RenderFrame&) override;
-    bool render_backglass(const BackglassFrame&) override;
+    bool render_backglass(const BackglassFrame&) override; // false = skipped
     void request_screenshot(const char* png_path) override;
 
     const RenderStats& stats() const override { return stats_; }
@@ -79,6 +80,7 @@ private:
     Rotation rotation_ = Rotation::ROT_0;
 
     QuadBatch quads_;
+    double sim_time_s_ = 0.0; // u_time for both windows' quad paths
     SdfBatch sdf_;
     PresentPass present_;
     ViewTransform view_{};

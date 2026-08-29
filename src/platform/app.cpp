@@ -8,14 +8,19 @@
 #include "core/version.h"
 #include "game/game_machine.h"
 #include "game/high_scores.h"
+#include "game/score_format.h"
+#include "platform/backglass_pacer.h"
+#include "platform/display_detect.h"
 #include "platform/gpu_device.h"
 #include "platform/input.h"
 #include "platform/latency.h"
 #include "platform/paths.h"
 #include "platform/window.h"
+#include "render/backglass_renderer.h"
 #include "render/overlay.h"
 #include "render/renderer.h"
 #include "render/sdl_gpu_renderer.h"
+#include "sim/script_host.h"
 #include "sim/sim_thread.h"
 #include "sim/snapshot.h"
 #include "sim/solver.h"
@@ -296,6 +301,7 @@ CliOptions parse_cli(int argc, char** argv) {
                 cli.window_w <= 0 || cli.window_h <= 0) {
                 return fail("--windowed expects WxH (e.g. 540x1080)");
             }
+            cli.windowed = true;
             continue;
         }
 
@@ -508,6 +514,7 @@ int run(const CliOptions& cli) {
             snap.tilt_armed = uint8_t((sim_state.tilt.warn_armed ? 1u : 0u) |
                                       (sim_state.tilt.hard_armed ? 2u : 0u) |
                                       (sim_state.tilt.abuse_armed ? 4u : 0u));
+
             snapshots.publish(snap);
         });
         const uint64_t start = tb_now_ns();
@@ -753,9 +760,159 @@ int run(const CliOptions& cli) {
             return 1; // ✗ step 8
         }
 
+        // --- Display topology (07-displays.md, M12) ---
+        platform::WindowPtr backglass_window;
+        if (!cli.headless && !cli.windowed) {
+            // Fullscreen cabinet path. --windowed dev mode (§11) skips
+            // detection and creates its own second window below.
+            // (bg_rotation rides on the Assignment and is consumed by
+            // the M13 art pass — v1 backglass content is
+            // orientation-agnostic by design.)
+            //
+            // displays.json loads ONLY on this path — headless and
+            // windowed runs never read a config they cannot consume.
+            platform::DisplaysConfig displays_cfg;
+            bool displays_cfg_no_write = false; // corrupt OR unreadable:
+                                                // never clobber it
+            {
+                const std::filesystem::path cfg_path =
+                    paths::pref() / "displays.json"; // --display-config: M18
+                std::error_code cfg_ec;
+                const bool present = std::filesystem::exists(cfg_path, cfg_ec);
+                if (cfg_ec) {
+                    TB_LOG_WARN("main", "displays.json stat failed: {}", cfg_ec.message());
+                    displays_cfg_no_write = true; // could not even stat:
+                                                  // do not replace it
+                } else if (present) {
+                    std::ifstream cfg_in(cfg_path);
+                    if (!cfg_in.good()) {
+                        TB_LOG_WARN("main",
+                                    "displays.json exists but cannot be read; using "
+                                    "heuristics (auto-write skipped — fix permissions)");
+                        displays_cfg_no_write = true;
+                    } else {
+                        const auto parsed = platform::load_displays_json(
+                            std::string(std::istreambuf_iterator<char>(cfg_in),
+                                        std::istreambuf_iterator<char>()));
+                        if (parsed.corrupt) {
+                            TB_LOG_WARN("main",
+                                        "displays.json corrupt; using heuristics "
+                                        "(auto-write skipped — fix the file)");
+                            displays_cfg_no_write = true;
+                        } else if (parsed.loaded) {
+                            displays_cfg = parsed.cfg;
+                        }
+                    }
+                }
+            }
+
+            std::vector<platform::DisplayInfo> displays;
+            platform::Assignment assign;
+            if (platform::enumerate_displays(displays)) {
+                assign = platform::detect(displays, displays_cfg);
+                for (const std::string& w : assign.warnings) {
+                    TB_LOG_WARN("main", "displays: {}", w);
+                }
+                // 07 §5: the engine writes last_auto (and only
+                // last_auto) after every successful auto-detection, so
+                // stability survives restarts (cycle-11 review: the
+                // read-only integration made the feature inert).
+                const bool auto_playfield =
+                    displays_cfg.playfield.match.empty() || displays_cfg.playfield.match == "auto";
+                if (auto_playfield && !displays_cfg_no_write && !assign.stability_reused &&
+                    assign.playfield >= 0) {
+                    displays_cfg.last_auto.present = true;
+                    displays_cfg.last_auto.playfield = displays[size_t(assign.playfield)].name;
+                    displays_cfg.last_auto.backglass =
+                        assign.backglass >= 0 ? displays[size_t(assign.backglass)].name : "";
+                    // The full topology gates the next run's reuse
+                    // (cycle-32): every attached display's name.
+                    displays_cfg.last_auto.displays.clear();
+                    for (const platform::DisplayInfo& d : displays) {
+                        displays_cfg.last_auto.displays.push_back(d.name);
+                    }
+                    std::error_code write_ec;
+                    std::filesystem::create_directories(paths::pref(), write_ec);
+                    const std::string text = platform::save_displays_json(displays_cfg);
+                    const std::filesystem::path tmp = paths::pref() / "displays.json.tmp";
+                    const std::filesystem::path dst = paths::pref() / "displays.json";
+                    std::ofstream out(tmp, std::ios::binary);
+                    out.write(text.data(), std::streamsize(text.size()));
+                    out.flush();
+                    if (out.good()) {
+                        out.close();
+                        std::filesystem::rename(tmp, dst, write_ec);
+                        if (write_ec) {
+                            TB_LOG_WARN(
+                                "main", "displays.json rename failed: {}", write_ec.message());
+                            // out is closed above (before the rename);
+                            // surface cleanup failures rather than
+                            // discarding the reason.
+                            std::error_code rm_ec;
+                            std::filesystem::remove(tmp, rm_ec); // no orphan tmp
+                            if (rm_ec) {
+                                TB_LOG_WARN("main",
+                                            "displays.json tmp cleanup failed for {}: {}",
+                                            tmp.string(),
+                                            rm_ec.message());
+                            }
+                        }
+                    } else {
+                        out.close();
+                        TB_LOG_WARN("main", "displays.json write failed");
+                        std::error_code rm_ec;
+                        std::filesystem::remove(tmp, rm_ec);
+                        if (rm_ec) {
+                            TB_LOG_WARN(
+                                "main", "displays.json tmp cleanup failed: {}", rm_ec.message());
+                        }
+                    }
+                }
+                // T13: single landscape display without a square
+                // backglass reads as a desktop — say how to override.
+                if (assign.backglass == -1 && assign.playfield >= 0 &&
+                    displays[size_t(assign.playfield)].w >= displays[size_t(assign.playfield)].h) {
+                    TB_LOG_WARN("main",
+                                "landscape display without square backglass: assuming "
+                                "desktop; set displays.json playfield.rotation for a "
+                                "cabinet");
+                }
+                TB_LOG_INFO("main",
+                            "displays: playfield={} backglass={} pf_rotation={}",
+                            assign.playfield,
+                            assign.backglass,
+                            assign.pf_rotation);
+            } else {
+                TB_LOG_WARN("main", "no displays detected; playfield window only");
+            }
+
+            if (assign.backglass >= 0) {
+                // 07 §7: borderless fullscreen via the CARRIED sdl_id —
+                // never a second enumeration (the list can change
+                // between calls; cycle-1 review).
+                const platform::DisplayInfo& bg_display = displays[size_t(assign.backglass)];
+                const SDL_DisplayMode* dm = SDL_GetDesktopDisplayMode(bg_display.sdl_id);
+                if (dm == nullptr) {
+                    TB_LOG_WARN("main", "backglass display mode unavailable; no backglass");
+                } else {
+                    backglass_window = platform::create_fullscreen_window(
+                        "Tiltburst Backglass", uint32_t(dm->w), uint32_t(dm->h), bg_display.sdl_id);
+                    if (!backglass_window) {
+                        TB_LOG_WARN("main", "backglass window creation failed: {}", SDL_GetError());
+                    }
+                }
+            }
+        } else if (cli.windowed && !cli.headless) {
+            // §11 dev mode: a second 640x512 window (side positioning
+            // lands with M18 menu work; v1 centers it). No displays.json
+            // on this path — the dev window always exists.
+            backglass_window = platform::create_window("Tiltburst Backglass", 640, 512);
+        }
+
         auto renderer = render::make_sdl_gpu_renderer();
         render::RendererConfig rcfg;
         rcfg.playfield_window = window.get();
+        rcfg.backglass_window = backglass_window.get();
         rcfg.debug_device = cli.dev;
         rcfg.prefer_mailbox = settings.present_mode != "vsync";
         if (!renderer->init(rcfg)) {
@@ -763,6 +920,16 @@ int run(const CliOptions& cli) {
             SDL_Quit();
             return 1; // ✗ step 9
         }
+
+        // Backglass content pipeline: layout + ~30 Hz pacer (07 §8).
+        render::BackglassLayout bg_layout;
+        // Invariant: Overlay's glyph emission is stateless
+        // (stb_easy_font prints from baked metrics — no init()); if
+        // that ever changes, backglass text silently renders nothing
+        // and this declaration must init it.
+        render::Overlay bg_font;
+        platform::BackglassPacer bg_pacer;
+        std::vector<render::QuadInstance> bg_built;
 
         tb::SnapshotBuffer snapshots;
         // Declaration order is load-bearing: the ScriptHost owned by
@@ -1047,6 +1214,60 @@ int run(const CliOptions& cli) {
             snap.tilt_armed = uint8_t((sim_state.tilt.warn_armed ? 1u : 0u) |
                                       (sim_state.tilt.hard_armed ? 2u : 0u) |
                                       (sim_state.tilt.abuse_armed ? 4u : 0u));
+
+            // Game-layer fields for the backglass (07 §8): filled HERE,
+            // on the sim thread that owns them — the render loop reads
+            // only the published snapshot, never the live objects
+            // (cycle-5 review: the old direct reads were a data race).
+            if (machine != nullptr) {
+                // machine exists only when loaded_table && script_loaded
+                // (its construction site ~line 1060); the deref below is
+                // invariant-safe.
+                snap.game.player_count =
+                    std::clamp(machine->player_count(), 1, decltype(snap.game)::kMaxPlayers);
+                snap.game.current_player =
+                    std::clamp(machine->current_player(), 1, snap.game.player_count);
+                snap.game.ball_number = machine->player_count() > 0
+                                            ? machine->player(snap.game.current_player).ball_number
+                                            : 1; // attract: no live player yet
+                snap.game.game_state = uint8_t(machine->state());
+                for (int pi = 1; pi <= snap.game.player_count; ++pi) {
+                    snap.game.scores[size_t(pi - 1)] = loaded_table->script.player_scores(pi).score;
+                }
+            } else if (loaded_table) {
+                // No framework attached: attract EXPLICITLY — never by
+                // relying on GameState::Attract == 0.
+                snap.game.game_state = uint8_t(game::GameState::Attract);
+                snap.game.scores[0] = loaded_table->script.player_scores(1).score;
+            }
+            {
+                // The high-score table mutates on THIS thread (insert
+                // at game end via the FSM); copy the top 10 here so
+                // the render loop never touches the live object
+                // (cycle-27 review).
+                snap.game.high_score_count = uint32_t(std::min<size_t>(
+                    high_scores.entries().size(), decltype(snap.game)::kHighScoreCap));
+                for (uint32_t i = 0; i < snap.game.high_score_count; ++i) {
+                    snap.game.high_scores[i].initials[0] = high_scores.entries()[i].initials[0];
+                    snap.game.high_scores[i].initials[1] = high_scores.entries()[i].initials[1];
+                    snap.game.high_scores[i].initials[2] = high_scores.entries()[i].initials[2];
+                    snap.game.high_scores[i].initials[3] = '\0';
+                    snap.game.high_scores[i].score = high_scores.entries()[i].score;
+                }
+            }
+            if (loaded_table) {
+                const sim::BackglassModel& bm = loaded_table->script.backglass();
+                snap.game.layout = bm.layout;
+                snap.game.focus_player = bm.focus_player;
+                snap.game.message_style = bm.message_style;
+                // Clamp ONCE and store the clamped length — a longer
+                // live message must not leave a stale tail in the copy.
+                const uint32_t msg_len =
+                    uint32_t(std::min(size_t(bm.message_len), sizeof(snap.game.message) - 1));
+                snap.game.message_len = msg_len;
+                std::memcpy(snap.game.message, bm.message, msg_len);
+                snap.game.message[msg_len] = '\0';
+            }
             snapshots.publish(snap);
 
             // §14.1 stages 1–3 of this tick's latency record.
@@ -1257,6 +1478,62 @@ int run(const CliOptions& cli) {
             frame.debug_collider_count = uint32_t(render_scene.colliders.size());
 
             renderer->render_playfield(frame);
+
+            // Backglass at ~30 Hz, non-blocking (07 §8): the attempt
+            // cadence is deadline-driven; a skipped acquire retries
+            // next playfield frame without advancing the deadline.
+            if (backglass_window) {
+                const uint64_t now_bg = tb_now_ns();
+                if (bg_pacer.should_attempt(now_bg)) {
+                    bg_built.clear();
+                    // Everything below reads the SNAPSHOT — including
+                    // the attract top-10 — no live game objects on this
+                    // thread at all.
+                    render::BackglassContent content;
+                    content.in_attract = snap.game.player_count <= 0 ||
+                                         snap.game.game_state == uint8_t(game::GameState::Attract);
+                    // Both bounds: >4 would write past content.scores,
+                    // and the publisher-side clamp is a convention, not
+                    // a type guarantee (cycle-26 review).
+                    content.player_count =
+                        std::clamp(snap.game.player_count, 1, decltype(snap.game)::kMaxPlayers);
+                    content.current_player =
+                        std::clamp(snap.game.current_player, 1, content.player_count);
+                    content.ball_number = snap.game.ball_number;
+                    for (int pi = 0; pi < content.player_count; ++pi) {
+                        content.scores[size_t(pi)] = snap.game.scores[size_t(pi)];
+                    }
+                    // Attract top-10 from the snapshot copy — the
+                    // table itself mutates on the same (sim) thread
+                    // that fills the copy, never here.
+                    content.high_score_count = std::min<uint32_t>(
+                        snap.game.high_score_count, decltype(snap.game)::kHighScoreCap);
+                    for (uint32_t i = 0; i < content.high_score_count; ++i) {
+                        content.high_scores[i] = {{snap.game.high_scores[i].initials[0],
+                                                   snap.game.high_scores[i].initials[1],
+                                                   snap.game.high_scores[i].initials[2]},
+                                                  snap.game.high_scores[i].score};
+                    }
+                    sim::BackglassModel model; // rebuilt from the snapshot copy
+                    model.layout = snap.game.layout;
+                    model.focus_player = snap.game.focus_player;
+                    model.message_style = snap.game.message_style;
+                    const uint32_t msg_len = uint32_t(
+                        std::min(size_t(snap.game.message_len), sizeof(model.message) - 1));
+                    model.message_len = msg_len;
+                    std::memcpy(model.message, snap.game.message, msg_len);
+                    model.message[msg_len] = '\0';
+                    bg_layout.build(content, model, bg_font, &bg_built);
+                    render::BackglassFrame bframe;
+                    bframe.quads = bg_built.data();
+                    bframe.quad_count = uint32_t(bg_built.size());
+                    if (renderer->render_backglass(bframe)) {
+                        bg_pacer.report_drawn(now_bg);
+                    } else {
+                        bg_pacer.report_skipped();
+                    }
+                }
+            }
 
             // §14.1 stages 4–5 on the record matching the rendered snapshot.
             input.ring.complete_main(snap.tick, frame_start_ns, tb_now_ns());

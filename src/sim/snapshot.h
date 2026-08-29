@@ -38,6 +38,42 @@ struct SimSnapshot {
     float tilt_abuse = 0.0f;              // abuse accumulator (m/s)
     uint16_t tilt_crossings = 0;          // per-ball crossing count
     uint8_t tilt_armed = 0x7;             // warn|hard|abuse arm bits
+
+    // Game-layer state for the backglass. OWNERSHIP (11 §1): the
+    // GameMachine and ScriptHost run ON THE SIM THREAD in this
+    // codebase (step() is the solver's phase-3 hook), so the fill in
+    // tick_fn executes on the owning thread — no cross-thread access
+    // to live game objects anywhere. The RENDER loop reads only this
+    // published copy (07 §8: "no extra sim access" — the same snapshot
+    // the playfield frame used).
+    struct Game {
+        static constexpr int kMaxPlayers = 4;
+        int player_count = 1;
+        int current_player = 1; // 1-based
+        int ball_number = 1;
+        uint8_t game_state = 0; // game::GameState value
+        uint8_t _pad[3] = {};
+        uint64_t scores[kMaxPlayers] = {};
+
+        // BackglassModel copy (message ticker + layout).
+        static constexpr uint32_t kMessageCap = 64;
+        int layout = 0;
+        int focus_player = 1;
+        int message_style = 0;
+        uint32_t message_len = 0;
+        char message[kMessageCap + 1] = {};
+
+        // Attract high-score top 10 (11 §7). The table itself is
+        // mutated on the sim thread (insert at game end); the render
+        // thread reads only this copy (cycle-27 review).
+        static constexpr uint32_t kHighScoreCap = 10;
+        uint32_t high_score_count = 0;
+
+        struct HighScoreRow {
+            char initials[4] = {0, 0, 0, 0};
+            uint64_t score = 0;
+        } high_scores[kHighScoreCap];
+    } game{};
 };
 
 // Triple buffer (§7.2, binding). Single writer (sim), single reader

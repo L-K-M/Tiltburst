@@ -36,15 +36,22 @@ struct RenderStats; // §17
 // light bindings (06 §8.6, §9).
 struct TableRenderData {};
 
-// Grows at M9/M12: backglass draw list (scores, messages).
-struct BackglassFrame {};
-
 // One flat-tint quad in target pixel space (cx, cy center; hx, hy
 // half-extents) with premultiplied color. The overlay/debug paths fill
 // these; the pipeline is the M1 sprite pair (untextured flat tint).
 struct QuadInstance {
     float cx, cy, hx, hy;
     float r, g, b, a;
+};
+
+// Backglass draw list (07 §10/§13 §9.2 v1): flat quads in canvas pixel
+// space; built by BackglassLayout, drawn by render_backglass and the
+// single-display B-key overlay alike.
+struct BackglassFrame {
+    static constexpr uint32_t kCanvasW = 640;
+    static constexpr uint32_t kCanvasH = 512;
+    const QuadInstance* quads = nullptr;
+    uint32_t quad_count = 0;
 };
 
 // Per-frame description (06 §2). M3 adds the F2 debug-draw inputs; TBArt,

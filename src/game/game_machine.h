@@ -101,6 +101,12 @@ public:
     // while already in Attract (app/test wiring order: construct, then
     // wire) arms the attract song immediately.
     void set_music_sink(sim::MusicSink* sink) {
+        // Replacing/detaching while in Attract must not orphan the
+        // outgoing sink mid-song: give it the same stop the Attract
+        // exit makes before the pointer drops (cycle-9 review).
+        if (music_sink_ != nullptr && music_sink_ != sink) {
+            music_sink_->stop_music();
+        }
         music_sink_ = sink;
         if (sink != nullptr && state_ == GameState::Attract) {
             sink->play_music("attract");

@@ -125,6 +125,7 @@ private:
         uint32_t fade_pos = kFadeSamples; // == kFadeSamples: done
         double old_phase = 0.0;
         float old_f_used = 0.0f, old_gain = 1.0f;
+        float old_vol_gain = 1.0f; // the channel vol the tail was sounding at
         const TrackerInstr* old_instr = nullptr;
         // Sample-and-hold noise (noise channel only).
         double noise_acc = 0.0;

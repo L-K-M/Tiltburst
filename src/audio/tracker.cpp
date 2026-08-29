@@ -168,6 +168,10 @@ void TrackerPlayer::process_row(uint32_t row) {
         ch.arp_n = 0;
         const TrackerCell& cell = p->chan[c][row];
 
+        // Capture the tail's channel volume BEFORE this row's cell
+        // replaces it (the retrigger fade must sound at the level the
+        // previous note was actually at; cycle-9 review).
+        ch.old_vol_gain = ch.vol_gain;
         if (cell.inst != 0xFF && cell.inst < song_->instruments.size()) {
             ch.instr = &song_->instruments[cell.inst];
         }
@@ -291,8 +295,8 @@ float TrackerPlayer::channel_sample(Channel& ch) {
         if (ch.old_phase >= 1.0) {
             ch.old_phase -= 1.0;
         }
-        out += osc(*ch.old_instr, ch.old_phase, ch.noise_val) * g *
-               (ch.old_instr->wave == Wave::Noise ? 1.0f : ch.old_gain);
+        out += osc(*ch.old_instr, ch.old_phase, ch.noise_val) * g * ch.old_vol_gain *
+               ch.old_instr->gain * (ch.old_instr->wave == Wave::Noise ? 1.0f : ch.old_gain);
         ++ch.fade_pos;
     }
     if (!ch.sounding || ch.env_off || ch.instr == nullptr) {
@@ -391,6 +395,7 @@ void TrackerPlayer::render(float* dst, const float* gains, uint32_t frames) {
                                 ch.slide_this_row = false;
                                 ch.arp_this_row = false;
                                 ch.arp_n = 0;
+                                ch.vib_active = false; // tail holds pitch
                                 if (ch.sounding && !ch.releasing) {
                                     ch.releasing = true;
                                     ch.release_pos = 0;

@@ -9,6 +9,15 @@ int PatchBank::find(const std::string& name) const {
     return it == by_name_.end() ? -1 : int(it->second);
 }
 
+int PatchBank::find_song(const std::string& id) const {
+    for (size_t i = 0; i < songs_.size(); ++i) {
+        if (songs_[i].id == id) {
+            return int(i);
+        }
+    }
+    return -1;
+}
+
 namespace {
 
 // §7.1 — the 24 built-ins, ids 0-23 in this exact order. Params not

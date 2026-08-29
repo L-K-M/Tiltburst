@@ -73,7 +73,20 @@ struct SimSnapshot {
             char initials[4] = {0, 0, 0, 0};
             uint64_t score = 0;
         } high_scores[kHighScoreCap];
+
+        // Attract page machine (11 §8.2, M14): 0 logo, 1/2 high
+        // scores, 3 rules card, 4 press start; time within the page
+        // drives the 1 Hz press-start pulse.
+        uint8_t attract_page = 0;
+        float attract_page_time_s = 0.0f;
     } game{};
+
+    // Live light state (M14): the first light_count lights' on/off as
+    // a bitmap — the render thread applies it to its scene copy so
+    // light-bound art follows the game (and the §8.2 attract show).
+    static constexpr uint32_t kLightCap = 128;
+    uint32_t light_count = 0;
+    uint8_t light_bits[kLightCap / 8] = {};
 };
 
 // Triple buffer (§7.2, binding). Single writer (sim), single reader

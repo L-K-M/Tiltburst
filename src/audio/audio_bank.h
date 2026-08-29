@@ -1,6 +1,7 @@
 #pragma once
 
 #include "audio/sfx_synth.h"
+#include "audio/tracker.h"
 #include "sim/sound_out.h"
 
 #include <cassert>
@@ -24,6 +25,12 @@ struct PatchEntry {
     float gain = 1.0f;    // db_to_amp(volume_db), applied at render
 };
 
+// One tracker song by reserved-or-extra id (§9).
+struct SongEntry {
+    std::string id;
+    TrackerSong song;
+};
+
 class PatchBank {
 public:
     // Intrusive retire-chain link (audio_engine's epoch protocol);
@@ -43,6 +50,21 @@ public:
         return entries_[i];
     }
 
+    // ---- tracker songs (§8/§9; M14) ----
+    const std::vector<SongEntry>& songs() const { return songs_; }
+
+    // -1 when the id is not in this bank (a missing song id is legal:
+    // that music state is silent, §9).
+    int find_song(const std::string& id) const;
+
+    // ---- duck triggers (§10) ----
+    // Patch ids whose SoundEvents duck the music bus, resolved at
+    // build from the fixed trigger-name list (plus the per-event
+    // duck=true flag, which never touches this table).
+    static constexpr uint32_t kDuckPatchCap = 8;
+    uint16_t duck_patch[kDuckPatchCap] = {};
+    uint32_t duck_patch_n = 0;
+
     // Renders the 24 built-ins (§7.1, ids 0-23 in listed order).
     static std::unique_ptr<PatchBank> built_ins();
     // The compiled §7.1 parameter table (name, params) in id order —
@@ -56,12 +78,15 @@ public:
 
     std::unordered_map<std::string, uint16_t>& mutable_names() { return by_name_; }
 
+    std::vector<SongEntry>& mutable_songs() { return songs_; }
+
 private:
     // Interned id -> entry. Ids 0..23 are the built-ins in §7.1 order;
     // table patches/wavs continue at 24 in JSON key order, and a table
     // patch with a built-in's name OVERRIDES it in place (same id).
     std::vector<PatchEntry> entries_;
     std::unordered_map<std::string, uint16_t> by_name_;
+    std::vector<SongEntry> songs_;
 };
 
 // The §7.2 purpose vocabulary lives in sim/sound_out.h (the emission

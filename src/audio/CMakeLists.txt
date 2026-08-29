@@ -17,6 +17,7 @@ add_library(tb_audio STATIC
     audio_engine.cpp
     audio_json.cpp
     sfx_synth.cpp
+    tracker.cpp
 )
 
 target_include_directories(tb_audio PUBLIC ${PROJECT_SOURCE_DIR}/src)

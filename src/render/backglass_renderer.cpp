@@ -4,6 +4,7 @@
 #include "render/overlay.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 namespace tb::render {
@@ -68,43 +69,91 @@ void BackglassLayout::build(const BackglassContent& content,
     quad(W * 0.5f, H * 0.5f, W * 0.5f, H * 0.5f, kBgR, kBgG, kBgB, 1.0f, out);
 
     if (content.in_attract) {
-        // §9.2 Attract: high scores, rank 1 highlighted, paged layout
-        // is M13 polish — v1 lists up to 10 rows.
-        text(font, 24.0f, 24.0f, "HIGH SCORES", kTextR, kTextG, kTextB, out);
-        float y = 60.0f;
-        char row[64];
-        for (uint32_t i = 0; i < content.high_score_count && i < 10; ++i) {
-            const auto& hs = content.high_scores[i];
-            const bool top = i == 0;
-            // Sanitize per glyph: any control byte (embedded NUL
-            // truncates the row's std::string, others corrupt the
-            // bitmap-font row) renders as a space — the score always
-            // shows (cycle-30/31 review).
-            const auto glyph = [](char c) {
-                return static_cast<unsigned char>(c) >= 0x20u ? c : ' ';
-            };
-            const char clean[3] = {
-                glyph(hs.initials[0]),
-                glyph(hs.initials[1]),
-                glyph(hs.initials[2]),
-            };
-            std::snprintf(row,
-                          sizeof(row),
-                          "%u %c%c%c  %s",
-                          i + 1,
-                          clean[0],
-                          clean[1],
-                          clean[2],
-                          game::format_score(hs.score).c_str());
-            if (top) {
-                text(font, 24.0f, y, row, kActiveR, kActiveG, kActiveB, out);
-            } else {
-                text(font, 24.0f, y, row, kDimR, kDimG, kDimB, out);
+        // §8.2 attract rotation, one page per build.
+        switch (std::clamp(content.attract_page, 0, 4)) {
+        case 0: {
+            // Logo: TILTBURST + the table's name.
+            text(font, 96.0f, 120.0f, "T I L T B U R S T", kTextR, kTextG, kTextB, out);
+            if (!content.table_name.empty()) {
+                text(font, 24.0f, 200.0f, content.table_name, kActiveR, kActiveG, kActiveB, out);
             }
-            y += 30.0f;
+            break;
         }
-        if (content.high_score_count == 0) {
-            text(font, 24.0f, 60.0f, "NO SCORES YET", kDimR, kDimG, kDimB, out);
+        case 1:
+        case 2: {
+            // High scores, two pages of five (§8.2), rank 1 highlighted
+            // as GRAND CHAMPION.
+            text(font, 24.0f, 24.0f, "HIGH SCORES", kTextR, kTextG, kTextB, out);
+            const int base = (content.attract_page - 1) * 5;
+            float y = 70.0f;
+            char row[64];
+            int shown = 0;
+            for (uint32_t i = uint32_t(base); i < content.high_score_count && i < 10 && shown < 5;
+                 ++i) {
+                const auto& hs = content.high_scores[i];
+                const bool top = i == 0;
+                // Sanitize per glyph: any control byte (embedded NUL
+                // truncates the row's std::string, others corrupt the
+                // bitmap-font row) renders as a space — the score
+                // always shows (cycle-30/31 review).
+                const auto glyph = [](char c) {
+                    return static_cast<unsigned char>(c) >= 0x20u ? c : ' ';
+                };
+                const char clean[3] = {
+                    glyph(hs.initials[0]),
+                    glyph(hs.initials[1]),
+                    glyph(hs.initials[2]),
+                };
+                char rank[8];
+                if (top) {
+                    std::snprintf(rank, sizeof(rank), "GC");
+                } else {
+                    std::snprintf(rank, sizeof(rank), "%u", i + 1);
+                }
+                std::snprintf(row,
+                              sizeof(row),
+                              "%s %c%c%c  %s",
+                              rank,
+                              clean[0],
+                              clean[1],
+                              clean[2],
+                              game::format_score(hs.score).c_str());
+                if (top) {
+                    text(font, 24.0f, y, row, kActiveR, kActiveG, kActiveB, out);
+                } else {
+                    text(font, 24.0f, y, row, kDimR, kDimG, kDimB, out);
+                }
+                y += 40.0f;
+                ++shown;
+            }
+            if (shown == 0) {
+                text(font, 24.0f, 70.0f, "NO SCORES YET", kDimR, kDimG, kDimB, out);
+            }
+            break;
+        }
+        case 3: {
+            // Rules card: meta.rules_card lines (§8.2).
+            text(font, 24.0f, 24.0f, "RULES", kTextR, kTextG, kTextB, out);
+            float y = 70.0f;
+            for (const std::string& line : content.rules_lines) {
+                if (y > H - 60.0f) {
+                    break; // card cap: the overflow lines are M15 polish
+                }
+                text(font, 24.0f, y, line, kDimR, kDimG, kDimB, out);
+                y += 30.0f;
+            }
+            break;
+        }
+        default: {
+            // Press start: 1 Hz pulse (§8.2) — the page's own clock.
+            const bool lit = std::fmod(content.attract_page_time_s, 1.0f) < 0.5f;
+            const float lr = lit ? kActiveR : kDimR * 0.5f;
+            const float lg = lit ? kActiveG : kDimG * 0.5f;
+            const float lb = lit ? kActiveB : kDimB * 0.5f;
+            text(font, 176.0f, 220.0f, "PRESS START", lr, lg, lb, out);
+            text(font, 120.0f, 280.0f, "1-4 PLAYERS  -  DUEL MODE", kDimR, kDimG, kDimB, out);
+            break;
+        }
         }
         return;
     }

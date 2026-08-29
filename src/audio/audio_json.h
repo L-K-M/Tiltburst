@@ -2,6 +2,7 @@
 
 #include "audio/audio_bank.h"
 #include "audio/sfx_synth.h"
+#include "audio/tracker.h"
 
 #include <nlohmann/json.hpp>
 
@@ -22,7 +23,9 @@ struct AudioLoadError : std::runtime_error {
 };
 
 // Parsed audio.json (12-audio.md §6). Patches carry author params; the
-// purpose map resolves at bank build (§6.2: "none" disables).
+// purpose map resolves at bank build (§6.2: "none" disables). Songs
+// stay raw JSON here and parse at bank build, where the merged
+// built-ins + table patch map exists to resolve instrument ids (§8.3).
 struct TableAudio {
     // JSON key order preserved (ids 24+ follow insertion order, §5.5).
     std::vector<std::pair<std::string, SfxPatch>> patches;
@@ -30,12 +33,22 @@ struct TableAudio {
     std::vector<std::pair<std::string, std::string>> wav;
     // purpose key -> patch id string, or "none".
     std::map<std::string, std::string> map;
-    bool has_songs = false; // songs are parsed for shape and deferred to M14
+    // song id -> raw song object (§8.3), parsed by build_bank.
+    std::vector<std::pair<std::string, nlohmann::ordered_json>> songs;
+    bool has_songs = false;
 };
 
 // Parses one patch object (§5.1 keys/ranges) — public for the
 // assets-mirror sync test. Throws AudioLoadError.
 SfxPatch parse_patch_json(const nlohmann::ordered_json& obj, const std::string& pointer);
+
+// Parses one song object (§8.3 schema) against the merged patch map
+// (built-ins + table patches by name). Enforces every §8.2/§8.3 range
+// plus the §8.1 wave-per-channel rule; inst is required on a channel's
+// first note. Throws AudioLoadError rooted at `pointer`.
+TrackerSong parse_song_json(const nlohmann::ordered_json& obj,
+                            const std::map<std::string, SfxPatch>& patches,
+                            const std::string& pointer);
 
 // Parses <dir>/audio.json. Throws AudioLoadError on schema violations
 // (§5.1 ranges, unknown keys, sustain==0 && decay==0, illegal map keys,

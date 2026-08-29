@@ -19,6 +19,16 @@ constexpr uint32_t kFadeSamples = 64; // §3.2 steal fade (1.33 ms)
 constexpr uint32_t kGainRamp = 960;   // §3.1 bus volume ramp (20 ms)
 constexpr uint32_t kMaxFrames = 512;  // ladder floor; offline render clamps
 constexpr uint32_t kBusCount = 4;     // sfx, ui, music, master
+
+// §9 music crossfade: 100 ms equal-power, two tracker instances.
+constexpr uint32_t kCrossfadeSamples = 4800;
+// §9 attract offset: -12 dB on the music bus, ramped over 20 ms.
+constexpr float kAttractFloor = 0.25118864315095800f; // 10^(-12/20)
+// §10 duck: -6 dB over 50 ms, hold until 200 ms after the last
+// trigger, 50 ms back up.
+constexpr float kDuckFloor = 0.50118723362727220f;         // 10^(-6/20)
+constexpr uint32_t kDuckHoldSamples = 9600;                // 200 ms
+constexpr float kDuckStep = (1.0f - kDuckFloor) / 2400.0f; // 50 ms ramp
 constexpr double kPi = 3.14159265358979323846;
 
 // §3.3 limiter constants (exact).
@@ -93,6 +103,21 @@ struct AudioEngineImpl {
     // Preallocated mixing scratch (callback is allocation-free).
     float bus_mix[3][kMaxFrames * 2] = {}; // sfx, ui, music
     float frame_gain[kBusCount][kMaxFrames] = {};
+
+    // ---- tracker music (12-audio.md §8/§9/§10, M14) ----
+    // Two instances: the playing song + an incoming crossfade (§9).
+    TrackerPlayer trackers[2];
+    uint16_t slot_song[2] = {0xFFFF, 0xFFFF}; // bank song index per slot
+    int8_t slot_dir[2] = {0, 0};              // +1 fade in, -1 out, 0 steady
+    uint32_t slot_pos[2] = {0, 0};            // fade progress, 0..4800
+    float music_gains[2][kMaxFrames] = {};    // per-frame crossfade curves
+    // §9 attract -12 dB offset on the music bus (20 ms walk both ways).
+    float attract_gain = 1.0f;
+    float attract_target = 1.0f;
+    // §10 duck envelope state (per-sample state machine).
+    float duck_gain = 1.0f;
+    uint8_t duck_phase = 0; // 0 idle, 1 attack, 2 hold, 3 release
+    uint64_t duck_hold_end = 0;
 
     // §3.3 limiter envelope persists across callbacks.
     double lim_env = 0.0;
@@ -286,6 +311,25 @@ int acquire_voice(AudioEngineImpl& impl,
     impl.debug_starts[impl.debug_write & (AudioSystem::kDebugStarts - 1)] = {
         ev.patch, 0, impl.stream_pos_at_mix_start + start_frame};
     impl.debug_write++;
+    // §10 ducking: the trigger list (resolved at bank build) plus the
+    // per-event duck flag. The trigger lands at the moment the voice
+    // actually starts — a scheduled (pending) event ducks at its
+    // scheduled sample, not its enqueue.
+    if ((ev.flags & 1u) || bank.duck_patch_n > 0) {
+        bool hit = (ev.flags & 1u) != 0;
+        for (uint32_t i = 0; !hit && i < bank.duck_patch_n; ++i) {
+            hit = bank.duck_patch[i] == ev.patch;
+        }
+        if (hit) {
+            const uint64_t now = impl.stream_pos_at_mix_start + start_frame;
+            impl.duck_hold_end = now + kDuckHoldSamples;
+            if (impl.duck_phase == 0u || impl.duck_phase == 3u) {
+                impl.duck_phase = 1u; // attack (retrigger resumes the dip)
+            } else {
+                impl.duck_phase = 2u; // extend the hold window
+            }
+        }
+    }
     record_latency_probe(impl, ev, period, periods);
     return slot;
 }
@@ -323,7 +367,67 @@ bool AudioSystem::push_command(const AudioCommand& cmd) {
     return impl_->commands.push(cmd);
 }
 
+bool AudioSystem::has_song(const std::string& song_id) const {
+    for (const std::string& s : song_ids_) {
+        if (s == song_id) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AudioSystem::play_music(const std::string& song_id) {
+    if (song_id.empty()) {
+        return false;
+    }
+    int idx = -1;
+    for (size_t i = 0; i < song_ids_.size(); ++i) {
+        if (song_ids_[i] == song_id) {
+            idx = int(i);
+            break;
+        }
+    }
+    if (idx < 0) {
+        if (last_unknown_song_ != song_id) {
+            last_unknown_song_ = song_id;
+            TB_LOG_WARN("audio", "play_music: no song '{}' in this bank", song_id);
+        }
+        return false; // a missing song id means silence in that state (§9)
+    }
+    AudioCommand cmd;
+    cmd.kind = AudioCommand::Kind::PlaySong;
+    cmd.patch = uint16_t(idx);
+    cmd.value = song_id == "attract" ? 1.0f : 0.0f; // §9 offset flag
+    return impl_->commands.push(cmd);
+}
+
+void AudioSystem::stop_music() {
+    AudioCommand cmd;
+    cmd.kind = AudioCommand::Kind::StopMusic;
+    (void)impl_->commands.push(cmd);
+}
+
 void AudioSystem::publish_bank(std::unique_ptr<PatchBank> bank) {
+    if (bank == nullptr) {
+        return;
+    }
+    // Song ids for the main-thread play_music resolver (copied BEFORE
+    // the pointer leaves for the audio thread).
+    song_ids_.clear();
+    song_ids_.reserve(bank->songs().size());
+    for (const SongEntry& s : bank->songs()) {
+        song_ids_.push_back(s.id);
+    }
+    // Music belongs to the table: stop any playing song before the old
+    // bank retires — tracker instances hold song pointers INTO it, and
+    // the epoch ack that frees the bank can land while a song would
+    // still be referenced. The command pops within one mix of here,
+    // before any ack of THIS publish can be recorded.
+    if (!song_ids_.empty()) {
+        AudioCommand stop;
+        stop.kind = AudioCommand::Kind::StopMusic;
+        (void)impl_->commands.push(stop);
+    }
     PatchBank* next = bank.release();
     PatchBank* old = impl_->bank.exchange(next, std::memory_order_acq_rel);
     const uint64_t epoch = impl_->publish_epoch.fetch_add(1, std::memory_order_acq_rel) + 1;
@@ -651,6 +755,60 @@ void AudioSystem::mix(float* out, uint32_t frames) {
             }
             impl_->pending_n = 0;
             break;
+        case AudioCommand::Kind::PlaySong: {
+            // §9: same id is a no-op; otherwise crossfade 100 ms
+            // equal-power; a third request hard-drops the outgoing
+            // instance (already the quietest). `value` carries the §9
+            // attract flag (music-bus -12 dB offset while active).
+            if (cmd.patch >= bank->songs().size()) {
+                break;
+            }
+            impl_->attract_target = cmd.value > 0.5f ? kAttractFloor : 1.0f;
+            if (impl_->slot_song[0] == cmd.patch || impl_->slot_song[1] == cmd.patch) {
+                break; // already playing
+            }
+            const TrackerSong* song = &bank->songs()[cmd.patch].song;
+            int idle = -1, out = -1;
+            for (int s = 0; s < 2; ++s) {
+                if (impl_->slot_song[s] == 0xFFFF) {
+                    idle = s;
+                } else if (impl_->slot_dir[s] == -1) {
+                    out = s;
+                }
+            }
+            if (idle < 0 && out >= 0) {
+                // Crossfade in progress: hard-drop the outgoing slot.
+                impl_->trackers[out].stop();
+                impl_->slot_song[out] = 0xFFFF;
+                impl_->slot_dir[out] = 0;
+                idle = out;
+            }
+            if (idle < 0) {
+                idle = 1; // both steady cannot happen; defensive
+            }
+            impl_->trackers[idle].start(song, true);
+            impl_->slot_song[idle] = cmd.patch;
+            const bool from_silence = impl_->slot_song[1 - idle] == 0xFFFF;
+            impl_->slot_dir[idle] = from_silence ? 0 : 1;
+            impl_->slot_pos[idle] = from_silence ? kCrossfadeSamples : 0;
+            // The other slot (a steady or fading-in song) fades out.
+            const int other = 1 - idle;
+            if (impl_->slot_song[other] != 0xFFFF && impl_->slot_dir[other] != -1) {
+                impl_->slot_dir[other] = -1;
+                impl_->slot_pos[other] = 0;
+            }
+            break;
+        }
+        case AudioCommand::Kind::StopMusic:
+            // §9: fade out over the same 100 ms.
+            impl_->attract_target = 1.0f;
+            for (int s = 0; s < 2; ++s) {
+                if (impl_->slot_song[s] != 0xFFFF && impl_->slot_dir[s] != -1) {
+                    impl_->slot_dir[s] = -1;
+                    impl_->slot_pos[s] = 0;
+                }
+            }
+            break;
         }
     }
 
@@ -717,8 +875,80 @@ void AudioSystem::mix(float* out, uint32_t frames) {
                     g = target;
                 }
             }
-            impl_->frame_gain[b][i] = g;
+            float fg = g;
+            if (b == 2) {
+                // Music bus extras (§9/§10): the attract -12 dB offset
+                // (20 ms walk, same shape as the volume ramp) and the
+                // duck envelope (-6 dB / 50 ms / hold 200 ms after the
+                // last trigger / 50 ms back).
+                float& ag = impl_->attract_gain;
+                if (ag != impl_->attract_target) {
+                    const float astep = (impl_->attract_target - ag) / float(kGainRamp);
+                    ag += astep;
+                    if ((astep > 0.0f && ag >= impl_->attract_target) ||
+                        (astep < 0.0f && ag <= impl_->attract_target)) {
+                        ag = impl_->attract_target;
+                    }
+                }
+                switch (impl_->duck_phase) {
+                case 1: // attack
+                    impl_->duck_gain -= kDuckStep;
+                    if (impl_->duck_gain <= kDuckFloor) {
+                        impl_->duck_gain = kDuckFloor;
+                        impl_->duck_phase = 2;
+                    }
+                    break;
+                case 2: // hold
+                    if (pos0 + i >= impl_->duck_hold_end) {
+                        impl_->duck_phase = 3;
+                    }
+                    break;
+                case 3: // release
+                    impl_->duck_gain += kDuckStep;
+                    if (impl_->duck_gain >= 1.0f) {
+                        impl_->duck_gain = 1.0f;
+                        impl_->duck_phase = 0;
+                    }
+                    break;
+                default:
+                    break; // idle at unity
+                }
+                fg = g * ag * impl_->duck_gain;
+            }
+            impl_->frame_gain[b][i] = fg;
         }
+    }
+
+    // ---- tracker music into the music bus (§8) ----
+    // Per-frame crossfade gains (equal-power, §9) then render both
+    // live instances; finished fades stop their instance here.
+    for (int s = 0; s < 2; ++s) {
+        if (impl_->slot_song[s] == 0xFFFF) {
+            continue;
+        }
+        for (uint32_t i = 0; i < frames; ++i) {
+            if (impl_->slot_dir[s] == 0) {
+                impl_->music_gains[s][i] = 1.0f;
+                continue;
+            }
+            if (impl_->slot_pos[s] < kCrossfadeSamples) {
+                ++impl_->slot_pos[s];
+            }
+            const float x = float(impl_->slot_pos[s]) / float(kCrossfadeSamples);
+            impl_->music_gains[s][i] =
+                impl_->slot_dir[s] > 0 ? tracker_eq_pow(x) : tracker_eq_pow(1.0f - x);
+            if (impl_->slot_pos[s] >= kCrossfadeSamples) {
+                if (impl_->slot_dir[s] > 0) {
+                    impl_->slot_dir[s] = 0; // fully in: steady
+                } else {
+                    // Fully out: stop the instance.
+                    impl_->trackers[s].stop();
+                    impl_->slot_song[s] = 0xFFFF;
+                    impl_->slot_dir[s] = 0;
+                }
+            }
+        }
+        impl_->trackers[s].render(impl_->bus_mix[2], impl_->music_gains[s], frames);
     }
 
     // ---- mix voices into their buses ----

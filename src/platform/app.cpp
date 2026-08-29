@@ -22,6 +22,7 @@
 #include "render/renderer.h"
 #include "render/sdl_gpu_renderer.h"
 #include "render/tbart.h"
+#include "sim/music_sink.h"
 #include "sim/script_host.h"
 #include "sim/sim_thread.h"
 #include "sim/snapshot.h"
@@ -967,6 +968,58 @@ int run(const CliOptions& cli) {
         }
         tb::sim::Solver solver;
 
+        // Music bridge (12-audio.md §9, M14): the script host and the
+        // GameMachine call this ON THE SIM THREAD; requests queue under
+        // a mutex (song changes are human-rate) and the main loop
+        // drains them into AudioSystem. Built before both the machine
+        // and the audio system; `audio` binds after its init.
+        struct MusicBridge final : sim::MusicSink {
+            struct Request {
+                std::string id; // empty = stop
+            };
+
+            std::mutex mu;
+            std::vector<Request> pending;
+            tb::audio::AudioSystem* audio = nullptr;
+
+            void play_music(const char* song_id) override {
+                if (song_id == nullptr || song_id[0] == '\0') {
+                    return;
+                }
+                std::lock_guard<std::mutex> lock(mu);
+                pending.push_back({song_id});
+            }
+
+            void stop_music() override {
+                std::lock_guard<std::mutex> lock(mu);
+                pending.push_back({});
+            }
+
+            // Main thread, once per frame.
+            void drain() {
+                std::vector<Request> take;
+                {
+                    std::lock_guard<std::mutex> lock(mu);
+                    take.swap(pending);
+                }
+                if (audio == nullptr) {
+                    return;
+                }
+                for (const Request& r : take) {
+                    // Unknown ids are legal silence (§9) — only play
+                    // what the published bank actually defines, without
+                    // the engine's log-once warning.
+                    if (r.id.empty()) {
+                        audio->stop_music();
+                    } else if (audio->has_song(r.id)) {
+                        audio->play_music(r.id);
+                    }
+                }
+            }
+        };
+
+        MusicBridge music_bridge;
+
         // M10 game framework (11-game-framework.md): only for a loaded
         // table with rules; synthetic scenes run bare.
         std::unique_ptr<tb::game::GameMachine> machine;
@@ -1077,6 +1130,10 @@ int run(const CliOptions& cli) {
             }
             machine = std::make_unique<tb::game::GameMachine>(
                 loaded_table->script, sim_state, high_scores, fcfg);
+            // §9 music seam: script (tb.play_music) + framework
+            // (attract/game_over autoplay) route through the bridge.
+            loaded_table->script.set_music_sink(&music_bridge);
+            machine->set_music_sink(&music_bridge);
             sim_state.nudge_level = std::clamp(settings.nudge_level, 1, 3);
             sim_state.fsm_ctx = machine.get();
             sim_state.fsm_step = [](void* ctx, tb::sim::SimState& s, const tb::sim::TickInput& in) {
@@ -1100,6 +1157,7 @@ int run(const CliOptions& cli) {
             if (!audio.init(acfg) && !cli.audio_null) {
                 TB_LOG_WARN("main", "continuing without audio");
             }
+            music_bridge.audio = &audio; // §9 bridge binds post-init
         }
         std::vector<std::string> intern_names;          // owns the strings
         std::vector<tb::sim::PatchIntern> patch_intern; // views into them
@@ -1240,6 +1298,10 @@ int run(const CliOptions& cli) {
                 for (int pi = 1; pi <= snap.game.player_count; ++pi) {
                     snap.game.scores[size_t(pi - 1)] = loaded_table->script.player_scores(pi).score;
                 }
+                // Attract page machine (§8.2): published for the
+                // backglass layout.
+                snap.game.attract_page = uint8_t(machine->attract_page());
+                snap.game.attract_page_time_s = machine->attract_page_time_s();
             } else if (loaded_table) {
                 // No framework attached: attract EXPLICITLY — never by
                 // relying on GameState::Attract == 0.
@@ -1273,6 +1335,21 @@ int run(const CliOptions& cli) {
                 snap.game.message_len = msg_len;
                 std::memcpy(snap.game.message, bm.message, msg_len);
                 snap.game.message[msg_len] = '\0';
+            }
+            // Light bitmap (M14): the sim-thread lights at phase-3
+            // exit — script show or framework attract choreography —
+            // published for the render thread's scene copy.
+            {
+                const uint32_t n =
+                    uint32_t(std::min<size_t>(sim_state.lights.size(), SimSnapshot::kLightCap));
+                snap.light_count = n;
+                for (uint32_t i = 0; i < n; ++i) {
+                    if (sim_state.lights[i].on) {
+                        snap.light_bits[i >> 3] |= uint8_t(1u << (i & 7));
+                    } else {
+                        snap.light_bits[i >> 3] &= uint8_t(~(1u << (i & 7)));
+                    }
+                }
             }
             snapshots.publish(snap);
 
@@ -1345,7 +1422,8 @@ int run(const CliOptions& cli) {
         bool show_overlay = true;
 
         while (!g_quit.load(std::memory_order_acquire)) {
-            audio.pump(); // reclaim retired patch banks (12 §2.3)
+            audio.pump();         // reclaim retired patch banks (12 §2.3)
+            music_bridge.drain(); // §9: sim-thread music -> commands
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
                 switch (event.type) {
@@ -1494,6 +1572,17 @@ int run(const CliOptions& cli) {
                 }
             }
 
+            // M14: apply the snapshot's light bitmap to the render
+            // scene copy — light-bound art follows the script show and
+            // the §8.2 attract choreography.
+            {
+                const uint32_t n =
+                    std::min<uint32_t>(uint32_t(render_scene.lights.size()), snap.light_count);
+                for (uint32_t i = 0; i < n; ++i) {
+                    render_scene.lights[i].on = (snap.light_bits[i >> 3] & (1u << (i & 7))) != 0;
+                }
+            }
+
             if (debug_level >= 1) {
                 // Insert lights drawn as debug circles (04-milestones.md M5).
                 for (const auto& light : render_scene.lights) {
@@ -1548,6 +1637,27 @@ int run(const CliOptions& cli) {
                     render::BackglassContent content;
                     content.in_attract = snap.game.player_count <= 0 ||
                                          snap.game.game_state == uint8_t(game::GameState::Attract);
+                    // Attract page machine (§8.2) + the static table
+                    // data the pages show (logo name, rules card).
+                    content.attract_page = int(snap.game.attract_page);
+                    content.attract_page_time_s = snap.game.attract_page_time_s;
+                    if (loaded_table != nullptr) {
+                        content.table_name = loaded_table->def.name;
+                        // §8.2 rules card: meta.rules_card lines. The
+                        // table object is immutable at runtime (loads
+                        // and F5 reloads happen with the sim stopped).
+                        std::istringstream card(loaded_table->def.rules_card);
+                        std::string line;
+                        while (std::getline(card, line)) {
+                            if (!line.empty() && line.back() == '\r') {
+                                line.pop_back();
+                            }
+                            content.rules_lines.push_back(line);
+                            if (content.rules_lines.size() >= 8) {
+                                break; // card cap; more is M15 polish
+                            }
+                        }
+                    }
                     // Both bounds: >4 would write past content.scores,
                     // and the publisher-side clamp is a convention, not
                     // a type guarantee (cycle-26 review).

@@ -653,7 +653,7 @@ corrections are new entries. Format: 03-process.md §3.1.
   marker text. The journal entry from M12 documents the full
   taxonomy.
 
-## M13b — Neon Drift art content (2026-08-29, in flight)
+## M13b — Neon Drift art content (2026-08-29, merged as #16)
 
 - The art.json ships (sunset-synth, 6 layers per §3.6: ground / deco /
   inserts / guides / logo / wire) with the three motifs from the 15 §1.2
@@ -666,9 +666,81 @@ corrections are new entries. Format: 03-process.md §3.1.
 - Two prefabs the loader hadn't implemented yet (checkerboard_strip
   §4.4, neon_arrow §4.6) join tbart.cpp — the art.json's use exposed
   the gap (the shipped test would not load without them).
-- The loader test asserts 6 unique-z layers, sunset-synth, ball trail,
-  and exactly 3 light-bound inserts (the RPM lanes — the test pins
-  the exact count). 165/165.
-- M13b still owes: the RenderSmoke.NeonDriftArtFrame GPU test, the
-  backglass art pass, the attract/title text pass, and the style-
-  checklist PR walk.
+- The loader test asserts every layer z (0/20/50/70/90/140),
+  sunset-synth, ball trail, exactly 3 light-bound inserts (the RPM
+  lanes — the test pins the exact count), and the prefab expansions
+  (2 tube_outline DecalGroups with tube+specular children, exactly 2
+  neon_arrow DecalGroups with head+shaft children). 13 review cycles
+  (checkerboard semantics took three passes: the real checkerboard
+  draws every cell alternating by (row+col)%2 — the skip-half version
+  was one color per row of dashes; the right-orbit chevrons pointed
+  down-table until cycle 12 — the ball enters the right orbit going
+  UP from the right flipper, rot_deg 280 → 100). 165/165 merged.
+- Still open from the M13b list (folded forward): the
+  RenderSmoke.NeonDriftArtFrame GPU test and the backglass ART pass
+  (the M14 attract pages are text/layout; the painted backglass art
+  card remains) — tracked under M16/M17 table polish.
+
+## M14 — Music tracker & attract mode (2026-08-29, in flight)
+
+- Tracker core (src/audio/tracker.*): 4 monophonic channels
+  (pulse1/pulse2/wide/noise), float tick accumulator scheduler (§8.4),
+  gated vs one-shot envelopes via the §5.1 mapping, 64-sample
+  retrigger fades, sample-and-hold noise (PCG32 @ 0x5EEDCAFE, hold
+  48000/(8f)), arp/slide/vibrato fx applied on music ticks, static
+  constant-power pans. Song parsing lives in audio_json (shares
+  AudioLoadError + the merged patch map); every §8.2/§8.3 range and
+  the §8.1 wave-per-channel rule enforced at load.
+- PORTABILITY: the sample math is deliberately libm-free — 2^(k/12)
+  and sin as pasted decimal-literal LUTs (tracker_pow2.inc /
+  tracker_sin.inc), fractional semitone ratios via a 4-term Taylor,
+  the slide per-tick factor via Newton nth-root — so the golden hash
+  (Tracker.SongRendersDeterministicPcm, pinned
+  0x577375EA9CB54983 over 3 s of the §8.5 reference song) is
+  identical on all 3 CI OSes. std::pow/std::sin are NOT
+  bit-stable across libms; the tracker must stay LUT-only.
+- Engine §9/§10: two TrackerPlayer slots with equal-power 100 ms
+  crossfades (third request hard-drops the outgoing instance),
+  attract -12 dB music-bus offset ramped over 20 ms, ducking (-6 dB
+  / 50 ms, hold to 200 ms after the last trigger, 50 ms recovery)
+  triggered by the fixed patch-name list resolved at bank build plus
+  the per-event duck flag. publish_bank stops music first — tracker
+  instances hold song pointers INTO the retiring bank (epoch
+  protocol interaction; the StopMusic command pops within one mix,
+  before any ack of the new publish can free the old bank).
+- Music seam: sim::MusicSink (play/stop by id, called on the SIM
+  thread by tb.play_music/stop_music and the framework); the app's
+  MusicBridge queues under a mutex and drains to AudioSystem each
+  frame. Unknown ids are legal silence (§9 subset) — the bridge
+  pre-checks has_song so song-less tables (test-lab without songs)
+  stay warn-free. GameMachine auto-plays attract on Attract entry
+  (and on late sink install — the construct-then-wire order would
+  otherwise lose it), stops on exit, plays game_over on game end.
+- Attract §8.2: 5-page machine in GameMachine (Logo 8 s, high scores
+  2×4 s, rules card 10 s, press start 5 s; flippers page manually,
+  Start interrupts within 1 tick); backglass layout renders each
+  page (the press-start pulse is the layout's only time input).
+  Framework light show (13 §7.2 v1): breathe (bottom-to-top band
+  offsets) / chase 80 ms per lamp / strobe / dark beat over every
+  light — function-tag + light-group personalization deferred to
+  M16/M17 (no table declares them yet). Lights reach the renderer
+  through a new snapshot bitmap (SimSnapshot::light_bits) — this
+  also closes the M13a gap where light-bound art never saw the
+  game's light state (render_scene.lights.on was never synced).
+- Neon Drift audio.json: the 7 §1.6 delta patches + map + 6 songs
+  (attract 92 neon ballad, main 118 synthwave groove A/B, mode 128
+  D-minor, multiball 140, wizard 150 alarm, game_over 104 engine-
+  down with S-n slides); rules.lua wires main/mode/multiball per
+  the §9 script contract (ball_start → main, drift corner → mode,
+  multiball_start/end, nd_gearshift on bank_complete with duck,
+  nd_nitro_hit at the multiball jackpot).
+- Tests: 17 new (parse rejects ×4, golden hash, row timing ±1 ms,
+  loop seam, play/no-op, stop fade, equal-power crossfade, attract
+  offset ±0.02 of ×0.251, duck ±0.05 of ×0.501 + recovery,
+  allocation-free callback with tracker active, neon-drift load,
+  attract cycle/interrupt/lights/game_over ×3). 182/182.
+- Deferred: playfield particle wiring for attract ("music and
+  particles" — ParticleSystem exists as a tested library but has no
+  GPU draw path yet; lands with the screenshot tooling that needs
+  it), per-table art-driven light-show personalization, the 30 s WAV
+  demo artifact (needs tb_autoplay --wav, M15).

@@ -3,6 +3,7 @@
 #include "platform/display_detect.h"
 
 #include <cstdint>
+#include <vector>
 
 // SDL enumeration fill-in (07 §2) and the ~30 Hz backglass cadence
 // logic (07 §8). The pacing state machine is GPU-free and unit-tested;

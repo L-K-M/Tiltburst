@@ -16,13 +16,12 @@ bool BackglassPacer::should_attempt(uint64_t now_ns) {
     return now_ns >= next_ns_;
 }
 
-void BackglassPacer::report_drawn(uint64_t now_ns) {
+void BackglassPacer::report_drawn(uint64_t) {
+    // The parameter is intentionally unused: advancement comes from the
+    // DEADLINE, not wall time — a frame drawn 5 ms late does not slide
+    // the cadence late (and should_attempt already resnapped past any
+    // >100 ms backlog before the attempt that led here).
     ++drawn_;
-    // Advance from the DEADLINE, not from now: a frame drawn 5 ms late
-    // does not slide the whole cadence late. (No second resync here:
-    // under the documented call pattern should_attempt() already
-    // snapped the deadline past any >100 ms backlog before the attempt
-    // that led here — the extra check was unreachable.)
     next_ns_ += kFrameNs;
 }
 

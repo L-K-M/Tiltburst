@@ -503,8 +503,10 @@ std::vector<ArtPrim> expand_prefab(const std::string& prefab,
         const float cell = float(param_f("cell", 0.006));
         const uint32_t color_a = param_color("color_a", "bg1");
         const uint32_t color_b = param_color("color_b", "glow_white");
-        if (!(cell > 0.0f)) {
-            fail("checkerboard cell must be > 0", pointer + "/params/cell");
+        // Upper bound too: 1e-7 cell → millions of columns. Cap at a
+        // physically meaningful density (cell ≥ 0.5 mm, ≤ 200 cols).
+        if (!(cell > 0.0f) || cell < 0.0005f || w / cell > 200.0f) {
+            fail("checkerboard cell must be > 0 and <= w/200", pointer + "/params/cell");
         }
         const int cols = std::max(1, int(w / cell));
         const float cw = w / float(cols);

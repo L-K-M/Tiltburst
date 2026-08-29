@@ -530,7 +530,91 @@ corrections are new entries. Format: 03-process.md §3.1.
   T15's backglass expectation: the NEC (5:4, squareness 0.80) beats the
   leftover 16:9 on the (squareness, area, -index) key — my test comment
   had rationalized the wrong pick.
-- tests: 22 new (T1-T15 incl. stability, stale-match warnings, glob
-  ambiguity, same-display drop, empty list; JSON round-trip with
-  comments/corrupt/missing; pacer draw/skip/retry/hitch semantics;
-  layout content + canvas bounds). 137/137 total.
+- tests: 30 display tests by merge (T1-T15 plus cycle-driven
+  regressions: failed-match fallback, empty-recording fall-through,
+  collision drops, pool degradation, topology-gated reuse, overflow
+  parses, JSON round-trip incl. the full-topology array; pacer
+  semantics; layout content + canvas bounds + control-byte
+  sanitize). 150/150 total.
+- Review saga: 35 cycles to steady state — the longest yet. The real
+  catches: the pacer hitch-resync unsigned underflow (cadence
+  collapsed to per-frame — my own test caught it), the backglass
+  render block reading LIVE ScriptHost/GameMachine state (moved to
+  the snapshot's Game sub-struct), the attract top-10 racing the
+  sim-thread insert (copied into the snapshot), the stability path's
+  four successive gating defects (subset equality blocking discovery,
+  disabled-bg killing playfield stability, empty recordings never
+  binding, and finally the role-name subset never matching any rig
+  with an unassigned display — fixed by recording the FULL topology),
+  the post-heuristic role collision my own degradation test exposed,
+  and the last_auto persistence that was missing entirely until
+  cycle 11.
+- PROCESS FAILURE, five times over: python string-replace edits kept
+  silently dying mid-batch when an assert failed AFTER earlier
+  replaces had matched — each run of the script lost every edit from
+  the failed assert onward, and four separate fix batches (strtol,
+  clamps, save/parse, ownership comments) vanished this way, with the
+  reviewer re-raising them cycles later and the splice-loss pattern
+  only becoming undeniable at cycle 26 (clamped read vs unclamped
+  write of the same loop). Countermeasures applied mid-PR: whole-
+  block rewrites over incremental anchors, per-edit OK/MISS
+  reporting, forced rebuilds after every batch (twice the static lib
+  had gone stale with passing tests against old code), and post-edit
+  grep verification of the fix's own marker text. The journal's
+  earlier 'every replace must assert' lesson was insufficient — the
+  failure mode is batch-partial application, which asserts alone
+  cannot catch.
+
+## M13a — Art system engine (2026-08-29, in flight)
+
+- Scope per 04 §M13 pre-authorized split: TBArt schema + loader with
+  prefab expansion (starburst/dotted_circle/chevron_row/
+  lightning_bolt/tube_outline/grid_horizon; the remaining prefabs join
+  with the renderer integration), particles (SoA pool 8192, §13.4
+  canonical effects, steal-oldest, flash-reduction), the font atlas
+  (stb_truetype 2048² R8, three faces × 24/48/96 px, ASCII+Latin-1),
+  and the CRT-branch math restated as CPU-verifiable values (0.88
+  dark-row / 0.85 corner / 0.748 both — 13 §10 verbatim; the shader
+  uniform branch lands with the composite integration).
+- Layering: art.json parses to concrete primitives at LOAD (stars→
+  polygons, decals→children composed through the instance transform);
+  the renderer never sees a prefab name. Light binding resolves through
+  the caller's element-id map so a "light" field naming an unknown id
+  is a load error (validated). Palette: five canon tables compiled in,
+  custom 8-role objects accepted.
+- ChakraPetch-Bold substitutes the "orbitron" HUD role per the M0
+  substitution ADR (assets/fonts/SOURCES.md) — the font enum keeps the
+  ROLE names (hud/monoton/righteous) so authored art is
+  substitution-agnostic.
+- 8 new tests: schema round-trip (every primitive kind + gradient +
+  hex-alpha + decal + star expansion + ball config), unknown
+  primitive/palette/z errors, missing-file-is-greybox, light-id
+  validation, pool cap under a spawn storm + expiry, the §17.1
+  1.5 ms-budget perf gate (600 frames at 60 Hz with ≥ 2000 live),
+  glyph-metric invariants, CRT value math. 158/158 total.
+- Parts 2-3 on the branch: ArtRenderer (layer → SdfInstance build,
+  below/above-ball split, live light brightness with the 15% ghost
+  floor, polyline/polygon lowered to stroked capsules, decal children
+  through composed world transforms, 8192-instance budget) and the
+  bloom-chain HLSL sources (bright/downsample/blur/upsample per §12.1–
+  12.4 verbatim weights). present.frag deliberately stays bloomless
+  until its C++ plumbing exists — the shader blobs and the C++ side
+  must land together (ADR-012 discipline).
+- Parts 4-6 on the branch: the bloom chain GPU wiring + §12.5
+  composite (present.frag carries the bloom sample, saturation clamp,
+  and the u_crt branch IN THE SAME COMMIT as its present_pass.cpp
+  plumbing — the blob/C++ divergence discipline from part 3); the
+  segmented score digits (§14.2 verbatim endpoints + masks, ghost 6%,
+  comma capsule, italic skew — the quad fallback emits bounding boxes
+  until the backglass migrates to the SDF pipeline); and the app-layer
+  integration (art.json loads beside the table, light ids validate,
+  ArtRenderer builds per frame from live LightState, RenderFrame
+  carries the typed instance views, draw_scene pushes below-ball
+  before the debug draw and above-ball after the ball). Settings:
+  render.crt (user-only, default false) + render.bloom_strength wired
+  through RendererConfig.
+- Remaining for the M13a PR: the NeonDriftArtFrame smoke test (needs
+  an art.json on a shipped table — M13b content makes that real) and
+  the committed present.frag blob refresh (CI compile loop covers it;
+  the local fallback blobs are stale until then, which is exactly the
+  ADR-012 degrade path).

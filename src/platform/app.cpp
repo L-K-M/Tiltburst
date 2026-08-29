@@ -16,10 +16,12 @@
 #include "platform/latency.h"
 #include "platform/paths.h"
 #include "platform/window.h"
+#include "render/art_renderer.h"
 #include "render/backglass_renderer.h"
 #include "render/overlay.h"
 #include "render/renderer.h"
 #include "render/sdl_gpu_renderer.h"
+#include "render/tbart.h"
 #include "sim/script_host.h"
 #include "sim/sim_thread.h"
 #include "sim/snapshot.h"
@@ -555,6 +557,8 @@ int run(const CliOptions& cli) {
         rcfg.playfield_window = window.get();
         rcfg.debug_device = cli.dev;
         rcfg.prefer_mailbox = settings.present_mode != "vsync";
+        rcfg.bloom_strength = settings.composite_bloom_strength();
+        rcfg.crt = settings.crt;
         if (!renderer->init(rcfg)) {
             log::flush_now();
             SDL_Quit();
@@ -914,6 +918,8 @@ int run(const CliOptions& cli) {
         rcfg.playfield_window = window.get();
         rcfg.backglass_window = backglass_window.get();
         rcfg.debug_device = cli.dev;
+        rcfg.bloom_strength = settings.composite_bloom_strength();
+        rcfg.crt = settings.crt;
         rcfg.prefer_mailbox = settings.present_mode != "vsync";
         if (!renderer->init(rcfg)) {
             log::flush_now();
@@ -1302,6 +1308,38 @@ int run(const CliOptions& cli) {
         } else {
             tb::sim::make_synthetic_scene(render_scene, 424242);
         }
+
+        // M13a: load art.json (13 s3) and build the light-id map the
+        // loader validates "light" fields against. The art renderer
+        // reads live LightState rows from the SIM state each frame.
+        render::TbArt table_art;
+        bool table_art_loaded = false;
+        std::vector<std::pair<std::string, int>> art_light_ids;
+        if (loaded_table != nullptr && !cli.headless) {
+            for (size_t i = 0; i < loaded_table->def.elements.size(); ++i) {
+                const auto& el = loaded_table->def.elements[size_t(i)];
+                if (std::holds_alternative<tb::table::LightDef>(el.def)) {
+                    art_light_ids.emplace_back(el.id(), int(i));
+                }
+            }
+            try {
+                auto result = render::load_art(table_dir, art_light_ids);
+                if (result.loaded) {
+                    table_art = std::move(result.art);
+                    table_art_loaded = true;
+                    TB_LOG_INFO("main", "art.json loaded: {} layers", table_art.layers.size());
+                }
+            } catch (const render::ArtError& e) {
+                // User-editable content: warn + greybox (the M11
+                // audio.json policy), never fatal at startup.
+                TB_LOG_WARN(
+                    "main", "art.json corrupt ({} at {}); greybox", e.what(), e.json_pointer);
+            }
+        }
+        render::ArtRenderer art_renderer;
+        if (table_art_loaded) {
+            art_renderer.set_art(&table_art);
+        }
         uint64_t last_frame_ns = tb_now_ns();
         uint64_t next_cap_ns = last_frame_ns;
         bool show_overlay = true;
@@ -1470,6 +1508,24 @@ int run(const CliOptions& cli) {
                                                              0.5f});
                 }
             }
+
+            // M13a: art instances from live light state (the renderer
+            // consumes below_/above_ between the scene draws).
+            if (!art_renderer.build(
+                    render_scene.lights.data(), render_scene.lights.size(), snap.sim_time_s)) {
+                TB_LOG_WARN_RATELIMITED("main", "art instance budget exceeded; art truncated");
+            }
+            // .data() reads MEMBER vectors (stable, no temporaries).
+            render::ArtInstances art_instances;
+            const auto& below = art_renderer.below_ball();
+            const auto& above = art_renderer.above_ball();
+            art_instances.below = below.data();
+            art_instances.below_count = uint32_t(below.size());
+            art_instances.above = above.data();
+            art_instances.above_count = uint32_t(above.size());
+            frame.art = &art_instances;
+            frame.lights = render_scene.lights.data();
+            frame.light_count = uint32_t(render_scene.lights.size());
 
             frame.quads = quads.data();
             frame.quad_count = uint32_t(quads.size());

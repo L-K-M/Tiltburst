@@ -20,9 +20,10 @@ struct Settings {
     // render (consumed from M13)
     bool bloom_enabled = true;
     float bloom_threshold = 1.0f;
-    float bloom_knee = 0.5f;
-    float bloom_strength = 0.6f;
-    bool crt = false;
+    float bloom_knee = 0.6f;     // §12.1 binding value (the shader hardcodes it; threshold/knee
+                                 // uniforms are M13b wiring)
+    float bloom_strength = 0.6f; // render.bloom_strength, 0-2 (06 §12.5)
+    bool crt = false;            // render.crt, user-only (13 §10)
 
     // audio — volumes 0..100, gain = (v/100)^2 (12-audio.md §3.1)
     int audio_master = 80;
@@ -48,6 +49,11 @@ struct Settings {
     bool reduce_flashing = false;
     bool ball_outline = false;
     bool screen_shake = true;
+
+    // §12.5: the composite strength (0 when bloom is disabled — the
+    // null-bloom bind multiplies to zero). Shared by the app wiring
+    // and the tests.
+    float composite_bloom_strength() const { return bloom_enabled ? bloom_strength : 0.0f; }
 
     // Default bindings per 05 §9.1, one action-indexed list each.
     static Settings defaults();

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "render/bloom_chain.h"
 #include "render/pipeline_quad.h"
 #include "render/present_pass.h"
 #include "render/renderer.h"
@@ -83,6 +84,9 @@ private:
     double sim_time_s_ = 0.0; // u_time for both windows' quad paths
     SdfBatch sdf_;
     PresentPass present_;
+    BloomChain bloom_;
+    float bloom_strength_ = 0.6f;
+    bool crt_ = false;
     ViewTransform view_{};
 
     SDL_GPUTexture* scene_ = nullptr; // RGBA16F (§7)

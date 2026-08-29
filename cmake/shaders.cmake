@@ -50,7 +50,7 @@ if(TB_COMPILE_SHADERS)
     set(SDLSHADERCROSS_INSTALL OFF CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(sdl_shadercross)
 
-    foreach(name IN ITEMS sprite.vert sprite.frag)
+    foreach(name IN ITEMS sprite.vert sprite.frag sdf.vert sdf.frag present.vert present.frag bloom.vert bloom_bright.frag bloom_down.frag bloom_blur.frag bloom_up.frag)
         set(src ${TB_SHADER_SOURCE_DIR}/${name}.hlsl)
         add_custom_command(
             OUTPUT ${TB_SHADER_OUT_DIR}/${name}.spv

@@ -36,6 +36,12 @@ public:
     // Intrusive retire-chain link (audio_engine's epoch protocol);
     // null unless this bank is retired awaiting an ack.
     PatchBank* retire_next = nullptr;
+    // The publish epoch this instance went live with (main thread
+    // sets it BEFORE the release publish of the pointer, so the audio
+    // thread's acquire snapshot reads bank data and epoch as one
+    // unit — a queued PlaySong can compare against the SAME object it
+    // indexes, never a separately-loaded counter).
+    uint64_t epoch = 0;
     // The int return is deliberate: -1 is the disabled sentinel, so
     // callers must check >= 0 before any size_t use.
     int find(const std::string& name) const;

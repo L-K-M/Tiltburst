@@ -403,7 +403,7 @@ bool AudioSystem::play_music(const std::string& song_id) {
     AudioCommand cmd;
     cmd.kind = AudioCommand::Kind::PlaySong;
     cmd.patch = uint16_t(idx);
-    cmd.epoch = uint16_t(impl_->publish_epoch.load(std::memory_order_relaxed));
+    cmd.epoch = bank->epoch;                        // the exact snapshot idx resolved against
     cmd.value = song_id == "attract" ? 1.0f : 0.0f; // §9 offset flag
     return impl_->commands.push(cmd);
 }
@@ -441,8 +441,14 @@ void AudioSystem::publish_bank(std::unique_ptr<PatchBank> bank) {
         (void)impl_->commands.push(stop);
     }
     PatchBank* next = bank.release();
-    PatchBank* old = impl_->bank.exchange(next, std::memory_order_acq_rel);
     const uint64_t epoch = impl_->publish_epoch.fetch_add(1, std::memory_order_acq_rel) + 1;
+    // Stamp BEFORE the release publish: the audio thread's acquire
+    // load of the pointer then observes {bank data, epoch} as one
+    // snapshot (the epoch counter alone is a separate location — a
+    // relaxed read of it could disagree with the bank dereferenced
+    // on the same pass; cycle-3 review).
+    next->epoch = epoch;
+    PatchBank* old = impl_->bank.exchange(next, std::memory_order_acq_rel);
     if (old != nullptr) {
         if (impl_->retired != nullptr) {
             // Prior retire never acked (device dead or callback idle):
@@ -777,9 +783,10 @@ void AudioSystem::mix(float* out, uint32_t frames) {
             }
             // Stale-epoch guard: the index was resolved against the
             // bank published at push time; a swap since renumbers the
-            // song list, so a queued request must not replay against
-            // the new bank's song at the same index.
-            if (cmd.epoch != uint16_t(impl_->publish_epoch.load(std::memory_order_relaxed))) {
+            // song list. Compared against the SNAPSHOT's own epoch
+            // field — the same acquire-loaded object being indexed —
+            // so index and epoch can never disagree (cycle-3 review).
+            if (cmd.epoch != bank->epoch) {
                 break;
             }
             impl_->attract_target = cmd.value > 0.5f ? kAttractFloor : 1.0f;

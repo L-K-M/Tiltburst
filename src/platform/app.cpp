@@ -781,6 +781,8 @@ int run(const CliOptions& cli) {
                 const bool present = std::filesystem::exists(cfg_path, cfg_ec);
                 if (cfg_ec) {
                     TB_LOG_WARN("main", "displays.json stat failed: {}", cfg_ec.message());
+                    displays_cfg_no_write = true; // could not even stat:
+                                                  // do not replace it
                 } else if (present) {
                     std::ifstream cfg_in(cfg_path);
                     if (!cfg_in.good()) {

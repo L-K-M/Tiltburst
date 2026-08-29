@@ -373,6 +373,36 @@ float stereo_rms(const std::vector<float>& buf, size_t begin, size_t end) {
     return n > 0 ? float(std::sqrt(acc / double(n))) : 0.0f;
 }
 
+// ---- semantic anchor for the cycle-9 tail fix: the retrigger fade
+// begins at the OLD note's actual level (channel vol x instr gain), so
+// the waveform stays continuous across a volume-changing retrigger —
+// a mis-scaled tail (unity, or gain applied twice) jumps instead. ----
+TEST(Tracker, RetriggerTailContinuity) {
+    auto patches = reference_patches();
+    audio::SfxPatch lead = patches["lead_pulse"];
+    lead.sustain = 0.6f; // gated: the old note rings at full level
+    lead.decay = 0.3f;
+    patches["cont_lead"] = lead;
+    // Row 0: E-5 at vol 6 ((6/15)^2 = 0.16). Row 4: same note at vol 15
+    // (level 1.0): the RETRIGGER must fade the 0.16 tail, not spike.
+    const std::string pulse1 = "[\"E-5 cont_lead 6\", \"---\", \"---\", \"---\", "
+                               "\"E-5 . 15\", \"---\", \"---\", \"---\", "
+                               "\"---\", \"---\", \"---\", \"---\", "
+                               "\"---\", \"---\", \"---\", \"---\"]";
+    const auto j = nlohmann::ordered_json::parse(solo_song(pulse1, 120, 6), nullptr, true, true);
+    const audio::TrackerSong song = audio::parse_song_json(j, patches, "/s");
+    std::vector<float> buf = render_song(song, 1.0f);
+    // Row 4 onset: 4 x 0.125 s = 24000 samples.
+    const size_t rt = 24000;
+    ASSERT_GT(buf.size() / 2, rt + 64);
+    const float before = stereo_rms(buf, 2 * (rt - 2000), 2 * rt);
+    const float tail = stereo_rms(buf, 2 * rt, 2 * (rt + 32));
+    EXPECT_GT(before, 0.005f) << "the old note should be ringing";
+    // The fade tail starts at the old level: continuity, not a jump.
+    // (The pre-fix code faded at ~unity: ratio ~6x here.)
+    EXPECT_NEAR(tail / before, 1.0f, 0.5f);
+}
+
 TEST(Music, PlaySongStartsAndNoOpsSameId) {
     audio::AudioSystem sys;
     audio::AudioConfig cfg;

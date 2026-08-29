@@ -910,7 +910,6 @@ int run(const CliOptions& cli) {
             return 1; // ✗ step 9
         }
 
-        sim::BackglassModel game_no_table_model; // defaults; M14 attract
         // Backglass content pipeline: layout + ~30 Hz pacer (07 §8).
         render::BackglassLayout bg_layout;
         render::Overlay bg_font; // glyph emitter only

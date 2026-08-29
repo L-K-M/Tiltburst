@@ -76,13 +76,17 @@ void BackglassLayout::build(const BackglassContent& content,
         for (uint32_t i = 0; i < content.high_score_count && i < 10; ++i) {
             const auto& hs = content.high_scores[i];
             const bool top = i == 0;
-            // Sanitize per glyph: an embedded NUL truncates the row's
-            // std::string at construction (cycle-30 review) — short or
-            // unset initials render as spaces, the score always shows.
+            // Sanitize per glyph: any control byte (embedded NUL
+            // truncates the row's std::string, others corrupt the
+            // bitmap-font row) renders as a space — the score always
+            // shows (cycle-30/31 review).
+            const auto glyph = [](char c) {
+                return static_cast<unsigned char>(c) >= 0x20u ? c : ' ';
+            };
             const char clean[3] = {
-                hs.initials[0] != '\0' ? hs.initials[0] : ' ',
-                hs.initials[1] != '\0' ? hs.initials[1] : ' ',
-                hs.initials[2] != '\0' ? hs.initials[2] : ' ',
+                glyph(hs.initials[0]),
+                glyph(hs.initials[1]),
+                glyph(hs.initials[2]),
             };
             std::snprintf(row,
                           sizeof(row),

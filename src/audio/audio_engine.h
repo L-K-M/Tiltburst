@@ -220,6 +220,15 @@ public:
 
     uint32_t debug_starts(uint32_t count, DebugStart* out) const;
 
+    // Test seams for the §9 music state: which bank song index each
+    // slot holds (0xFFFF = empty) and the absolute stream sample that
+    // slot STARTED at (a same-id no-op must leave both unchanged —
+    // an RMS level cannot see a phase reset on a steady tone).
+    static constexpr uint32_t kMusicSlots = 2;
+
+    uint16_t debug_music_song(uint32_t slot) const;
+    uint64_t debug_music_start_sample(uint32_t slot) const;
+
 private:
     static void dataCallback(ma_device* device, void* out, const void* input, unsigned int frames);
     // The whole callback core; also the offline path.

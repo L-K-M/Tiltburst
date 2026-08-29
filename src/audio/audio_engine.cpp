@@ -108,6 +108,7 @@ struct AudioEngineImpl {
     // Two instances: the playing song + an incoming crossfade (§9).
     TrackerPlayer trackers[2];
     uint16_t slot_song[2] = {0xFFFF, 0xFFFF}; // bank song index per slot
+    uint64_t slot_start[2] = {0, 0};          // absolute sample each slot started
     int8_t slot_dir[2] = {0, 0};              // +1 fade in, -1 out, 0 steady
     uint32_t slot_pos[2] = {0, 0};            // fade progress, 0..4800
     float music_gains[2][kMaxFrames] = {};    // per-frame crossfade curves
@@ -527,6 +528,14 @@ uint32_t AudioSystem::debug_starts(uint32_t count, DebugStart* out) const {
     return n;
 }
 
+uint16_t AudioSystem::debug_music_song(uint32_t slot) const {
+    return slot < kMusicSlots ? impl_->slot_song[slot] : 0xFFFF;
+}
+
+uint64_t AudioSystem::debug_music_start_sample(uint32_t slot) const {
+    return slot < kMusicSlots ? impl_->slot_start[slot] : 0;
+}
+
 // ---- device ----
 
 bool AudioSystem::init(const AudioConfig& cfg) {
@@ -813,6 +822,7 @@ void AudioSystem::mix(float* out, uint32_t frames) {
                 impl_->trackers[out].stop();
                 impl_->slot_song[out] = 0xFFFF;
                 impl_->slot_dir[out] = 0;
+                impl_->slot_start[out] = 0;
                 idle = out;
             }
             if (idle < 0) {
@@ -820,6 +830,7 @@ void AudioSystem::mix(float* out, uint32_t frames) {
             }
             impl_->trackers[idle].start(song, true);
             impl_->slot_song[idle] = cmd.patch;
+            impl_->slot_start[idle] = impl_->stream_pos_at_mix_start;
             const bool from_silence = impl_->slot_song[1 - idle] == 0xFFFF;
             impl_->slot_dir[idle] = from_silence ? 0 : 1;
             impl_->slot_pos[idle] = from_silence ? kCrossfadeSamples : 0;

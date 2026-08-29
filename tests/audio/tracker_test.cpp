@@ -315,7 +315,10 @@ TEST(Tracker, LoopSeamless) {
       "order": ["A"] })json";
     const auto j = nlohmann::ordered_json::parse(src, nullptr, true, true);
     const audio::TrackerSong song = audio::parse_song_json(j, patches, "/s");
-    std::vector<float> buf = render_song(song, 3.0f);
+    // 4.5 s: both seams (96000 and 192000) are inside the buffer —
+    // a 3 s render silently skipped the second (cycle-17 review).
+    std::vector<float> buf = render_song(song, 4.5f);
+    ASSERT_GT(buf.size() / 2, 192101u) << "both seams must be in-bounds";
     // Pattern length = 16 rows * 0.125 s = 2 s = 96000 samples; seams
     // at 96000 and 192000.
     for (uint64_t seam : {96000ull, 192000ull}) {
@@ -335,7 +338,8 @@ TEST(Tracker, LoopSeamless) {
 
 // A bank with continuous-tone songs under the given ids (gated square,
 // no OFF): constant amplitude, ideal for gain measurements.
-std::unique_ptr<audio::PatchBank> tone_bank(const std::vector<std::string>& ids, float bpm) {
+std::unique_ptr<audio::PatchBank>
+tone_bank_notes(const std::vector<std::pair<std::string, const char*>>& songs, float bpm) {
     audio::TableAudio ta;
     audio::SfxPatch lead;
     lead.wave = audio::Wave::Square;
@@ -343,24 +347,34 @@ std::unique_ptr<audio::PatchBank> tone_bank(const std::vector<std::string>& ids,
     lead.sustain = 0.6f;
     lead.decay = 0.3f;
     ta.patches.emplace_back("tone_lead", lead);
-    const std::string src = std::string(R"json({
+    for (const auto& [id, note] : songs) {
+        const std::string song_src = std::string(R"json({
       "bpm": )json") + std::to_string(int(bpm)) +
-                            R"json(, "ticks_per_row": 6,
+                                     R"json(, "ticks_per_row": 6,
       "patterns": { "A": {
-        "pulse1": )json" + cells("\"A-4 tone_lead 12\"") +
-                            R"json(,
-        "pulse2": )json" + all_off() +
-                            R"json(,
-        "wide": )json" + all_off() +
-                            R"json(,
-        "noise": )json" + all_off() +
-                            R"json( } },
+        "pulse1": )json" + cells(std::string("\"") + note + " tone_lead 12\"") +
+                                     R"json(,
+        "pulse2": ["---", "---", "---", "---", "---", "---", "---", "---",
+                   "---", "---", "---", "---", "---", "---", "---", "---"],
+        "wide": ["---", "---", "---", "---", "---", "---", "---", "---",
+                 "---", "---", "---", "---", "---", "---", "---", "---"],
+        "noise": ["---", "---", "---", "---", "---", "---", "---", "---",
+                  "---", "---", "---", "---", "---", "---", "---", "---"] } },
       "order": ["A"] })json";
-    for (const std::string& id : ids) {
-        ta.songs.emplace_back(id, nlohmann::ordered_json::parse(src, nullptr, true, true));
+        ta.songs.emplace_back(id, nlohmann::ordered_json::parse(song_src, nullptr, true, true));
     }
     int purpose[sim::SimState::kSoundPurposeCount] = {};
     return audio::build_bank(ta, tb::test::data_path("tables/test-lab"), purpose);
+}
+
+// Single-note convenience for the call sites that do not need
+// per-song pitches.
+std::unique_ptr<audio::PatchBank> tone_bank(const std::vector<std::string>& ids, float bpm) {
+    std::vector<std::pair<std::string, const char*>> songs;
+    for (const std::string& id : ids) {
+        songs.emplace_back(id, "A-4");
+    }
+    return tone_bank_notes(songs, bpm);
 }
 
 float stereo_rms(const std::vector<float>& buf, size_t begin, size_t end) {
@@ -430,14 +444,26 @@ TEST(Music, PlaySongStartsAndNoOpsSameId) {
         sys.render_offline(buf.data(), 512);
     }
     EXPECT_GT(stereo_rms(buf, 0, buf.size()), 0.01f);
-    // Same id again: a no-op — the song keeps playing.
+    // Same id again: a TRUE no-op — the same slot keeps the SAME start
+    // sample (a restart would reset it; an RMS level cannot see a
+    // phase reset on a steady tone, so this pins the §9 contract).
+    const uint16_t song_before = sys.debug_music_song(0);
+    const uint64_t start_before = sys.debug_music_start_sample(0);
     ASSERT_TRUE(sys.play_music("main"));
-    for (int i = 0; i < 8; ++i) {
+    sys.render_offline(buf.data(), 512); // command pops here
+    EXPECT_EQ(sys.debug_music_song(0), song_before);
+    EXPECT_EQ(sys.debug_music_start_sample(0), start_before);
+    for (int i = 0; i < 7; ++i) {
         sys.render_offline(buf.data(), 512);
     }
     EXPECT_GT(stereo_rms(buf, 0, buf.size()), 0.01f);
-    // Unknown id: reported, silent no-op.
+    // Unknown id: reported false AND resolves to silence (§9): the
+    // song stops (the slot empties as the 100 ms fade completes).
     EXPECT_FALSE(sys.play_music("wizard"));
+    for (int i = 0; i < 16; ++i) {
+        sys.render_offline(buf.data(), 512);
+    }
+    EXPECT_EQ(sys.debug_music_song(0), 0xFFFFu);
     sys.shutdown();
 }
 
@@ -472,9 +498,11 @@ TEST(Music, CrossfadeEqualPower) {
     audio::AudioConfig cfg;
     cfg.null_backend = true;
     ASSERT_TRUE(sys.init(cfg));
-    // Two identical-tone songs at different pitches (bank ids share the
-    // tone patch; pitch differs via bpm so the RMS is comparable).
-    sys.publish_bank(tone_bank({"main", "mode"}, 120.0f));
+    // Two gated tones an octave apart (A-4 vs A-3): same envelope and
+    // volume (so RMS levels compare 1:1) but incommensurate pitches —
+    // the two instances never sum phase-coherently, so the mid-fade
+    // level reflects the equal-power curve itself.
+    sys.publish_bank(tone_bank_notes({{"main", "A-4"}, {"mode", "A-3"}}, 120.0f));
     std::vector<float> buf(512 * 2);
     sys.publish_tick(0);
     ASSERT_TRUE(sys.play_music("main"));
@@ -482,8 +510,8 @@ TEST(Music, CrossfadeEqualPower) {
         sys.render_offline(buf.data(), 512);
     }
     const float rms_a = stereo_rms(buf, 0, buf.size());
-    // Switch: 100 ms equal-power crossfade; at the midpoint both
-    // instances sound at ~0.707 each, so the bus power stays ~equal.
+    // Switch: 100 ms equal-power crossfade. Incoherent sources add in
+    // POWER: sqrt(0.707^2 + 0.707^2) = 1.0 at the midpoint.
     ASSERT_TRUE(sys.play_music("mode"));
     for (int i = 0; i < 5; ++i) { // ~53 ms: near the midpoint
         sys.render_offline(buf.data(), 512);
@@ -493,12 +521,10 @@ TEST(Music, CrossfadeEqualPower) {
         sys.render_offline(buf.data(), 512);
     }
     const float rms_b = stereo_rms(buf, 0, buf.size());
-    // Equal-power: mid-fade amplitude stays near either end (the two
-    // instances are the same waveform, so they sum coherently only if
-    // phase-aligned; at 0.707+0.707 worst case the RMS stays within
-    // [0.7, 1.5]x of steady).
     EXPECT_GT(rms_a, 0.01f);
-    EXPECT_GT(rms_mid, 0.4f * rms_a);
+    // Equal-power at the midpoint: ~unity relative to one steady tone.
+    EXPECT_NEAR(rms_mid / rms_a, 1.0f, 0.35f);
+    // Past the fade, the new song alone matches the old level.
     EXPECT_NEAR(rms_b / rms_a, 1.0f, 0.2f);
     sys.shutdown();
 }

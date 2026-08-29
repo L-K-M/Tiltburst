@@ -652,3 +652,22 @@ corrections are new entries. Format: 03-process.md §3.1.
   per-script-call with immediate grep verification of the fix's own
   marker text. The journal entry from M12 documents the full
   taxonomy.
+
+## M13b — Neon Drift art content (2026-08-29, in flight)
+
+- The art.json ships (sunset-synth, 6 layers per §3.6: ground / deco /
+  inserts / guides / logo / wire) with the three motifs from the 15 §1.2
+  brief: horizon grid + sun-stripe arcs, chrome speed-line chevrons on
+  both orbit lanes, and a 4-segment tach around the gear bank. Light-
+  bound RPM lane inserts + the full text set (insert captions 0.008 m,
+  zone headlines 0.014 m, Monoton logo 0.040 m with glow 1.4, amber
+  shot_arrow ramp markers per §6's function-color override, magenta
+  underline swoosh, additive tube_outline wireforms over both ramps).
+- Two prefabs the loader hadn't implemented yet (checkerboard_strip
+  §4.4, neon_arrow §4.6) join tbart.cpp — the art.json's use exposed
+  the gap (the shipped test would not load without them).
+- The loader test asserts 6 unique-z layers, sunset-synth, ball trail,
+  and ≥ 3 light-bound inserts. 165/165.
+- M13b still owes: the RenderSmoke.NeonDriftArtFrame GPU test, the
+  backglass art pass, the attract/title text pass, and the style-
+  checklist PR walk.

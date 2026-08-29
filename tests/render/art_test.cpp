@@ -527,4 +527,36 @@ TEST(ArtRenderer, NullArtBuildsEmpty) {
     EXPECT_TRUE(ar.above_ball().empty());
 }
 
+// ---- The shipped Neon Drift art loads ----
+TEST(TbArt, NeonDriftArtLoads) {
+    const auto result =
+        render::load_art(tb::test::data_path("tables/neon-drift"),
+                         {{"light_rpm_r", 0}, {"light_rpm_p", 1}, {"light_rpm_m", 2}});
+    ASSERT_TRUE(result.loaded);
+    EXPECT_EQ(result.art.palette_name, "sunset-synth");
+    EXPECT_TRUE(result.art.ball_trail);
+    // 6 layers: ground, deco, inserts, guides, logo, wire.
+    ASSERT_EQ(result.art.layers.size(), 6u);
+    // Layer z values: 0, 20, 50, 70, 90, 140 (unique, sorted).
+    EXPECT_EQ(result.art.layers[0].z, 0);
+    EXPECT_EQ(result.art.layers[5].z, 140);
+    EXPECT_TRUE(result.art.layers[5].additive);
+    // No duplicate z.
+    for (size_t i = 0; i < result.art.layers.size(); ++i) {
+        for (size_t j = i + 1; j < result.art.layers.size(); ++j) {
+            EXPECT_NE(result.art.layers[i].z, result.art.layers[j].z);
+        }
+    }
+    // Light-bound inserts resolve.
+    int bound = 0;
+    for (const auto& layer : result.art.layers) {
+        for (const auto& prim : layer.prims) {
+            if (prim.light_index >= 0) {
+                ++bound;
+            }
+        }
+    }
+    EXPECT_GE(bound, 3); // the three RPM lane inserts
+}
+
 } // namespace

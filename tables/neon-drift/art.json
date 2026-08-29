@@ -1,0 +1,179 @@
+{
+  // neon-drift art — sunset-synth (13 §2.2, binding per 15 §1.2).
+  // Motifs: (1) horizon grid + sun stripe, (2) chrome speed-line
+  // chevrons, (3) tach arcs around the gear bank. All coordinates in
+  // table meters (physics space, origin at the flipper end, +y up).
+  "palette": "sunset-synth",
+  "ball": { "trail": true, "trail_color": "glow_white" },
+  "layers": [
+    { "name": "ground", "z": 0, "blend": "normal", "primitives": [
+      // bg0→bg1 gradient up-table (§11: never flat black).
+      { "kind": "rect", "transform": { "pos": [0.260, 0.520] },
+        "w": 0.520, "h": 1.040,
+        "fill": { "type": "linear", "angle_deg": 90, "length": 1.040,
+                  "colors": ["bg0", "bg1"] } },
+
+      // Motif 1: horizon grid receding up-table (§4.5).
+      { "kind": "decal", "transform": { "pos": [0.260, 0.480] },
+        "prefab": "grid_horizon",
+        "params": { "w": 0.440, "h": 0.260, "lines": 9, "color": "primary" } },
+
+      // Sun-stripe circles: three concentric ring fragments.
+      { "kind": "arc", "transform": { "pos": [0.260, 0.780] },
+        "r": 0.075, "thickness": 0.003, "start_deg": 200, "end_deg": 340,
+        "fill": "accent2",
+        "glow": { "radius": 0.006, "intensity": 0.8 } },
+      { "kind": "arc", "transform": { "pos": [0.260, 0.780] },
+        "r": 0.055, "thickness": 0.003, "start_deg": 200, "end_deg": 340,
+        "fill": "accent1",
+        "glow": { "radius": 0.005, "intensity": 0.7 } },
+      { "kind": "arc", "transform": { "pos": [0.260, 0.780] },
+        "r": 0.035, "thickness": 0.003, "start_deg": 200, "end_deg": 340,
+        "fill": "primary",
+        "glow": { "radius": 0.005, "intensity": 0.7 } }
+    ] },
+
+    { "name": "deco", "z": 20, "blend": "normal", "primitives": [
+      // Checkerboard trim along the apron (§4.4).
+      { "kind": "decal", "transform": { "pos": [0.260, 0.075] },
+        "prefab": "checkerboard_strip",
+        "params": { "w": 0.480, "h": 0.012, "cell": 0.006 } },
+
+      // Speed-line chevrons along the left orbit (motif 2).
+      { "kind": "decal", "transform": { "pos": [0.075, 0.560], "rot_deg": 80 },
+        "prefab": "chevron_row",
+        "params": { "count": 3, "w": 0.010, "h": 0.012, "gap": 0.006,
+                     "color": "secondary", "glow_intensity": 0.8 } },
+
+      // Chevrons on the right orbit.
+      { "kind": "decal", "transform": { "pos": [0.445, 0.560], "rot_deg": 280 },
+        "prefab": "chevron_row",
+        "params": { "count": 3, "w": 0.010, "h": 0.012, "gap": 0.006,
+                     "color": "secondary", "glow_intensity": 0.8 } },
+
+      // Starburst by the pit scoop (§4.1).
+      { "kind": "decal", "transform": { "pos": [0.180, 0.540] },
+        "prefab": "starburst",
+        "params": { "r": 0.018, "spikes": 10, "color": "accent1",
+                     "glow_intensity": 0.9 } }
+    ] },
+
+    { "name": "inserts", "z": 50, "blend": "normal", "primitives": [
+      // RPM lane inserts (progression → primary per §6; light-bound).
+      { "kind": "circle", "transform": { "pos": [0.180, 0.905] }, "r": 0.008,
+        "fill": "primary",
+        "glow": { "radius": 0.010, "intensity": 1.2 },
+        "light": "light_rpm_r" },
+      { "kind": "circle", "transform": { "pos": [0.220, 0.905] }, "r": 0.008,
+        "fill": "primary",
+        "glow": { "radius": 0.010, "intensity": 1.2 },
+        "light": "light_rpm_p" },
+      { "kind": "circle", "transform": { "pos": [0.260, 0.905] }, "r": 0.008,
+        "fill": "primary",
+        "glow": { "radius": 0.010, "intensity": 1.2 },
+        "light": "light_rpm_m" },
+
+      // RPM labels (insert captions 0.006–0.010 m per §5).
+      { "kind": "text", "transform": { "pos": [0.180, 0.860] },
+        "string": "R", "font": "orbitron", "size": 0.008, "align": "center",
+        "fill": "glow_white" },
+      { "kind": "text", "transform": { "pos": [0.220, 0.860] },
+        "string": "P", "font": "orbitron", "size": 0.008, "align": "center",
+        "fill": "glow_white" },
+      { "kind": "text", "transform": { "pos": [0.260, 0.860] },
+        "string": "M", "font": "orbitron", "size": 0.008, "align": "center",
+        "fill": "glow_white" },
+
+      // Zone label: DRIFT CORNER (zone headline 0.014 m min per §5).
+      { "kind": "text", "transform": { "pos": [0.130, 0.720] },
+        "string": "DRIFT", "font": "orbitron", "size": 0.014, "align": "center",
+        "fill": "accent1",
+        "glow": { "radius": 0.005, "intensity": 0.9 } },
+      { "kind": "text", "transform": { "pos": [0.130, 0.690] },
+        "string": "CORNER", "font": "orbitron", "size": 0.014, "align": "center",
+        "fill": "accent1" },
+
+      // Gear bank label (zone headline).
+      { "kind": "text", "transform": { "pos": [0.348, 0.650] },
+        "string": "GEARS", "font": "orbitron", "size": 0.014, "align": "center",
+        "fill": "glow_white" },
+
+      // N-O-S labels.
+      { "kind": "text", "transform": { "pos": [0.442, 0.545] },
+        "string": "N O S", "font": "orbitron", "size": 0.008, "align": "center",
+        "fill": "accent2" },
+
+      // Pit scoop caption.
+      { "kind": "text", "transform": { "pos": [0.180, 0.460] },
+        "string": "PIT", "font": "orbitron", "size": 0.008, "align": "center",
+        "fill": "glow_white" }
+    ] },
+
+    { "name": "guides", "z": 70, "blend": "normal", "primitives": [
+      // Orbit lane strokes (3-5 mm wide per §11; contrast ≥ 4.5).
+      { "kind": "arc", "transform": { "pos": [0.260, 0.520] },
+        "r": 0.185, "thickness": 0.004, "start_deg": 15, "end_deg": 165,
+        "fill": "primary",
+        "glow": { "radius": 0.008, "intensity": 1.0 } },
+
+      // Gear bank tach arcs (motif 3): 5 segments, 1 per gear.
+      { "kind": "arc", "transform": { "pos": [0.348, 0.695] },
+        "r": 0.048, "thickness": 0.004, "start_deg": 200, "end_deg": 232,
+        "fill": "primary",
+        "glow": { "radius": 0.006, "intensity": 1.0 } },
+      { "kind": "arc", "transform": { "pos": [0.348, 0.695] },
+        "r": 0.048, "thickness": 0.004, "start_deg": 236, "end_deg": 268,
+        "fill": "primary",
+        "glow": { "radius": 0.006, "intensity": 1.0 } },
+      { "kind": "arc", "transform": { "pos": [0.348, 0.695] },
+        "r": 0.048, "thickness": 0.004, "start_deg": 272, "end_deg": 304,
+        "fill": "primary",
+        "glow": { "radius": 0.006, "intensity": 1.0 } },
+      { "kind": "arc", "transform": { "pos": [0.348, 0.695] },
+        "r": 0.048, "thickness": 0.004, "start_deg": 308, "end_deg": 340,
+        "fill": "primary",
+        "glow": { "radius": 0.006, "intensity": 1.0 } },
+
+      // Ramp entrance arrows (neon_arrow, shot_arrow amber per §6 —
+      // these are painted amber because they are shot guides).
+      { "kind": "decal", "transform": { "pos": [0.155, 0.660] },
+        "prefab": "neon_arrow",
+        "params": { "len": 0.028, "w": 0.014, "color": "#FFB000",
+                     "glow_intensity": 1.2 } },
+      { "kind": "decal", "transform": { "pos": [0.370, 0.580] },
+        "prefab": "neon_arrow",
+        "params": { "len": 0.028, "w": 0.014, "color": "#FFB000",
+                     "glow_intensity": 1.2 } }
+    ] },
+
+    { "name": "logo", "z": 90, "blend": "normal", "primitives": [
+      // "NEON DRIFT" logo (0.030–0.050 m per §5; Monoton ≥ 0.018 m,
+      // glow ≥ 1.0).
+      { "kind": "text", "transform": { "pos": [0.260, 0.320] },
+        "string": "NEON DRIFT", "font": "monoton", "size": 0.040,
+        "align": "center",
+        "fill": "primary",
+        "glow": { "radius": 0.012, "intensity": 1.4, "color": "primary" } },
+
+      // Magenta underline swoosh.
+      { "kind": "capsule", "transform": { "pos": [0, 0] },
+        "a": [0.120, 0.290], "b": [0.400, 0.285], "r": 0.002,
+        "fill": "primary",
+        "glow": { "radius": 0.006, "intensity": 1.0 } }
+    ] },
+
+    { "name": "wire", "z": 140, "blend": "additive", "primitives": [
+      // Wireform over the ramp crossing (§4.11 tube_outline).
+      { "kind": "decal", "transform": { "pos": [0, 0] },
+        "prefab": "tube_outline",
+        "params": { "points": [[0.155, 0.760], [0.130, 0.800], [0.100, 0.780],
+                                 [0.090, 0.600], [0.240, 0.320]],
+                     "r_tube": 0.003, "color": "secondary" } },
+      { "kind": "decal", "transform": { "pos": [0, 0] },
+        "prefab": "tube_outline",
+        "params": { "points": [[0.370, 0.620], [0.310, 0.760], [0.200, 0.800],
+                                 [0.090, 0.880]],
+                     "r_tube": 0.003, "color": "secondary" } }
+    ] }
+  ]
+}

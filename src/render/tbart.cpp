@@ -496,6 +496,71 @@ std::vector<ArtPrim> expand_prefab(const std::string& prefab,
         return out;
     }
 
+    if (prefab == "checkerboard_strip") {
+        // §4.4: alternating rect cells, two rows, classic diner trim.
+        const float w = float(param_f("w", 0.10));
+        const float h = float(param_f("h", 0.012));
+        const float cell = float(param_f("cell", 0.006));
+        const uint32_t color_a = param_color("color_a", "bg1");
+        const uint32_t color_b = param_color("color_b", "glow_white");
+        const int cols = std::max(1, int(w / cell));
+        const float cw = w / float(cols);
+        for (int row = 0; row < 2; ++row) {
+            for (int col = 0; col < cols; ++col) {
+                if ((row + col) % 2 == 0) {
+                    continue; // alternate
+                }
+                ArtPrim r;
+                r.kind = ArtPrim::Kind::Rect;
+                r.transform.pos[0] = -w * 0.5f + cw * (float(col) + 0.5f);
+                r.transform.pos[1] = (row == 0 ? 1.0f : -1.0f) * h * 0.25f;
+                r.w = cw;
+                r.h = h * 0.5f;
+                r.fill.color0 = row == 0 ? color_a : color_b;
+                // No glow (§4.4: "No glow").
+                out.push_back(child_prim(base, r));
+            }
+        }
+        return out;
+    }
+
+    if (prefab == "neon_arrow") {
+        // §4.6: triangle head + rect shaft, outline_only draws stroke
+        // + glow with 15% fill — the standard shot arrow.
+        const float len = float(param_f("len", 0.030));
+        const float w = float(param_f("w", 0.014));
+        const uint32_t color = param_color("color", "primary");
+        const float gi = float(param_f("glow_intensity", 1.4));
+        const bool outline_only = params.value("outline_only", true);
+
+        // Head: triangle pointing +y.
+        ArtPrim head;
+        head.kind = ArtPrim::Kind::Polygon;
+        head.points = {0.0f, len * 0.5f, -w * 0.5f, 0.0f, w * 0.5f, 0.0f};
+        head.stroke = {0.0015f, color};
+        head.glow = {len * 0.15f, gi, false, color};
+        head.fill.color0 = (color & 0xFFFFFF00u) | 0x26u; // 15%
+        if (!outline_only) {
+            head.fill.color0 = color;
+        }
+        out.push_back(child_prim(base, head));
+
+        // Shaft.
+        ArtPrim shaft;
+        shaft.kind = ArtPrim::Kind::Rect;
+        shaft.transform.pos[1] = -len * 0.25f;
+        shaft.w = w * 0.5f;
+        shaft.h = len * 0.5f;
+        shaft.stroke = {0.0015f, color};
+        shaft.glow = {w * 0.3f, gi * 0.8f, false, color};
+        shaft.fill.color0 = (color & 0xFFFFFF00u) | 0x26u;
+        if (!outline_only) {
+            shaft.fill.color0 = color;
+        }
+        out.push_back(child_prim(base, shaft));
+        return out;
+    }
+
     fail("unknown decal prefab '" + prefab + "'", pointer + "/prefab");
 }
 

@@ -618,3 +618,37 @@ corrections are new entries. Format: 03-process.md §3.1.
   the committed present.frag blob refresh (CI compile loop covers it;
   the local fallback blobs are stale until then, which is exactly the
   ADR-012 degrade path).
+
+## M13a — Art system engine (2026-08-29, merged)
+
+- Merged as PR #15 after 14 review cycles. What shipped: TBArt loader
+  (every §3 primitive, 6 prefabs, canon palettes, gradients, light-id
+  validation), ArtRenderer (below/above-ball split, live light
+  brightness, polyline/polygon lowering, budget), BloomChain (§12.1–
+  12.4 verbatim: 11 passes, steal the exact weights), the §12.5
+  composite (bloom sample + saturation clamp + CRT uniform branch,
+  shader and C++ in one commit), ParticleSystem (§13.4 canonical
+  effects, SoA pool 8192, flash reduction), FontAtlas (stb_truetype
+  2048², 3 faces × 3 sizes, Latin-1, oversampling), SegmentDigits
+  (§14.2 endpoints/masks, ghost 6%, angle-invariant italic).
+- The review caught four genuine GPU-plumbing bugs (pipeline format
+  mismatch, uniform-slot mismatch, Quality::Off passing nonzero
+  strength, null bloom in degrade) and a long tail of real rendering
+  defects (unlit glow should be zero not 15%, closed polygons
+  missing the closing edge, polygon capsules inheriting the fill
+  gradient, particle scale_rgba wrapping at brightness 1.4, grid
+  horizon fade inverted + verticals diverging, arc start applied
+  twice, gradient not rotating with the prim, italic shear scaling
+  by cell width). The best conceptual catch: the CRT/bloom tests were
+  validating their own local math, not the shader source or config
+  — now they grep the actual HLSL for the §10/§12.5 formulas.
+- THE RECURRING HAZARD materialized fully: python batch edits kept
+  silently dying mid-batch when an assert failed after earlier
+  replaces matched — every fix from the failed assert onward was
+  lost, four separate times (strtol, clamps, save/parse, ownership
+  comments → this PR: oversampling ×2, kPi, dead num_samplers).
+  The M12 countermeasures (per-edit OK/MISS, whole-block rewrites)
+  were not enough; the working discipline by cycle 7 was one-edit-
+  per-script-call with immediate grep verification of the fix's own
+  marker text. The journal entry from M12 documents the full
+  taxonomy.

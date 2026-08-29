@@ -66,7 +66,7 @@ bool FontAtlas::bake(const std::filesystem::path& fonts_dir) {
             const int px = int(kBakedSizes[size_t(s)]);
             stbtt_packedchar chars[224] = {};
             // §14.1: 24 px bakes with 2×2 oversampling.
-            stbtt_PackSetOversampling(&pack, px == 24 ? 2 : 1);
+            stbtt_PackSetOversampling(&pack, px == 24 ? 2u : 1u, px == 24 ? 2u : 1u);
             const int result =
                 stbtt_PackFontRange(&pack,
                                     reinterpret_cast<const unsigned char*>(ttf.data()),

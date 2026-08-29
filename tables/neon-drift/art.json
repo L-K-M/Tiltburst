@@ -46,7 +46,7 @@
                      "color": "secondary", "glow_intensity": 0.8 } },
 
       // Chevrons on the right orbit.
-      { "kind": "decal", "transform": { "pos": [0.445, 0.560], "rot_deg": 280 },
+      { "kind": "decal", "transform": { "pos": [0.445, 0.560], "rot_deg": 100 },
         "prefab": "chevron_row",
         "params": { "count": 3, "w": 0.010, "h": 0.012, "gap": 0.006,
                      "color": "secondary", "glow_intensity": 0.8 } },

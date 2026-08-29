@@ -550,13 +550,19 @@ TEST(TbArt, NeonDriftArtLoads) {
         }
     }
     // Prefab expansions produce children: the wire layer's
-    // tube_outline decals each expand to tube + specular children.
+    // tube_outline decals each expand to tube + specular children
+    // (the layer may carry other kinds later — check the DecalGroups
+    // we know about, not exhaustively).
     const auto& wire = result.art.layers[5];
     ASSERT_FALSE(wire.prims.empty());
+    int wire_decals = 0;
     for (const auto& prim : wire.prims) {
-        ASSERT_EQ(prim.kind, render::ArtPrim::Kind::DecalGroup);
-        EXPECT_GE(prim.children.size(), 2u) << "tube_outline has tube+specular";
+        if (prim.kind == render::ArtPrim::Kind::DecalGroup) {
+            EXPECT_GE(prim.children.size(), 2u) << "tube_outline tube+specular";
+            ++wire_decals;
+        }
     }
+    EXPECT_EQ(wire_decals, 2); // both ramp wireforms
     // The guides layer has neon_arrow decals (head+shaft children) and
     // the tach arcs.
     int arrows = 0;

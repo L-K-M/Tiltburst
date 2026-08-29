@@ -855,8 +855,16 @@ void AudioSystem::mix(float* out, uint32_t frames) {
             }
             for (int s = 0; s < 2; ++s) {
                 if (impl_->slot_song[s] != 0xFFFF && impl_->slot_dir[s] != -1) {
+                    // Same continuity rule as the PlaySong flip: a
+                    // fading-in slot converts at its current gain
+                    // (pos = 4800 - pos); resetting pos to 0 would pop
+                    // it to unity mid-fade (cycle-13 review).
+                    if (impl_->slot_dir[s] > 0) {
+                        impl_->slot_pos[s] = kCrossfadeSamples - impl_->slot_pos[s];
+                    } else {
+                        impl_->slot_pos[s] = 0;
+                    }
                     impl_->slot_dir[s] = -1;
-                    impl_->slot_pos[s] = 0;
                 }
             }
             break;

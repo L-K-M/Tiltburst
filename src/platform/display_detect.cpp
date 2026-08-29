@@ -83,8 +83,14 @@ int auto_pf_rotation(const DisplayInfo& pf, int bg, const std::vector<DisplayInf
     if (pf.h >= pf.w) {
         return 0; // reported portrait: already upright
     }
-    if (bg != -1 && bg >= 0 && size_t(bg) < ds.size() && squareness(ds[size_t(bg)]) >= 0.70f) {
-        return 90; // cabinet assumption; flip -> 270 via config
+    if (bg != -1) {
+        // Scan, never index by value: the id<->position invariant is a
+        // producer convention, not a type guarantee (cycle-24).
+        for (const DisplayInfo& d : ds) {
+            if (d.index == bg && squareness(d) >= 0.70f) {
+                return 90; // cabinet assumption; flip -> 270 via config
+            }
+        }
     }
     return 0; // desktop: render portrait, pillarboxed
 }
@@ -226,13 +232,17 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
         };
         const bool all_present = !last_names.empty() && set_of(names) == set_of(last_names);
         if (all_present) {
-            // Resolve by name against the CURRENT indices.
+            // Resolve by name against the CURRENT indices, capturing
+            // the elements directly — never re-index the vector by a
+            // role index value (cycle-24 review).
             int pf_by_name = -1;
             int bg_by_name = -1;
+            const DisplayInfo* pf_disp = nullptr;
             for (const DisplayInfo& d : displays) {
                 if (!cfg.last_auto.playfield.empty() && d.name == cfg.last_auto.playfield &&
                     pf_by_name == -1) {
                     pf_by_name = d.index;
+                    pf_disp = &d;
                 }
                 if (!cfg.last_auto.backglass.empty() && d.name == cfg.last_auto.backglass &&
                     bg_by_name == -1) {
@@ -243,10 +253,9 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
                 a.playfield = pf_by_name;
                 a.backglass = cfg.backglass.enabled ? bg_by_name : -1;
                 a.stability_reused = true;
-                a.pf_rotation =
-                    cfg.playfield.rotation != "auto"
-                        ? parse_rotation(cfg.playfield.rotation)
-                        : auto_pf_rotation(displays[size_t(pf_by_name)], a.backglass, displays);
+                a.pf_rotation = cfg.playfield.rotation != "auto"
+                                    ? parse_rotation(cfg.playfield.rotation)
+                                    : auto_pf_rotation(*pf_disp, a.backglass, displays);
                 a.bg_rotation = parse_rotation(cfg.backglass.rotation);
                 return a;
             }
@@ -254,9 +263,15 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
     }
 
     // --- 3. heuristic scoring ---
+    // An explicitly matched backglass owns its display: the heuristic
+    // playfield must not land on it (cycle-24 review).
+    const int pf_pool_exclusion = (pf == -1 && bg != -1) ? bg : -1;
     std::vector<const DisplayInfo*> portrait;
     std::vector<const DisplayInfo*> landscape;
     for (const DisplayInfo& d : displays) {
+        if (d.index == pf_pool_exclusion) {
+            continue;
+        }
         if (float(d.h) / float(d.w) >= 1.4f) {
             portrait.push_back(&d);
         } else if (float(d.w) / float(d.h) >= 1.4f) {
@@ -273,7 +288,9 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
         std::vector<const DisplayInfo*> everything;
         if (pool->empty()) {
             for (const DisplayInfo& d : displays) {
-                everything.push_back(&d);
+                if (d.index != pf_pool_exclusion) {
+                    everything.push_back(&d);
+                }
             }
             pool = &everything;
         }

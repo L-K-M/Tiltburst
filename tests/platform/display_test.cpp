@@ -486,4 +486,20 @@ TEST(DisplayAssign, OverflowIndexRejected) {
     EXPECT_EQ(platform::resolve_match("index:2147483648", ds), -1);
 }
 
+// An explicitly matched backglass owns its display: the heuristic
+// playfield must pick another.
+TEST(DisplayAssign, HeuristicPlayfieldSkipsExplicitBackglass) {
+    std::vector<platform::DisplayInfo> ds = {
+        make_display(0, 1920, 1080, 144), // biggest area, but taken
+        make_display(1, 1080, 1920, 60),  // portrait pool after exclusion
+        make_display(2, 1280, 1024, 60, "NEC"),
+    };
+    platform::DisplaysConfig cfg;
+    cfg.backglass.match = "index:0"; // explicit: the 144 Hz landscape
+    const auto a = platform::detect(ds, cfg);
+    EXPECT_EQ(a.backglass, 0);
+    EXPECT_EQ(a.playfield, 1); // NOT 0 — the portrait is the next best
+    EXPECT_EQ(a.pf_rotation, 0);
+}
+
 } // namespace

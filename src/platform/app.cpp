@@ -846,7 +846,8 @@ int run(const CliOptions& cli) {
                             std::filesystem::remove(tmp, rm_ec); // no orphan tmp
                             if (rm_ec) {
                                 TB_LOG_WARN("main",
-                                            "displays.json tmp cleanup failed: {}",
+                                            "displays.json tmp cleanup failed for {}: {}",
+                                            tmp.string(),
                                             rm_ec.message());
                             }
                         }

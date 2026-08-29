@@ -394,13 +394,19 @@ TEST(Tracker, RetriggerTailContinuity) {
     std::vector<float> buf = render_song(song, 1.0f);
     // Row 4 onset: 4 x 0.125 s = 24000 samples.
     const size_t rt = 24000;
-    ASSERT_GT(buf.size() / 2, rt + 64);
+    ASSERT_GT(buf.size() / 2, rt + 4000);
+    // ASSERT (not EXPECT): `before` guards the ratio checks below.
     const float before = stereo_rms(buf, 2 * (rt - 2000), 2 * rt);
+    ASSERT_GT(before, 0.005f) << "the old note should be ringing";
     const float tail = stereo_rms(buf, 2 * rt, 2 * (rt + 32));
-    EXPECT_GT(before, 0.005f) << "the old note should be ringing";
     // The fade tail starts at the old level: continuity, not a jump.
     // (The pre-fix code faded at ~unity: ratio ~6x here.)
     EXPECT_NEAR(tail / before, 1.0f, 0.5f);
+    // The other half of the contract: the vol-15 voice must actually
+    // ring (~6x the 0.16 tail once the fade clears) — a retrigger that
+    // only fades the old note, or mis-scales the new one, stays quiet.
+    const float after = stereo_rms(buf, 2 * (rt + 2000), 2 * (rt + 4000));
+    EXPECT_GT(after / before, 2.0f) << "the vol-15 retrigger must sound";
 }
 
 TEST(Music, PlaySongStartsAndNoOpsSameId) {

@@ -21,4 +21,7 @@ add_library(tb_platform STATIC
 
 target_include_directories(tb_platform PUBLIC ${CMAKE_SOURCE_DIR}/src)
 find_package(nlohmann_json CONFIG REQUIRED)
-target_link_libraries(tb_platform PUBLIC tb_core nlohmann_json::nlohmann_json SDL3::SDL3)
+target_link_libraries(tb_platform PUBLIC tb_core SDL3::SDL3)
+# JSON is implementation-only (display_detect.cpp); PRIVATE keeps the
+# detection header's purity honest for consumers.
+target_link_libraries(tb_platform PRIVATE nlohmann_json::nlohmann_json)

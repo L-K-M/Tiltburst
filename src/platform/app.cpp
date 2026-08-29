@@ -824,8 +824,16 @@ int run(const CliOptions& cli) {
                         if (write_ec) {
                             TB_LOG_WARN(
                                 "main", "displays.json rename failed: {}", write_ec.message());
+                            // out is closed above (before the rename);
+                            // surface cleanup failures rather than
+                            // discarding the reason.
                             std::error_code rm_ec;
                             std::filesystem::remove(tmp, rm_ec); // no orphan tmp
+                            if (rm_ec) {
+                                TB_LOG_WARN("main",
+                                            "displays.json tmp cleanup failed: {}",
+                                            rm_ec.message());
+                            }
                         }
                     } else {
                         out.close();

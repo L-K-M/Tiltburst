@@ -108,7 +108,11 @@ void BackglassLayout::build(const BackglassContent& content,
                 // a GC/1/10 width difference must not shift the
                 // initials+score column — rank and row draw separately.
                 char rank[8];
-                std::snprintf(rank, sizeof(rank), top ? "GC" : "%u", i + 1);
+                if (top) {
+                    std::snprintf(rank, sizeof(rank), "GC");
+                } else {
+                    std::snprintf(rank, sizeof(rank), "%u", i + 1);
+                }
                 std::snprintf(row,
                               sizeof(row),
                               "%c%c%c  %s",

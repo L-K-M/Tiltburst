@@ -33,8 +33,6 @@
     "nd_stab":  { "wave": "square", "duty": 0.5, "sustain": 0.0, "decay": 0.12,
                   "volume_db": -6 },
     "nd_bass":  { "wave": "saw", "sustain": 0.5, "decay": 0.2, "volume_db": -2 },
-    "nd_pad":   { "wave": "triangle", "attack": 0.08, "sustain": 0.5,
-                  "decay": 0.3, "volume_db": -8 },
     "nd_kit":   { "wave": "noise", "sustain": 0, "decay": 0.18, "volume_db": -4 },
     "nd_hat":   { "wave": "noise", "sustain": 0, "decay": 0.06, "volume_db": -10 }
   },

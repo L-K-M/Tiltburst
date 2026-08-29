@@ -123,14 +123,17 @@ int resolve_match(const std::string& match,
             })) {
             return -1; // "index:abc"/"index: 2" must not silently bind 0
         }
-        // strtol with a range guard: atoi on an out-of-range digit
-        // string is UB (C standard), not merely implementation-defined.
+        // strtoll (not strtol/atoi): atoi on out-of-range digit
+        // strings is UB, and on LLP64 Windows long == int, where
+        // strtol's overflow behavior is indistinguishable from a valid
+        // end-of-parse (cycle-10 review). The 64-bit form sets errno.
+        errno = 0;
         char* end = nullptr;
-        const long v = std::strtol(digits.c_str(), &end, 10);
+        const long long v = std::strtoll(digits.c_str(), &end, 10);
         // end == start rejects a no-conversion result ("index:")
         // unconditionally — not by the empty-digits check's ordering.
-        if (end == nullptr || end == digits.c_str() || *end != '\0' || v < 0 ||
-            v > long(std::numeric_limits<int>::max())) {
+        if (errno == ERANGE || end == nullptr || end == digits.c_str() || *end != '\0' || v < 0 ||
+            v > long long(std::numeric_limits<int>::max())) {
             return -1;
         }
         const int n = int(v);

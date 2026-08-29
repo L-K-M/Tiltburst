@@ -739,6 +739,30 @@ corrections are new entries. Format: 03-process.md §3.1.
   offset ±0.02 of ×0.251, duck ±0.05 of ×0.501 + recovery,
   allocation-free callback with tracker active, neon-drift load,
   attract cycle/interrupt/lights/game_over ×3). 182/182.
+- Review cycle 1 (23 findings) — the majors, all real:
+  (1) publish_bank's fading StopMusic left a use-after-free — the
+  100 ms fade keeps reading the retiring bank past the epoch ack;
+  now an IMMEDIATE stop (value flag on StopMusic), unconditional
+  (a song-less new bank must stop the old table's music too).
+  (2) Downward slides played upward — semitone_ratio(negative) is
+  already < 1; the second 1/x inversion came straight out.
+  (3) play_music resolved indices against the main-thread song_ids_
+  copy, racing the callback's bank epoch — now resolves through the
+  PUBLISHED bank pointer. (4) A fading-OUT slot matched the
+  "already playing" no-op (requests lost); a fading-IN slot flipped
+  to fade-out snapped back to unity (pop) — the flip now continues
+  from the complementary curve position (4800 - pos). (5) Duck
+  retrigger during attack froze the dip above -6 dB (phase jumped to
+  hold before reaching the floor). (6) Unknown song ids must mean
+  SILENCE (§9) — play_music now stops the current song instead of
+  leaving it up. Plus: sticky-inst is song-wide per channel (not per
+  pattern), pattern objects reject unknown keys, instrument count
+  capped below the 0xFF sentinel, vib_phase wrapped, midi LUT
+  defensively clamped, null-deref guard after a defensive stop()
+  inside render(), rules.lua music-state stack (multiball outranks
+  drift mode; drift end/multiball end restore the RIGHT theme),
+  backglass fixed rank column + page-2 emptiness, chase-march
+  asserted, MusicSink lifetime contract documented.
 - Deferred: playfield particle wiring for attract ("music and
   particles" — ParticleSystem exists as a tested library but has no
   GPU draw path yet; lands with the screenshot tooling that needs

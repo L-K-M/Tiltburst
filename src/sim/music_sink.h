@@ -12,6 +12,11 @@ namespace tb::sim {
 class MusicSink {
 public:
     virtual ~MusicSink() = default;
+    // CONTRACT: `song_id` is valid only for the call — implementations
+    // that retain it must copy (callers pass string literals and
+    // script-owned buffers). Implementations must outlive every caller
+    // (the host/machine hold raw pointers; the app clears them — or
+    // outlives them — before teardown).
     virtual void play_music(const char* song_id) = 0;
     virtual void stop_music() = 0;
 };

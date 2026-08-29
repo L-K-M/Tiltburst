@@ -9,6 +9,9 @@
 
 namespace tb::audio {
 
+// The tracker's fixed output rate (§8.1: oscillators run at 48 kHz).
+inline constexpr uint32_t kTrackerRate = 48000;
+
 // 12-audio.md §8 — tracker music. Songs are authored as text in
 // audio.json and synthesized live on the audio thread: 4 monophonic
 // channels (pulse1/pulse2/wide/noise), sample-accurate rows via the
@@ -46,8 +49,9 @@ struct TrackerCell {
     uint8_t fx = 0;                       // 0 none, 1 arp, 2 slide, 3 vibrato
     int8_t slide = 0;                     // S±n: semitones ±1..12
     uint8_t vib_depth = 0, vib_speed = 0; // V<d>,<s>
-    uint8_t arp_n = 0;                    // A<digits>: digit count
-    std::array<uint8_t, 8> arp = {};      // hex semitone offsets
+    static constexpr size_t kArpCap = 8;
+    uint8_t arp_n = 0;                     // A<digits>: digit count (<= kArpCap)
+    std::array<uint8_t, kArpCap> arp = {}; // hex semitone offsets
 };
 
 struct TrackerPattern {

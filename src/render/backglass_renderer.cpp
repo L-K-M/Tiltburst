@@ -104,29 +104,40 @@ void BackglassLayout::build(const BackglassContent& content,
                     glyph(hs.initials[1]),
                     glyph(hs.initials[2]),
                 };
+                // Fixed columns: the bitmap font is proportional, so
+                // a GC/1/10 width difference must not shift the
+                // initials+score column — rank and row draw separately.
                 char rank[8];
-                if (top) {
-                    std::snprintf(rank, sizeof(rank), "GC");
-                } else {
-                    std::snprintf(rank, sizeof(rank), "%u", i + 1);
-                }
+                std::snprintf(rank, sizeof(rank), top ? "GC" : "%u", i + 1);
                 std::snprintf(row,
                               sizeof(row),
-                              "%s %c%c%c  %s",
-                              rank,
+                              "%c%c%c  %s",
                               clean[0],
                               clean[1],
                               clean[2],
                               game::format_score(hs.score).c_str());
-                if (top) {
-                    text(font, 24.0f, y, row, kActiveR, kActiveG, kActiveB, out);
-                } else {
-                    text(font, 24.0f, y, row, kDimR, kDimG, kDimB, out);
-                }
+                text(font,
+                     24.0f,
+                     y,
+                     rank,
+                     top ? kActiveR : kDimR,
+                     top ? kActiveG : kDimG,
+                     top ? kActiveB : kDimB,
+                     out);
+                text(font,
+                     90.0f,
+                     y,
+                     row,
+                     top ? kActiveR : kDimR,
+                     top ? kActiveG : kDimG,
+                     top ? kActiveB : kDimB,
+                     out);
                 y += 40.0f;
                 ++shown;
             }
-            if (shown == 0) {
+            // Only page 1 claims emptiness: a 1-5 entry list HAS
+            // scores — page 2 is simply past the end.
+            if (shown == 0 && content.attract_page == 1) {
                 text(font, 24.0f, 70.0f, "NO SCORES YET", kDimR, kDimG, kDimB, out);
             }
             break;

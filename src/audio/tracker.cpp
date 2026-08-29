@@ -41,11 +41,12 @@ float lut_cos(float a) {
 }
 
 constexpr double kTwoPi = 6.28318530717958647692;
-constexpr float kSampleRate = 48000.0f;
+constexpr float kSampleRate = float(kTrackerRate);
 
-// midi 12..119 -> frequency (§8.2).
+// midi 12..119 -> frequency (§8.2). Parse guarantees the range; the
+// clamp keeps a stray note (player is a public seam) in the table.
 float midi_to_freq(int midi) {
-    const int k = midi - 69;
+    const int k = std::clamp(midi - 69, -69, 50);
     return 440.0f * float(kPow2[size_t(k + 69)]);
 }
 
@@ -220,13 +221,13 @@ void TrackerPlayer::process_row(uint32_t row) {
             ch.arp_n = cell.arp_n;
             ch.arp = cell.arp;
             break;
-        case 2: { // S±n: spread 2^(±n/12) evenly over the row's ticks
-            const float total = semitone_ratio(cell.slide);
+        case 2: { // S±n: spread 2^(±n/12) evenly over the row's ticks.
+            // semitone_ratio(negative n) is already < 1 — the tpr-th
+            // root of it slides DOWN per tick. (A second inversion
+            // here made every downward slide climb; cycle-1 review.)
             ch.slide_this_row = true;
-            ch.slide_per_tick = float(nth_root(double(total), song_->ticks_per_row));
-            if (cell.slide < 0) {
-                ch.slide_per_tick = 1.0f / ch.slide_per_tick;
-            }
+            ch.slide_per_tick =
+                float(nth_root(double(semitone_ratio(cell.slide)), song_->ticks_per_row));
             break;
         }
         case 3: // V<d>,<s>
@@ -255,6 +256,9 @@ void TrackerPlayer::apply_tick() {
             f *= semitone_ratio(int(d));
         } else if (ch.vib_active && ch.vib_depth > 0.0f) {
             ch.vib_phase += ch.vib_speed * float(kTwoPi) / 64.0f;
+            if (ch.vib_phase >= float(kTwoPi)) {
+                ch.vib_phase -= float(kTwoPi); // wrap: precision on long holds
+            }
             // §8.3: f_used = f * 2^((d/8)*sin(phase)/12). The ratio
             // helper computes 2^(x/12), so x = (d/8)*sin(phase) — the
             // depth is in eighth-semitones.
@@ -343,6 +347,9 @@ void TrackerPlayer::render(float* dst, const float* gains, uint32_t frames) {
         if (accum_ < 1.0) {
             if (!finishing_ && tick_in_row_ == 0) {
                 process_row(row_idx_);
+                if (song_ == nullptr) {
+                    return; // defensive stop() inside (bad order entry)
+                }
             }
             apply_tick();
             ++tick_in_row_;

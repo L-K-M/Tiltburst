@@ -113,7 +113,7 @@ std::vector<float> render_song(const audio::TrackerSong& song,
                                uint64_t* out_hash = nullptr) {
     audio::TrackerPlayer player;
     player.start(&song, loop);
-    std::vector<float> buf(size_t(seconds * 48000.0f) * 2, 0.0f);
+    std::vector<float> buf(size_t(seconds * audio::kTrackerRate) * 2, 0.0f);
     std::vector<float> g(512, 1.0f);
     size_t done = 0;
     while (done + 512 <= buf.size() / 2) {
@@ -182,19 +182,15 @@ TEST(TrackerSongParse, ReferenceSongParses) {
 
 TEST(TrackerSongParse, RejectsIllegalWaveForChannel) {
     // bass_saw (saw) on pulse1: §8.1 allows square only there.
-    const std::string pulse1 = "[\"C-4 bass_saw 10\", \"---\", \"---\", \"---\", "
-                               "\"---\", \"---\", \"---\", \"---\", "
-                               "\"---\", \"---\", \"---\", \"---\", "
-                               "\"---\", \"---\", \"---\", \"OFF\"]";
+    // cells() builds structurally-16 rows (first + 15 skips) — no
+    // hand-counted literals that can drift to 15/17 entries.
+    const std::string pulse1 = cells("\"C-4 bass_saw 10\"");
     const auto j = nlohmann::ordered_json::parse(solo_song(pulse1, 120, 12), nullptr, true, true);
     EXPECT_THROW(audio::parse_song_json(j, reference_patches(), "/songs/x"), audio::AudioLoadError);
 }
 
 TEST(TrackerSongParse, RejectsMissingInstOnFirstNote) {
-    const std::string pulse1 = "[\"C-4\", \"---\", \"---\", \"---\", "
-                               "\"---\", \"---\", \"---\", \"---\", "
-                               "\"---\", \"---\", \"---\", \"---\", "
-                               "\"---\", \"---\", \"---\", \"OFF\"]";
+    const std::string pulse1 = cells("\"C-4\"");
     const auto j = nlohmann::ordered_json::parse(solo_song(pulse1, 120, 12), nullptr, true, true);
     EXPECT_THROW(audio::parse_song_json(j, reference_patches(), "/songs/x"), audio::AudioLoadError);
 }
@@ -270,7 +266,7 @@ TEST(Tracker, RowTimingWithin1ms) {
     const auto j = nlohmann::ordered_json::parse(solo_song(lead, 120, 6), nullptr, true, true);
     const audio::TrackerSong song = audio::parse_song_json(j, patches, "/s");
     std::vector<float> buf = render_song(song, 2.0f);
-    const float row_samples = 0.125f * 48000.0f;
+    const float row_samples = 0.125f * float(audio::kTrackerRate);
     float prev = 0.0f;
     int onsets = 0;
     for (size_t i = 1; i < buf.size() / 2; ++i) {

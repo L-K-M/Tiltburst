@@ -699,9 +699,11 @@ TEST(Attract, CyclesAndInterrupts) {
     }
     EXPECT_EQ(m->attract_page(), 0);
 
-    // Light show (§7.2): fresh entry so the loop clock is at step 1.
-    // Breathe window, t = 2.1 s: band 0 phase 0.1 (on), band 2 phase
-    // 1.3 -> 0.3 (on), band 4 phase 2.1-1.6 = 0.5 (off).
+    // Light show (§7.2): a fresh machine restarts the loop clock at
+    // entry; tick to t = 2.1 s inside the breathe window. Band phases
+    // at t = 2.1: band 0 -> 0.1 (on), band 2 -> 0.3 (on), band 4 ->
+    // 2.1 - 1.6 = 0.5 (off: the wave has not climbed there yet).
+    rig.state->fsm_ctx = nullptr; // no window where it points at the old machine
     m = std::make_unique<GameMachine>(rig.host, *rig.state, scores, base_cfg());
     m->set_music_sink(&music);
     rig.state->fsm_ctx = m.get();
@@ -737,12 +739,17 @@ TEST(Attract, LightsDarkBeatAndChase) {
     rig.state->fsm_step = [](void* ctx, sim::SimState& s, const sim::TickInput& in) {
         static_cast<GameMachine*>(ctx)->step(in);
     };
-    // Run to the chase window (8 s): exactly one light on, marching.
+    // Chase window (8 s): exactly one light on, and it MARCHES — the
+    // §7.1 rate is 80 ms/lamp, so +80 ms moves the lit lamp one over.
     for (int t = 0; t < 8050; ++t) {
         rig.solver.step(*rig.state, sim::TickInput{0});
     }
-    const bool exactly_one = (rig.state->lights[0].on != rig.state->lights[1].on);
-    EXPECT_TRUE(exactly_one);
+    EXPECT_TRUE(rig.state->lights[0].on && !rig.state->lights[1].on) << "chase starts at lamp 0";
+    for (int t = 0; t < 80; ++t) {
+        rig.solver.step(*rig.state, sim::TickInput{0});
+    }
+    EXPECT_TRUE(!rig.state->lights[0].on && rig.state->lights[1].on)
+        << "chase advances to lamp 1 after 80 ms";
     // Run to the dark beat (13 s): everything off.
     for (int t = 0; t < 5000; ++t) {
         rig.solver.step(*rig.state, sim::TickInput{0});

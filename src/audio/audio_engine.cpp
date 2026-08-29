@@ -325,9 +325,10 @@ int acquire_voice(AudioEngineImpl& impl,
             impl.duck_hold_end = now + kDuckHoldSamples;
             if (impl.duck_phase == 0u || impl.duck_phase == 3u) {
                 impl.duck_phase = 1u; // attack (retrigger resumes the dip)
-            } else {
-                impl.duck_phase = 2u; // extend the hold window
             }
+            // Phase 1 (attack): leave it — flipping to hold here would
+            // freeze the dip above -6 dB before it reaches the floor.
+            // Phase 2 (hold): already holding; the deadline extends.
         }
     }
     record_latency_probe(impl, ev, period, periods);
@@ -380,19 +381,24 @@ bool AudioSystem::play_music(const std::string& song_id) {
     if (song_id.empty()) {
         return false;
     }
-    int idx = -1;
-    for (size_t i = 0; i < song_ids_.size(); ++i) {
-        if (song_ids_[i] == song_id) {
-            idx = int(i);
-            break;
-        }
-    }
-    if (idx < 0) {
+    // Resolve against the PUBLISHED bank: the audio thread indexes
+    // THAT object's song list, and a main-thread song_ids_ copy can
+    // race one epoch ahead (a fresh publish mid-call would hand the
+    // callback an index into a bank it does not hold).
+    const PatchBank* bank = impl_->bank.load(std::memory_order_acquire);
+    const int idx = bank != nullptr ? bank->find_song(song_id) : -1;
+    if (idx < 0 || idx > 0xFFFE) {
         if (last_unknown_song_ != song_id) {
             last_unknown_song_ = song_id;
-            TB_LOG_WARN("audio", "play_music: no song '{}' in this bank", song_id);
+            TB_LOG_WARN("audio", "play_music: no song '{}' in this bank (silence, §9)", song_id);
         }
-        return false; // a missing song id means silence in that state (§9)
+        // A missing id means SILENCE in that state (§9): stop whatever
+        // is playing rather than leaving the previous song up.
+        AudioCommand stop;
+        stop.kind = AudioCommand::Kind::StopMusic;
+        stop.value = 0.0f;
+        (void)impl_->commands.push(stop);
+        return false;
     }
     AudioCommand cmd;
     cmd.kind = AudioCommand::Kind::PlaySong;
@@ -404,6 +410,7 @@ bool AudioSystem::play_music(const std::string& song_id) {
 void AudioSystem::stop_music() {
     AudioCommand cmd;
     cmd.kind = AudioCommand::Kind::StopMusic;
+    cmd.value = 0.0f; // fade out over 100 ms (§9)
     (void)impl_->commands.push(cmd);
 }
 
@@ -421,11 +428,15 @@ void AudioSystem::publish_bank(std::unique_ptr<PatchBank> bank) {
     // Music belongs to the table: stop any playing song before the old
     // bank retires — tracker instances hold song pointers INTO it, and
     // the epoch ack that frees the bank can land while a song would
-    // still be referenced. The command pops within one mix of here,
-    // before any ack of THIS publish can be recorded.
-    if (!song_ids_.empty()) {
+    // still be referenced. The stop must be IMMEDIATE (value 1): a
+    // 100 ms fade would keep reading the retiring bank's song data for
+    // several more mixes, past the ack. Unconditional — publishing a
+    // song-less bank while the OLD table's music plays must stop it
+    // too (gating on the new bank's song list would leave it playing).
+    {
         AudioCommand stop;
         stop.kind = AudioCommand::Kind::StopMusic;
+        stop.value = 1.0f; // > 0.5 = immediate, no fade
         (void)impl_->commands.push(stop);
     }
     PatchBank* next = bank.release();
@@ -764,8 +775,12 @@ void AudioSystem::mix(float* out, uint32_t frames) {
                 break;
             }
             impl_->attract_target = cmd.value > 0.5f ? kAttractFloor : 1.0f;
-            if (impl_->slot_song[0] == cmd.patch || impl_->slot_song[1] == cmd.patch) {
-                break; // already playing
+            // §9 no-op: "already playing" means actively sounding — a
+            // slot fading OUT is stopping, so re-requesting that song
+            // restarts it (it becomes the hard-dropped outgoing slot).
+            if ((impl_->slot_song[0] == cmd.patch && impl_->slot_dir[0] != -1) ||
+                (impl_->slot_song[1] == cmd.patch && impl_->slot_dir[1] != -1)) {
+                break;
             }
             const TrackerSong* song = &bank->songs()[cmd.patch].song;
             int idle = -1, out = -1;
@@ -791,17 +806,36 @@ void AudioSystem::mix(float* out, uint32_t frames) {
             const bool from_silence = impl_->slot_song[1 - idle] == 0xFFFF;
             impl_->slot_dir[idle] = from_silence ? 0 : 1;
             impl_->slot_pos[idle] = from_silence ? kCrossfadeSamples : 0;
-            // The other slot (a steady or fading-in song) fades out.
+            // The other slot (a steady or fading-in song) fades out —
+            // CONTINUING from its current gain: a fading-in slot at
+            // sin(x*pi/2) flips to the complementary cos curve at
+            // 4800-pos so the sample gain never jumps (a fresh pos=0
+            // fade-out would pop it back to unity mid-fade).
             const int other = 1 - idle;
             if (impl_->slot_song[other] != 0xFFFF && impl_->slot_dir[other] != -1) {
+                if (impl_->slot_dir[other] > 0) {
+                    impl_->slot_pos[other] = kCrossfadeSamples - impl_->slot_pos[other];
+                } else {
+                    impl_->slot_pos[other] = 0;
+                }
                 impl_->slot_dir[other] = -1;
-                impl_->slot_pos[other] = 0;
             }
             break;
         }
         case AudioCommand::Kind::StopMusic:
-            // §9: fade out over the same 100 ms.
+            // §9: fade out over the same 100 ms — EXCEPT the
+            // publish_bank stop (value 1), which must be immediate so
+            // no instance outlives the retiring bank (see the comment
+            // there).
             impl_->attract_target = 1.0f;
+            if (cmd.value > 0.5f) {
+                for (int s = 0; s < 2; ++s) {
+                    impl_->trackers[s].stop();
+                    impl_->slot_song[s] = 0xFFFF;
+                    impl_->slot_dir[s] = 0;
+                }
+                break;
+            }
             for (int s = 0; s < 2; ++s) {
                 if (impl_->slot_song[s] != 0xFFFF && impl_->slot_dir[s] != -1) {
                     impl_->slot_dir[s] = -1;

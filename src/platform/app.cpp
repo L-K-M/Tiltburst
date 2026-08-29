@@ -1007,13 +1007,13 @@ int run(const CliOptions& cli) {
                     return;
                 }
                 for (const Request& r : take) {
-                    // Unknown ids are legal silence (§9) — only play
-                    // what the published bank actually defines, without
-                    // the engine's log-once warning.
+                    // play_music owns the §9 semantics: unknown ids are
+                    // SILENCE (it stops the current song, warn-once) —
+                    // do not pre-filter here.
                     if (r.id.empty()) {
                         audio->stop_music();
-                    } else if (audio->has_song(r.id)) {
-                        audio->play_music(r.id);
+                    } else {
+                        (void)audio->play_music(r.id);
                     }
                 }
             }

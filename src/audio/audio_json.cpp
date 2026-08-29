@@ -429,7 +429,8 @@ int parse_int_token(const std::string& tok, int lo, int hi, const std::string& p
 
 // Parses the fx token (§8.3): A<hex>, S+n/S-n, V<d>,<s>.
 void parse_fx_token(const std::string& tok, TrackerCell& cell, const std::string& ptr) {
-    if (tok.size() >= 2 && tok[0] == 'A' && tok.size() <= 9) {
+    // +1 for the 'A' itself; longer tokens cannot fit the cell's arp.
+    if (tok.size() >= 2 && tok[0] == 'A' && tok.size() <= 1 + TrackerCell::kArpCap) {
         cell.arp_n = uint8_t(tok.size() - 1);
         for (size_t i = 1; i < tok.size(); ++i) {
             const int d = hex_digit(tok[i]);
@@ -566,6 +567,18 @@ TrackerSong parse_song_json(const nlohmann::ordered_json& obj,
         if (!it->is_object()) {
             fail("pattern must be an object", pptr);
         }
+        for (auto pk = it->begin(); pk != it->end(); ++pk) {
+            bool known = false;
+            for (const char* cn : kSongChannelNames) {
+                known = known || pk.key() == cn;
+            }
+            if (!known) {
+                fail("unknown pattern key '" + pk.key() +
+                         "' (channels are pulse1/"
+                         "pulse2/wide/noise, §8.3)",
+                     pptr + "/" + pk.key());
+            }
+        }
         std::array<std::vector<std::string>, TrackerPattern::kChannels> chans;
         for (uint32_t c = 0; c < TrackerPattern::kChannels; ++c) {
             if (!it->contains(kSongChannelNames[c])) {
@@ -634,11 +647,16 @@ TrackerSong parse_song_json(const nlohmann::ordered_json& obj,
     // Cells: parse text, collect instruments (dedup, order-preserving),
     // enforce inst-on-first-note and the §8.1 wave rule per channel.
     std::vector<std::string> instr_names;
-    const auto intern_instr = [&instr_names](const std::string& n) -> int {
+    const auto intern_instr = [&instr_names, &base](const std::string& n) -> int {
         for (size_t i = 0; i < instr_names.size(); ++i) {
             if (instr_names[i] == n) {
                 return int(i);
             }
+        }
+        if (instr_names.size() >= 0xFF) {
+            // 0xFF is the cell's no-inst sentinel: index 255 must not
+            // exist.
+            fail("song uses more than 254 distinct instruments", base);
         }
         instr_names.push_back(n);
         return int(instr_names.size() - 1);
@@ -653,11 +671,14 @@ TrackerSong parse_song_json(const nlohmann::ordered_json& obj,
         }
         parsed.emplace_back(pname, std::move(pat));
     }
+    // The sticky-inst rule is per channel across the WHOLE song
+    // (§8.3): once channel c's first note carried an instrument, later
+    // patterns need not repeat it.
+    bool has_inst[TrackerPattern::kChannels] = {false, false, false, false};
     for (size_t pi = 0; pi < raw.size(); ++pi) {
         auto& [pname, chans] = raw[pi];
         TrackerPattern& pat = parsed[pi].second;
         const std::string pptr = p("/patterns/" + pname);
-        bool has_inst[TrackerPattern::kChannels] = {false, false, false, false};
         for (uint32_t c = 0; c < TrackerPattern::kChannels; ++c) {
             for (size_t r = 0; r < rows; ++r) {
                 const std::string cptr =
@@ -686,7 +707,10 @@ TrackerSong parse_song_json(const nlohmann::ordered_json& obj,
     for (const std::string& n : instr_names) {
         const auto it = patches.find(n);
         if (it == patches.end()) {
-            fail("instrument '" + n + "' does not resolve to a patch, wav, or built-in", base);
+            fail("instrument '" + n +
+                     "' does not resolve to a patch or built-in (wav ids cannot be "
+                     "tracker instruments, §8.1)",
+                 base);
         }
         const SfxPatch& sp = it->second;
         TrackerInstr ti;

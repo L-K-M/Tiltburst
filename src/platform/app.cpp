@@ -555,6 +555,8 @@ int run(const CliOptions& cli) {
         rcfg.playfield_window = window.get();
         rcfg.debug_device = cli.dev;
         rcfg.prefer_mailbox = settings.present_mode != "vsync";
+        rcfg.bloom_strength = settings.bloom_enabled ? settings.bloom_strength : 0.0f;
+        rcfg.crt = settings.crt;
         if (!renderer->init(rcfg)) {
             log::flush_now();
             SDL_Quit();
@@ -914,6 +916,8 @@ int run(const CliOptions& cli) {
         rcfg.playfield_window = window.get();
         rcfg.backglass_window = backglass_window.get();
         rcfg.debug_device = cli.dev;
+        rcfg.bloom_strength = settings.bloom_enabled ? settings.bloom_strength : 0.0f;
+        rcfg.crt = settings.crt;
         rcfg.prefer_mailbox = settings.present_mode != "vsync";
         if (!renderer->init(rcfg)) {
             log::flush_now();

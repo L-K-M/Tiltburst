@@ -31,7 +31,17 @@ public:
     // scene uvs for the current rotation and scene/swapchain sizes.
     void build_corners(const ViewTransform& view, uint32_t swap_w, uint32_t swap_h);
 
-    void add_pass(SDL_GPUCommandBuffer* cmd, SDL_GPUTexture* scene, SDL_GPUTexture* target);
+    // §12.5 composite: scene + BLOOM_STRENGTH × bloom0, saturation
+    // clamp, optional CRT (u_crt), sRGB encode. bloom == nullptr is
+    // the quality-off fallback (the shader samples black).
+    void add_pass(SDL_GPUCommandBuffer* cmd,
+                  SDL_GPUTexture* scene,
+                  SDL_GPUTexture* bloom,
+                  SDL_GPUTexture* target,
+                  float bloom_strength,
+                  bool crt,
+                  uint32_t scene_w,
+                  uint32_t scene_h);
 
 private:
     struct CornerVertex {

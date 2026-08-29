@@ -259,6 +259,7 @@ bool Settings::save(const std::filesystem::path& path) const {
     render["bloom_knee"] = bloom_knee;
     render["bloom_strength"] = bloom_strength;
     render["crt"] = crt;
+    render["crt"] = crt;
 
     auto& audio = doc["audio"];
     audio["master"] = audio_master;

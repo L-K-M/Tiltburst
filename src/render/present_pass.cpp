@@ -33,7 +33,8 @@ load(SDL_GPUDevice* dev, ShaderStage stage, const std::filesystem::path& dir, co
         ci.num_samplers = stage == ShaderStage::Fragment ? 1 : 0;
         ci.num_storage_buffers = 0;
         ci.num_storage_textures = 0;
-        ci.num_uniform_buffers = stage == ShaderStage::Vertex ? 1 : 0;
+        ci.num_samplers = stage == ShaderStage::Fragment ? 2 : 0;
+        ci.num_uniform_buffers = stage == ShaderStage::Vertex ? 1 : 1;
         if (SDL_GPUShader* sh = SDL_CreateGPUShader(dev, &ci)) {
             return sh;
         }
@@ -221,9 +222,29 @@ void PresentPass::build_corners(const ViewTransform& view, uint32_t swap_w, uint
 
 void PresentPass::add_pass(SDL_GPUCommandBuffer* cmd,
                            SDL_GPUTexture* scene,
-                           SDL_GPUTexture* target) {
+                           SDL_GPUTexture* bloom,
+                           SDL_GPUTexture* target,
+                           float bloom_strength,
+                           bool crt,
+                           uint32_t scene_w,
+                           uint32_t scene_h) {
     const float identity[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
     SDL_PushGPUVertexUniformData(cmd, 0, identity, sizeof(identity));
+
+    // §12.5 composite uniform block (b1, space3): bloom strength,
+    // u_crt, u_scene_px.
+    struct CompositeUniforms {
+        float bloom_strength;
+        float u_crt;
+        float scene_px[2];
+        float _pad[4]; // 256-bit alignment headroom
+    } uniforms{};
+
+    uniforms.bloom_strength = bloom_strength;
+    uniforms.u_crt = crt ? 1.0f : 0.0f;
+    uniforms.scene_px[0] = float(scene_w);
+    uniforms.scene_px[1] = float(scene_h);
+    SDL_PushGPUFragmentUniformData(cmd, 1, &uniforms, sizeof(uniforms));
 
     SDL_GPUColorTargetInfo tgt{};
     tgt.texture = target;
@@ -233,8 +254,15 @@ void PresentPass::add_pass(SDL_GPUCommandBuffer* cmd,
 
     SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(cmd, &tgt, 1, nullptr);
     SDL_BindGPUGraphicsPipeline(pass, pipeline_);
-    SDL_GPUTextureSamplerBinding binding{scene, sampler_};
-    SDL_BindGPUFragmentSamplers(pass, 0, &binding, 1);
+    SDL_GPUTextureSamplerBinding bindings[2] = {
+        {scene, sampler_},
+        {bloom != nullptr ? bloom : scene, sampler_}, // null bloom: sample black
+                                                      // via the scene? No — see below
+    };
+    // Null bloom fallback: bind the scene to slot 1 too; the shader
+    // multiplies it by bloom_strength, and Quality::Off callers pass
+    // bloom_strength 0 (the term vanishes identically).
+    SDL_BindGPUFragmentSamplers(pass, 0, bindings, 2);
     SDL_GPUBufferBinding vb{vertices_, 0};
     SDL_BindGPUVertexBuffers(pass, 0, &vb, 1);
     SDL_DrawGPUPrimitives(pass, 4, 1, 0, 0);

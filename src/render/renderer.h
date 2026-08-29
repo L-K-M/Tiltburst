@@ -28,6 +28,10 @@ struct RendererConfig {
     Rotation playfield_rotation = Rotation::ROT_0;
     bool debug_device = false;  // SDL GPU debug mode
     bool prefer_mailbox = true; // canon §5.4
+    // §12.5: BLOOM_STRENGTH (config render.bloom_strength 0-2).
+    float bloom_strength = 0.6f;
+    // §12.5: render.crt — user-only, default false (13 §10).
+    bool crt = false;
 };
 
 struct RenderStats; // §17

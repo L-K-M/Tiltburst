@@ -138,6 +138,11 @@ bool SdlGpuRenderer::init(const RendererConfig& cfg) {
     playfield_ = cfg.playfield_window;
     backglass_ = cfg.backglass_window;
     rotation_ = cfg.playfield_rotation;
+    bloom_strength_ = cfg.bloom_strength;
+    crt_ = cfg.crt;
+    if (scene_w_ > 0 && scene_h_ > 0) {
+        bloom_.ensure_targets(scene_w_, scene_h_);
+    }
 
     const platform::SwapchainInit sc =
         platform::create_device_for_window(playfield_, cfg.debug_device, "auto");
@@ -165,6 +170,13 @@ bool SdlGpuRenderer::init(const RendererConfig& cfg) {
         shutdown();
         return false;
     }
+    // §12: the bloom chain is best-effort — a missing blob degrades
+    // to Quality::Off (the composite's bloom term is multiplied by 0
+    // via a null bind, so the plain path renders).
+    if (!bloom_.init(device_, SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT, dir)) {
+        TB_LOG_WARN("render", "bloom chain unavailable; Quality::Off fallback");
+        bloom_.set_quality(BloomChain::Quality::Off);
+    }
     scene_w_ = 0; // recreate on first frame via ensure_scene
     scene_h_ = 0;
     return true;
@@ -174,6 +186,7 @@ void SdlGpuRenderer::destroy_device() {
     quads_.shutdown();
     sdf_.shutdown();
     present_.shutdown();
+    bloom_.shutdown();
     if (scene_) {
         SDL_ReleaseGPUTexture(device_, scene_);
         scene_ = nullptr;
@@ -217,6 +230,11 @@ bool SdlGpuRenderer::ensure_scene(SDL_GPUTextureFormat) {
     }
     scene_w_ = view_.scene_w;
     scene_h_ = view_.scene_h;
+
+    // §12: bloom level targets follow the scene size.
+    if (bloom_.quality() != BloomChain::Quality::Off) {
+        bloom_.ensure_targets(scene_w_, scene_h_);
+    }
 
     SDL_GPUTextureCreateInfo ti{};
     ti.type = SDL_GPU_TEXTURETYPE_2D;
@@ -304,8 +322,13 @@ void SdlGpuRenderer::render_playfield(const RenderFrame& frame) {
     sim_time_s_ = frame.snapshot ? double(frame.snapshot->tick) * 0.001 : sim_time_s_;
     draw_scene(cmd, frame, sim_time_s_);
 
+    // §12: the bloom chain (11 passes at <= 1/2 res), then the §12.5
+    // composite with the combined bloom0.
+    if (bloom_.quality() != BloomChain::Quality::Off) {
+        bloom_.record(cmd, scene_);
+    }
     present_.build_corners(view_, w, h);
-    present_.add_pass(cmd, scene_, tex);
+    present_.add_pass(cmd, scene_, bloom_.bloom0(), tex, bloom_strength_, crt_, scene_w_, scene_h_);
 
     SDL_SubmitGPUCommandBuffer(cmd);
 
@@ -531,7 +554,11 @@ bool SdlGpuRenderer::capture_to_png(const std::filesystem::path& png) {
     }
 
     draw_scene(cmd, last_, last_.snapshot ? double(last_.snapshot->tick) * 0.001 : 0.0);
-    present_.add_pass(cmd, scene_, capture_);
+    // §12.5 goldens: CRT always off in tb_screenshot (13 §10);
+    // capture uses bloom strength 0 (§15.2: goldens must not depend
+    // on quality settings) — but the chain itself may run; the
+    // composite samples with strength 0.
+    present_.add_pass(cmd, scene_, bloom_.bloom0(), capture_, 0.0f, false, scene_w_, scene_h_);
 
     SDL_GPUCopyPass* copy = SDL_BeginGPUCopyPass(cmd);
     SDL_GPUTextureRegion src{capture_, 0, 0, 0, 0, capture_w_, capture_h_, 1};

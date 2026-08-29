@@ -21,8 +21,8 @@ struct Settings {
     bool bloom_enabled = true;
     float bloom_threshold = 1.0f;
     float bloom_knee = 0.5f;
-    float bloom_strength = 0.6f;
-    bool crt = false;
+    float bloom_strength = 0.6f; // render.bloom_strength, 0-2 (06 §12.5)
+    bool crt = false;            // render.crt, user-only (13 §10)
 
     // audio — volumes 0..100, gain = (v/100)^2 (12-audio.md §3.1)
     int audio_master = 80;

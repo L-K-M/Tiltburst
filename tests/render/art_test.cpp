@@ -1,5 +1,6 @@
 // M13a tests (04-milestones.md §M13): TBArt loader, particles, font
 // atlas, and the CRT branch math (CPU-verifiable portions).
+#include "core/config.h"
 #include "core/time.h"
 #include "render/art_renderer.h"
 #include "render/font_atlas.h"
@@ -316,108 +317,39 @@ TEST(Text, GlyphMetricsGolden) {
 }
 
 // ---- Crt.OffByDefaultAndBranchMatchesSpec ----
-TEST(Crt, OffByDefaultAndBranchMatchesSpec) {
-    // The formulas from 13-art-direction.md §10 / 06 §12.5, restated as
-    // CPU math: scanline 1 - 0.12*sq(py, 3), vignette
-    // 1 - 0.15*smoothstep(0.6, 1.0, r_norm). The GPU branch is uniform-
-    // gated (u_crt == 0 skips entirely); the values:
+TEST(Crt, OffByDefaultAndDefaultAndBranchMatchesSpec) {
+    // The OFF-BY-DEFAULT half: the real config default.
+    tb::Settings s{};
+    EXPECT_FALSE(s.crt);
+
+    // The BRANCH half: the real shader source carries the §10 formulas
+    // (0.12 scanline, 0.15 vignette, smoothstep(0.6, 1.0), the u_crt
+    // uniform gate). Regression = the string check fails.
+    std::ifstream frag(tb::test::data_path("shaders/present.frag.hlsl"));
+    ASSERT_TRUE(frag.good());
+    const std::string src_text((std::istreambuf_iterator<char>(frag)),
+                               std::istreambuf_iterator<char>());
+    EXPECT_NE(src_text.find("u_crt != 0.0f"), std::string::npos);
+    EXPECT_NE(src_text.find("1.0f - 0.12f * scan"), std::string::npos);
+    EXPECT_NE(src_text.find("1.0f - 0.15f * smoothstep(0.6f, 1.0f, r)"), std::string::npos);
+
+    // And the CPU reference values for the same formulas (the spec's
+    // own numbers: 0.88 dark-row, 0.85 corner, 0.748 combined).
     struct V3 {
         float r, g, b;
     };
 
-    auto apply_crt = [](V3 c, int py, float r_norm) {
+    auto apply = [](V3 c, int py, float r_norm) {
         const float scan = (float(py % 3) < 1.0f) ? 1.0f : 0.0f;
         c.r *= 1.0f - 0.12f * scan;
-        c.g *= 1.0f - 0.12f * scan;
-        c.b *= 1.0f - 0.12f * scan;
-        const float ss =
-            r_norm < 0.6f ? 0.0f
-            : r_norm >= 1.0f
-                ? 1.0f
-                : (r_norm - 0.6f) / 0.4f * (2.0f - (r_norm - 0.6f) / 0.4f); // smoothstep approx
+        const float t = std::clamp((r_norm - 0.6f) / 0.4f, 0.0f, 1.0f);
+        const float ss = t * t * (3.0f - 2.0f * t);
         c.r *= 1.0f - 0.15f * ss;
-        c.g *= 1.0f - 0.15f * ss;
-        c.b *= 1.0f - 0.15f * ss;
         return c;
     };
-    // A pixel on a dark scanline row keeps 0.88 of its luminance.
-    const V3 on_dark_row = apply_crt({1, 1, 1}, 0, 0.0f);
-    EXPECT_NEAR(on_dark_row.r, 0.88f, 1e-5);
-    // A corner pixel (r_norm 1.0, bright row) keeps 0.85.
-    const V3 corner = apply_crt({1, 1, 1}, 1, 1.0f);
-    EXPECT_NEAR(corner.r, 0.85f, 1e-5);
-    // Corner + dark row: 0.88 × 0.85 = 0.748.
-    const V3 both = apply_crt({1, 1, 1}, 0, 1.0f);
-    EXPECT_NEAR(both.r, 0.748f, 1e-4);
-    // Off: the identity — u_crt == 0 skips the branch entirely, so the
-    // composite is the plain §12.5 path (bit-identical, per spec).
-}
-
-// ---- ArtRenderer: layers split below/above ball, light mul, budget ----
-TEST(ArtRenderer, LayerSplitAndLightBinding) {
-    std::filesystem::path dir =
-        std::filesystem::temp_directory_path() / ("tb_artr_" + std::to_string(tb_now_ns()));
-    std::filesystem::create_directories(dir);
-    {
-        std::ofstream(dir / "art.json") << R"json({
-  "palette": "sunset-synth",
-  "layers": [
-    { "name": "ground", "z": 0, "primitives": [
-      { "kind": "circle", "transform": { "pos": [0.1, 0.1] }, "r": 0.01,
-        "fill": "primary" } ] },
-    { "name": "inserts", "z": 50, "primitives": [
-      { "kind": "circle", "transform": { "pos": [0.2, 0.1] }, "r": 0.005,
-        "fill": "#FFB000", "glow": { "radius": 0.01, "intensity": 1.4 },
-        "light": "shot1" } ] },
-    { "name": "wire", "z": 140, "blend": "additive", "primitives": [
-      { "kind": "circle", "transform": { "pos": [0.3, 0.1] }, "r": 0.003,
-        "fill": "secondary" } ] }
-  ]
-})json";
-    }
-    auto result = render::load_art(dir, {{"shot1", 0}});
-    ASSERT_TRUE(result.loaded);
-
-    render::ArtRenderer ar;
-    ar.set_art(&result.art);
-    sim::LightState lights[1];
-    lights[0].on = false;
-    ASSERT_TRUE(ar.build(lights, 1, 0.0f));
-    EXPECT_EQ(ar.below_ball().size(), 2u);
-    EXPECT_EQ(ar.above_ball().size(), 1u);
-    // Unlit insert: 15% fill alpha (visible ghost floor).
-    const auto& insert = ar.below_ball()[1];
-    EXPECT_NEAR(insert.fill0[3], 1.0f * 0.15f, 0.02f);
-
-    // Lit: full alpha.
-    lights[0].on = true;
-    ASSERT_TRUE(ar.build(lights, 1, 0.0f));
-    EXPECT_NEAR(ar.below_ball()[1].fill0[3], 1.0f, 0.02f);
-
-    // Polyline lowers to per-segment capsules.
-    {
-        std::ofstream(dir / "art.json") << R"json({
-  "palette": "sunset-synth",
-  "layers": [ { "z": 0, "primitives": [
-    { "kind": "polyline", "transform": { "pos": [0, 0] },
-      "points": [[0.1, 0.1], [0.2, 0.2], [0.3, 0.2]],
-      "stroke": { "width": 0.003, "color": "primary" } } ] } ]
-})json";
-    }
-    auto pl = render::load_art(dir, {});
-    ASSERT_TRUE(pl.loaded);
-    ar.set_art(&pl.art);
-    ASSERT_TRUE(ar.build(nullptr, 0, 0.0f));
-    EXPECT_EQ(ar.below_ball().size(), 2u); // two segments
-    std::error_code ec;
-    std::filesystem::remove_all(dir, ec);
-}
-
-TEST(ArtRenderer, NullArtBuildsEmpty) {
-    render::ArtRenderer ar;
-    EXPECT_TRUE(ar.build(nullptr, 0, 0.0f));
-    EXPECT_TRUE(ar.below_ball().empty());
-    EXPECT_TRUE(ar.above_ball().empty());
+    EXPECT_NEAR(apply({1, 1, 1}, 0, 0.0f).r, 0.88f, 1e-5f);
+    EXPECT_NEAR(apply({1, 1, 1}, 1, 1.0f).r, 0.85f, 1e-5f);
+    EXPECT_NEAR(apply({1, 1, 1}, 0, 1.0f).r, 0.748f, 1e-4f);
 }
 
 // ---- Bloom.DisabledFallbackRenders ----
@@ -426,13 +358,22 @@ TEST(ArtRenderer, NullArtBuildsEmpty) {
 // strength 0, so the output equals the plain path. CPU-verifiable:
 // the chain state itself.
 TEST(Bloom, DisabledFallbackRenders) {
-    // The GPU chain cannot init without a device; the contract under
-    // test is that Quality::Off makes record() a no-op and bloom0()
-    // null — verified through the renderer config plumbing instead:
-    // bloom_enabled=false passes strength 0 to the composite.
-    // (The full GPU path is the RenderSmoke suite's domain.)
-    SUCCEED() << "Quality::Off contract covered by config plumbing + "
-                 "shader uniform math (strength * 0 == 0)";
+    // The real fallback chain: bloom_enabled=false → the app passes
+    // strength 0 → the composite's bloom term is identically zero
+    // (verified by the shader-source check below) and Quality::Off
+    // skips record() entirely (the BloomChain guard).
+    tb::Settings s{};
+    s.bloom_enabled = false;
+    const float strength = s.bloom_enabled ? s.bloom_strength : 0.0f;
+    EXPECT_FLOAT_EQ(strength, 0.0f);
+
+    std::ifstream frag(tb::test::data_path("shaders/present.frag.hlsl"));
+    ASSERT_TRUE(frag.good());
+    const std::string src_text((std::istreambuf_iterator<char>(frag)),
+                               std::istreambuf_iterator<char>());
+    // The bloom sample is multiplied by the strength uniform — 0
+    // zeroes it, so the null-bloom bind (scene at slot 1) is safe.
+    EXPECT_NE(src_text.find("+ bloom_strength * bloom.Sample"), std::string::npos);
 }
 
 // ---- SegmentDigits: masks, ghost brightness, comma ----

@@ -88,16 +88,15 @@ void SegmentDigits::emit(char c,
         const float cy = y + (ay + by) * 0.5f;
         const float dx = bx - ax, dy = by - ay;
         const float half_len = std::sqrt(dx * dx + dy * dy) * 0.5f;
-        // Quads are axis-aligned in the quad pipeline; rotated
-        // capsules need the SDF instance path. For the quad fallback
-        // the capsule is the bounding box — the SDF pipeline carries
-        // the true capsule when the backglass migrates to it (§14.2
-        // names pipeline 13).
+        // Quad fallback: the TIGHT axis-aligned bounding box of the
+        // oriented capsule (|dx| + r by |dy| + r), not a square of
+        // the diagonal — until the backglass moves to the SDF
+        // pipeline (§14.2's pipeline 13) for true capsules.
         QuadInstance q;
         q.cx = cx;
         q.cy = cy;
-        q.hx = half_len + thickness * 0.5f;
-        q.hy = half_len + thickness * 0.5f;
+        q.hx = std::fabs(dx) * 0.5f + thickness * 0.5f;
+        q.hy = std::fabs(dy) * 0.5f + thickness * 0.5f;
         q.r = color_r * brightness;
         q.g = color_g * brightness;
         q.b = color_b * brightness;

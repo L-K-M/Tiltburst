@@ -53,11 +53,11 @@ public:
     // indices follow the Palette role order (bg0..glow_white).
     void set_palette(const uint32_t (&roles)[8]);
 
-    // Spawns `effect` at table-space (x, y). Cone directions are
-    // properties of the canonical effect rows (the M13b event wiring
-    // orients them per event). Returns the burst count spawned (the
-    // pool may steal slots when full).
-    int spawn(Effect effect, float x, float y);
+    // Spawns `effect` at table-space (x, y). Returns the burst count
+    // spawned (the pool may steal slots when full).
+    // dir (optional, unit, table space) overrides the effect's cone
+    // orientation (sling cones fire along the sling face normal).
+    int spawn(Effect effect, float x, float y, const float* dir = nullptr);
 
     // §13.1 integration; dt clamped to 33 ms by the caller contract.
     void update(float dt);

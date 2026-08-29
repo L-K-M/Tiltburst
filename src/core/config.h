@@ -49,6 +49,11 @@ struct Settings {
     bool ball_outline = false;
     bool screen_shake = true;
 
+    // §12.5: the composite strength (0 when bloom is disabled — the
+    // null-bloom bind multiplies to zero). Shared by the app wiring
+    // and the tests.
+    float composite_bloom_strength() const { return bloom_enabled ? bloom_strength : 0.0f; }
+
     // Default bindings per 05 §9.1, one action-indexed list each.
     static Settings defaults();
 

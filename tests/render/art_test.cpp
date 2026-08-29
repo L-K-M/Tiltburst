@@ -364,8 +364,9 @@ TEST(Bloom, DisabledFallbackRenders) {
     // skips record() entirely (the BloomChain guard).
     tb::Settings s{};
     s.bloom_enabled = false;
-    const float strength = s.bloom_enabled ? s.bloom_strength : 0.0f;
-    EXPECT_FLOAT_EQ(strength, 0.0f);
+    EXPECT_FLOAT_EQ(s.composite_bloom_strength(), 0.0f);
+    s.bloom_enabled = true;
+    EXPECT_FLOAT_EQ(s.composite_bloom_strength(), s.bloom_strength);
 
     std::ifstream frag(tb::test::data_path("shaders/present.frag.hlsl"));
     ASSERT_TRUE(frag.good());
@@ -415,6 +416,73 @@ TEST(SegmentDigits, DigitMasksAndGhosting) {
     quads.clear();
     render::SegmentDigits::emit(' ', 0, 0, 64, 96, true, 1, 1, 1, &quads);
     EXPECT_TRUE(quads.empty());
+}
+
+// ---- ArtRenderer: layers split below/above ball, light mul, budget ----
+TEST(ArtRenderer, LayerSplitAndLightBinding) {
+    std::filesystem::path dir =
+        std::filesystem::temp_directory_path() / ("tb_artr_" + std::to_string(tb_now_ns()));
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream(dir / "art.json") << R"json({
+  "palette": "sunset-synth",
+  "layers": [
+    { "name": "ground", "z": 0, "primitives": [
+      { "kind": "circle", "transform": { "pos": [0.1, 0.1] }, "r": 0.01,
+        "fill": "primary" } ] },
+    { "name": "inserts", "z": 50, "primitives": [
+      { "kind": "circle", "transform": { "pos": [0.2, 0.1] }, "r": 0.005,
+        "fill": "#FFB000", "glow": { "radius": 0.01, "intensity": 1.4 },
+        "light": "shot1" } ] },
+    { "name": "wire", "z": 140, "blend": "additive", "primitives": [
+      { "kind": "circle", "transform": { "pos": [0.3, 0.1] }, "r": 0.003,
+        "fill": "secondary" } ] }
+  ]
+})json";
+    }
+    auto result = render::load_art(dir, {{"shot1", 0}});
+    ASSERT_TRUE(result.loaded);
+
+    render::ArtRenderer ar;
+    ar.set_art(&result.art);
+    sim::LightState lights[1];
+    lights[0].on = false;
+    ASSERT_TRUE(ar.build(lights, 1, 0.0f));
+    EXPECT_EQ(ar.below_ball().size(), 2u);
+    EXPECT_EQ(ar.above_ball().size(), 1u);
+    // Unlit insert: 15% fill alpha (visible ghost floor).
+    const auto& insert = ar.below_ball()[1];
+    EXPECT_NEAR(insert.fill0[3], 1.0f * 0.15f, 0.02f);
+
+    // Lit: full alpha.
+    lights[0].on = true;
+    ASSERT_TRUE(ar.build(lights, 1, 0.0f));
+    EXPECT_NEAR(ar.below_ball()[1].fill0[3], 1.0f, 0.02f);
+
+    // Polyline lowers to per-segment capsules.
+    {
+        std::ofstream(dir / "art.json") << R"json({
+  "palette": "sunset-synth",
+  "layers": [ { "z": 0, "primitives": [
+    { "kind": "polyline", "transform": { "pos": [0, 0] },
+      "points": [[0.1, 0.1], [0.2, 0.2], [0.3, 0.2]],
+      "stroke": { "width": 0.003, "color": "primary" } } ] } ]
+})json";
+    }
+    auto pl = render::load_art(dir, {});
+    ASSERT_TRUE(pl.loaded);
+    ar.set_art(&pl.art);
+    ASSERT_TRUE(ar.build(nullptr, 0, 0.0f));
+    EXPECT_EQ(ar.below_ball().size(), 2u); // two segments
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+TEST(ArtRenderer, NullArtBuildsEmpty) {
+    render::ArtRenderer ar;
+    EXPECT_TRUE(ar.build(nullptr, 0, 0.0f));
+    EXPECT_TRUE(ar.below_ball().empty());
+    EXPECT_TRUE(ar.above_ball().empty());
 }
 
 } // namespace

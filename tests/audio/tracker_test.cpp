@@ -238,9 +238,12 @@ TEST(Tracker, SongRendersDeterministicPcm) {
     uint64_t h1 = 0, h2 = 0;
     const std::vector<float> a = render_song(song, 3.0f, true, &h1);
     (void)render_song(song, 3.0f, true, &h2);
-    EXPECT_EQ(h1, h2);                    // identical re-render
-    EXPECT_EQ(h1, 0x5BBC79B2904D1F59ull); // pinned golden (re-pin only
-                                          // via a deliberate change)
+    EXPECT_EQ(h1, h2); // identical re-render
+    // Re-pinned at cycle 9: the retrigger fade now carries the old
+    // signal's full gain chain (channel vol x instrument gain), which
+    // the first pin omitted.
+    EXPECT_EQ(h1, 0x87678561D1CD575Cull); // re-pin only via a
+                                          // deliberate change
     // Non-silence: the mix carries energy.
     float peak = 0.0f;
     for (float s : a) {

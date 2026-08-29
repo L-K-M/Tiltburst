@@ -116,7 +116,12 @@ bool BloomChain::init(SDL_GPUDevice* device, const std::filesystem::path& shader
     si.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
     si.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
     sampler_ = SDL_CreateGPUSampler(device_, &si);
-    return sampler_ != nullptr;
+    if (sampler_ == nullptr) {
+        TB_LOG_ERROR("render", "bloom sampler creation failed: {}", SDL_GetError());
+        shutdown(); // release the already-created shaders + pipelines
+        return false;
+    }
+    return true;
 }
 
 void BloomChain::destroy_targets() {
@@ -169,7 +174,10 @@ bool BloomChain::ensure_targets(uint32_t scene_w, uint32_t scene_h) {
     for (Level& lv : levels_) {
         w = std::max(w / 2u, 1u);
         h = std::max(h / 2u, 1u);
-        if (lv.tex != nullptr && lv.w == w && lv.h == h) {
+        // BOTH targets must exist at the right size — a partial
+        // allocation (tex ok, blur null) must retry, not skip
+        // (cycle-12 review).
+        if (lv.tex != nullptr && lv.blur != nullptr && lv.w == w && lv.h == h) {
             continue;
         }
         if (lv.tex != nullptr) {

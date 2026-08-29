@@ -772,6 +772,7 @@ int run(const CliOptions& cli) {
             // displays.json loads ONLY on this path — headless and
             // windowed runs never read a config they cannot consume.
             platform::DisplaysConfig displays_cfg;
+            bool displays_cfg_corrupt = false;
             {
                 const std::filesystem::path cfg_path =
                     paths::pref() / "displays.json"; // --display-config: M18
@@ -780,7 +781,10 @@ int run(const CliOptions& cli) {
                     const auto parsed = platform::load_displays_json(std::string(
                         std::istreambuf_iterator<char>(cfg_in), std::istreambuf_iterator<char>()));
                     if (parsed.corrupt) {
-                        TB_LOG_WARN("main", "displays.json corrupt; using heuristics");
+                        TB_LOG_WARN("main",
+                                    "displays.json corrupt; using heuristics "
+                                    "(auto-write skipped — fix the file)");
+                        displays_cfg_corrupt = true;
                     } else if (parsed.loaded) {
                         displays_cfg = parsed.cfg;
                     }
@@ -798,7 +802,10 @@ int run(const CliOptions& cli) {
                 // last_auto) after every successful auto-detection, so
                 // stability survives restarts (cycle-11 review: the
                 // read-only integration made the feature inert).
-                if (!assign.stability_reused && assign.playfield >= 0) {
+                const bool auto_playfield =
+                    displays_cfg.playfield.match.empty() || displays_cfg.playfield.match == "auto";
+                if (auto_playfield && !displays_cfg_corrupt && !assign.stability_reused &&
+                    assign.playfield >= 0) {
                     displays_cfg.last_auto.present = true;
                     displays_cfg.last_auto.playfield = displays[size_t(assign.playfield)].name;
                     displays_cfg.last_auto.backglass =
@@ -817,6 +824,8 @@ int run(const CliOptions& cli) {
                         if (write_ec) {
                             TB_LOG_WARN(
                                 "main", "displays.json rename failed: {}", write_ec.message());
+                            std::error_code rm_ec;
+                            std::filesystem::remove(tmp, rm_ec); // no orphan tmp
                         }
                     } else {
                         out.close();

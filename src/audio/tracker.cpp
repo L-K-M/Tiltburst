@@ -198,7 +198,19 @@ void TrackerPlayer::process_row(uint32_t row) {
                 ch.old_phase = ch.phase;
                 ch.old_f_used = ch.f_used;
                 ch.old_instr = ch.instr;
-                ch.old_gain = ch.releasing ? ch.release_start : 1.0f;
+                // Fade the previous signal out from its CURRENT
+                // envelope level — a flat 1.0/release_start would jump
+                // the tail up to peak before the 64-sample fade (the
+                // click §8.1's fade exists to prevent; cycle-8 review).
+                if (ch.releasing) {
+                    const float rel = ch.release_len > 0
+                                          ? 1.0f - float(ch.release_pos) / float(ch.release_len)
+                                          : 0.0f;
+                    ch.old_gain = ch.release_start * rel;
+                } else {
+                    ch.old_gain =
+                        ch.attack_len > 0 ? float(ch.attack_pos) / float(ch.attack_len) : 1.0f;
+                }
             }
             ch.sounding = true;
             ch.f = f;
@@ -373,6 +385,12 @@ void TrackerPlayer::render(float* dst, const float* gains, uint32_t frames) {
                             // tail rings out, then the player idles.
                             finishing_ = true;
                             for (Channel& ch : chan_) {
+                                // Row-scope fx ended with the song's
+                                // last row — hold the tail pitch steady
+                                // (§8.3 "its row only"; cycle-8 review).
+                                ch.slide_this_row = false;
+                                ch.arp_this_row = false;
+                                ch.arp_n = 0;
                                 if (ch.sounding && !ch.releasing) {
                                     ch.releasing = true;
                                     ch.release_pos = 0;
@@ -405,7 +423,9 @@ void TrackerPlayer::render(float* dst, const float* gains, uint32_t frames) {
     if (finishing_) {
         bool any = false;
         for (Channel& ch : chan_) {
-            if (ch.sounding || ch.fade_pos < kFadeSamples) {
+            // Same guard as channel_sample's fade path: a fade only
+            // counts with an old_instr behind it (cycle-8 review).
+            if (ch.sounding || (ch.old_instr != nullptr && ch.fade_pos < kFadeSamples)) {
                 any = true;
             }
         }

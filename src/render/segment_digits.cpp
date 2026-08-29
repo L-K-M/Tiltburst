@@ -87,7 +87,6 @@ void SegmentDigits::emit(char c,
         const float cx = x + (ax + bx) * 0.5f;
         const float cy = y + (ay + by) * 0.5f;
         const float dx = bx - ax, dy = by - ay;
-        const float half_len = std::sqrt(dx * dx + dy * dy) * 0.5f;
         // Quad fallback: the TIGHT axis-aligned bounding box of the
         // oriented capsule (|dx| + r by |dy| + r), not a square of
         // the diagonal — until the backglass moves to the SDF

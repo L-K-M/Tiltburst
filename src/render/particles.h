@@ -55,8 +55,10 @@ public:
 
     // Spawns `effect` at table-space (x, y). Returns the burst count
     // spawned (the pool may steal slots when full).
-    // dir (optional, unit, table space) overrides the effect's cone
-    // orientation (sling cones fire along the sling face normal).
+    // dir (optional, unit, table space): the SlingFlash cone's
+    // orientation (the sling face normal). Other effects ignore it —
+    // their shapes are inherent (ring/burst are radially symmetric,
+    // DrainBurst's cone is always up-table per §13.4).
     int spawn(Effect effect, float x, float y, const float* dir = nullptr);
 
     // §13.1 integration; dt clamped to 33 ms by the caller contract.

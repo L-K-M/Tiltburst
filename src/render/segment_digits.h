@@ -7,11 +7,13 @@
 
 namespace tb::render {
 
-// 14-segment score digits (06-rendering.md §14.2). Builds capsule
-// SdfInstances in pixel space: cell normalized [0,1]×[0,1] (y up),
-// thickness 0.09, optional 8° italic skew (x += 0.14·y), glow radius
-// 0.35 × cell width. Ghost (unlit) segments draw at 6% brightness,
-// no glow.
+// 14-segment score digits (06-rendering.md §14.2). v1 emits tight AABB
+// quads in pixel space (the true rotated capsules + glow need the SDF
+// pipeline — §14.2's pipeline 13 — which the backglass adopts when it
+// leaves the quad batch). Cell normalized [0,1]×[0,1] (y up), optional
+// 8° italic skew (x += 0.14·y), ghost (unlit) segments at 6%
+// brightness. The glow radius constant rides the header for the SDF
+// migration.
 class SegmentDigits {
 public:
     // §14.2 bit masks (bit0=A .. 13=M).

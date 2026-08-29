@@ -6,8 +6,6 @@ namespace tb::render {
 
 namespace {
 
-constexpr float kPi = 3.14159265358979323846f;
-
 // §14.2 segment endpoints in cell-normalized [0,1] (y up).
 struct Seg {
     float ax, ay, bx, by;

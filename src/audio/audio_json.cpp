@@ -654,9 +654,9 @@ TrackerSong parse_song_json(const nlohmann::ordered_json& obj,
             }
         }
         if (instr_names.size() >= 0xFF) {
-            // 0xFF is the cell's no-inst sentinel: index 255 must not
-            // exist.
-            fail("song uses more than 254 distinct instruments", base);
+            // 0xFF is the cell's no-inst sentinel, so legal indices are
+            // 0..254: the song exceeds 255 instruments.
+            fail("song uses more than 255 distinct instruments", base);
         }
         instr_names.push_back(n);
         return int(instr_names.size() - 1);
@@ -671,34 +671,59 @@ TrackerSong parse_song_json(const nlohmann::ordered_json& obj,
         }
         parsed.emplace_back(pname, std::move(pat));
     }
-    // The sticky-inst rule is per channel across the WHOLE song
-    // (§8.3): once channel c's first note carried an instrument, later
-    // patterns need not repeat it.
-    bool has_inst[TrackerPattern::kChannels] = {false, false, false, false};
-    for (size_t pi = 0; pi < raw.size(); ++pi) {
-        auto& [pname, chans] = raw[pi];
-        TrackerPattern& pat = parsed[pi].second;
-        const std::string pptr = p("/patterns/" + pname);
-        for (uint32_t c = 0; c < TrackerPattern::kChannels; ++c) {
-            for (size_t r = 0; r < rows; ++r) {
-                const std::string cptr =
-                    pptr + "/" + kSongChannelNames[c] + "/" + std::to_string(r);
-                std::string inst_name;
-                TrackerCell cell = parse_cell_text(chans[c][r], inst_name, cptr);
-                if (!inst_name.empty()) {
-                    cell.inst = uint8_t(intern_instr(inst_name));
+    // The sticky-inst rule is per channel across the WHOLE song and
+    // runs in PLAYBACK order (§8.3): `order` decides which pattern's
+    // note is the channel's first, not the patterns object's
+    // declaration order (cycle-2 review). Patterns never referenced
+    // by `order` still parse — each validated standalone.
+    auto parse_pattern_cells =
+        [&](size_t pi, bool(&has_inst)[TrackerPattern::kChannels], bool fresh) {
+            auto& [pname, chans] = raw[pi];
+            TrackerPattern& pat = parsed[pi].second;
+            if (fresh) {
+                for (uint32_t c = 0; c < TrackerPattern::kChannels; ++c) {
+                    has_inst[c] = false;
                 }
-                if (cell.note != 0 && cell.note != TrackerCell::kOff && !has_inst[c] &&
-                    cell.inst == 0xFF) {
-                    fail(std::string("channel '") + kSongChannelNames[c] +
-                             "' needs an inst on its first note (§8.3)",
-                         cptr);
-                }
-                if (cell.inst != 0xFF) {
-                    has_inst[c] = true;
-                }
-                pat.chan[c].push_back(cell);
             }
+            const std::string pptr = p("/patterns/" + pname);
+            for (uint32_t c = 0; c < TrackerPattern::kChannels; ++c) {
+                for (size_t r = 0; r < rows; ++r) {
+                    const std::string cptr =
+                        pptr + "/" + kSongChannelNames[c] + "/" + std::to_string(r);
+                    std::string inst_name;
+                    TrackerCell cell = parse_cell_text(chans[c][r], inst_name, cptr);
+                    if (!inst_name.empty()) {
+                        cell.inst = uint8_t(intern_instr(inst_name));
+                    }
+                    if (cell.note != 0 && cell.note != TrackerCell::kOff && !has_inst[c] &&
+                        cell.inst == 0xFF) {
+                        fail(std::string("channel '") + kSongChannelNames[c] +
+                                 "' needs an inst on its first PLAYED note (§8.3)",
+                             cptr);
+                    }
+                    if (cell.inst != 0xFF) {
+                        has_inst[c] = true;
+                    }
+                    pat.chan[c].push_back(cell);
+                }
+            }
+        };
+    bool has_inst[TrackerPattern::kChannels] = {false, false, false, false};
+    std::vector<bool> played(raw.size(), false);
+    for (const std::string& name : song.order) {
+        for (size_t pi = 0; pi < raw.size(); ++pi) {
+            if (raw[pi].first == name) {
+                if (!played[pi]) {
+                    parse_pattern_cells(pi, has_inst, /*fresh=*/false);
+                    played[pi] = true;
+                }
+                break;
+            }
+        }
+    }
+    for (size_t pi = 0; pi < raw.size(); ++pi) {
+        if (!played[pi]) {
+            parse_pattern_cells(pi, has_inst, /*fresh=*/true);
         }
     }
     // Resolve instruments through the merged patch map; enforce the

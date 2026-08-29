@@ -1,6 +1,7 @@
 // sin(2*pi*i/256) — portable LUT for sine osc, vibrato,
-// crossfade curves, and the pan constants (i = 0..255; index
-// 256 duplicates 0 so callers can lerp without a wrap branch).
+// crossfade curves, and the pan constants (i = 0..256; the
+// wrap entry is EXACTLY 0.0 — index 0 duplicated — so the
+// seam lerp carries no epsilon; callers wrap without a branch).
 0.000000000e+00f,
 2.454122852e-02f,
 4.906767433e-02f,
@@ -257,4 +258,4 @@
 -7.356456360e-02f,
 -4.906767433e-02f,
 -2.454122852e-02f,
--2.449293598e-16f,
+0.000000000e+00f,

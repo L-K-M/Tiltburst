@@ -403,6 +403,7 @@ bool AudioSystem::play_music(const std::string& song_id) {
     AudioCommand cmd;
     cmd.kind = AudioCommand::Kind::PlaySong;
     cmd.patch = uint16_t(idx);
+    cmd.epoch = uint16_t(impl_->publish_epoch.load(std::memory_order_relaxed));
     cmd.value = song_id == "attract" ? 1.0f : 0.0f; // §9 offset flag
     return impl_->commands.push(cmd);
 }
@@ -772,6 +773,13 @@ void AudioSystem::mix(float* out, uint32_t frames) {
             // instance (already the quietest). `value` carries the §9
             // attract flag (music-bus -12 dB offset while active).
             if (cmd.patch >= bank->songs().size()) {
+                break;
+            }
+            // Stale-epoch guard: the index was resolved against the
+            // bank published at push time; a swap since renumbers the
+            // song list, so a queued request must not replay against
+            // the new bank's song at the same index.
+            if (cmd.epoch != uint16_t(impl_->publish_epoch.load(std::memory_order_relaxed))) {
                 break;
             }
             impl_->attract_target = cmd.value > 0.5f ? kAttractFloor : 1.0f;

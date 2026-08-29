@@ -256,8 +256,10 @@ void TrackerPlayer::apply_tick() {
             f *= semitone_ratio(int(d));
         } else if (ch.vib_active && ch.vib_depth > 0.0f) {
             ch.vib_phase += ch.vib_speed * float(kTwoPi) / 64.0f;
-            if (ch.vib_phase >= float(kTwoPi)) {
-                ch.vib_phase -= float(kTwoPi); // wrap: precision on long holds
+            // Wrap keeps long-held notes precise; the per-tick
+            // increment is < 2*pi, so the while fully bounds it.
+            while (ch.vib_phase >= float(kTwoPi)) {
+                ch.vib_phase -= float(kTwoPi);
             }
             // §8.3: f_used = f * 2^((d/8)*sin(phase)/12). The ratio
             // helper computes 2^(x/12), so x = (d/8)*sin(phase) — the
@@ -348,7 +350,11 @@ void TrackerPlayer::render(float* dst, const float* gains, uint32_t frames) {
             if (!finishing_ && tick_in_row_ == 0) {
                 process_row(row_idx_);
                 if (song_ == nullptr) {
-                    return; // defensive stop() inside (bad order entry)
+                    // Defensive stop() (unreachable with validated
+                    // songs). render ACCUMULATES into dst: returning
+                    // early leaves the remaining frames un-added,
+                    // which is exactly silence — nothing to fill.
+                    return;
                 }
             }
             apply_tick();

@@ -75,7 +75,14 @@ struct AudioCommand {
     Kind kind = Kind::Volume;
     uint8_t bus = 0;    // 0 sfx, 1 ui, 2 music, 3 master
     float value = 0.0f; // volume 0..100 (Volume); >0.5 = attract (PlaySong)
+                        // or immediate stop (StopMusic)
     uint16_t patch = 0; // PlayUi patch id / PlaySong bank song index
+    // PlaySong only: the publish_epoch the song index was resolved
+    // against. A bank swap between push and pop renumbers the song
+    // list; the handler drops stale requests instead of playing the
+    // wrong song.
+    uint16_t epoch = 0;
+    uint16_t _pad = 0;
 };
 
 class CommandQueue {

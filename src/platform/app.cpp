@@ -1491,8 +1491,9 @@ int run(const CliOptions& cli) {
                     for (int pi = 0; pi < content.player_count; ++pi) {
                         content.scores[size_t(pi)] = snap.game.scores[size_t(pi)];
                     }
-                    // Attract top-10: from the snapshot copy (the
-                    // table itself is sim-thread-mutated).
+                    // Attract top-10 from the snapshot copy — the
+                    // table itself mutates on the same (sim) thread
+                    // that fills the copy, never here.
                     content.high_score_count = std::min<uint32_t>(
                         snap.game.high_score_count, decltype(snap.game)::kHighScoreCap);
                     for (uint32_t i = 0; i < content.high_score_count; ++i) {

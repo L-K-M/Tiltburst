@@ -144,14 +144,19 @@ void BackglassLayout::build(const BackglassContent& content,
 
     // §9.2 D — message ticker: the BackglassModel message when present
     // (framework messages preempt script ones upstream of the model).
-    if (model.message_len > 0) {
+    // Clamp defensively at the layout boundary: a caller-supplied
+    // message_len past the buffer truncates, never reads past
+    // kMessageCap (cycle-15 review).
+    const uint32_t msg_len =
+        std::min(uint32_t(model.message_len), uint32_t(sizeof(model.message) - 1));
+    if (msg_len > 0) {
         const uint32_t style =
             uint32_t(model.message_style) < 4 ? uint32_t(model.message_style) : 0;
         quad(W * 0.5f, H - 40.0f, W * 0.5f - 16.0f, 20.0f, 0.10f, 0.11f, 0.16f, 1.0f, out);
         text(font,
              28.0f,
              H - 34.0f,
-             std::string(model.message, model.message_len),
+             std::string(model.message, msg_len),
              kMsgStyle[style][0],
              kMsgStyle[style][1],
              kMsgStyle[style][2],

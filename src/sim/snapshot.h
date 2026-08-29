@@ -39,11 +39,13 @@ struct SimSnapshot {
     uint16_t tilt_crossings = 0;          // per-ball crossing count
     uint8_t tilt_armed = 0x7;             // warn|hard|abuse arm bits
 
-    // Game-layer state for the backglass (07 §8: "produced by the game
-    // layer on the main thread from the latest SimSnapshot — the same
-    // snapshot read the playfield frame used; no extra sim access").
-    // The sim thread fills this from the GameMachine/ScriptHost each
-    // tick; the render loop NEVER reads those live objects.
+    // Game-layer state for the backglass. OWNERSHIP (11 §1): the
+    // GameMachine and ScriptHost run ON THE SIM THREAD in this
+    // codebase (step() is the solver's phase-3 hook), so the fill in
+    // tick_fn executes on the owning thread — no cross-thread access
+    // to live game objects anywhere. The RENDER loop reads only this
+    // published copy (07 §8: "no extra sim access" — the same snapshot
+    // the playfield frame used).
     struct Game {
         static constexpr int kMaxPlayers = 4;
         int player_count = 1;

@@ -20,7 +20,10 @@ struct DisplayInfo {
                              // 0 for synthetic/test entries
 };
 
-// min(w,h)/max(w,h) in (0,1]; 1.0 = square (07 §1).
+// min(w,h)/max(w,h) in (0,1]; 1.0 = square (07 §1). Degenerate sizes
+// (w<=0 or h<=0, e.g. entries kept without a desktop mode) -> 0.0f —
+// never NaN — so "0x0 scores last" holds by contract, not by IEEE
+// comparison accident.
 float squareness(const DisplayInfo& d);
 
 // displays.json role blocks (07 §5).

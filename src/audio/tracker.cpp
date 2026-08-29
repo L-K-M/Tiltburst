@@ -295,8 +295,11 @@ float TrackerPlayer::channel_sample(Channel& ch) {
         if (ch.old_phase >= 1.0) {
             ch.old_phase -= 1.0;
         }
+        // The envelope model applies to noise exactly as to tonal
+        // waves (the main path multiplies env in identically), so the
+        // fade uses the captured level for every wave.
         out += osc(*ch.old_instr, ch.old_phase, ch.noise_val) * g * ch.old_vol_gain *
-               ch.old_instr->gain * (ch.old_instr->wave == Wave::Noise ? 1.0f : ch.old_gain);
+               ch.old_instr->gain * ch.old_gain;
         ++ch.fade_pos;
     }
     if (!ch.sounding || ch.env_off || ch.instr == nullptr) {
@@ -397,9 +400,16 @@ void TrackerPlayer::render(float* dst, const float* gains, uint32_t frames) {
                                 ch.arp_n = 0;
                                 ch.vib_active = false; // tail holds pitch
                                 if (ch.sounding && !ch.releasing) {
+                                    // Release from wherever the envelope
+                                    // stands — same rule as note-off
+                                    // (§8.1; a mid-attack channel must
+                                    // not jump to 1.0, cycle-14 review).
+                                    ch.release_start =
+                                        ch.attack_pos < ch.attack_len
+                                            ? float(ch.attack_pos) / float(ch.attack_len)
+                                            : 1.0f;
                                     ch.releasing = true;
                                     ch.release_pos = 0;
-                                    ch.release_start = 1.0f;
                                 }
                             }
                         }

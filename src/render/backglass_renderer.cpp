@@ -5,7 +5,6 @@
 
 #include <algorithm>
 #include <cstdio>
-#include <cstring>
 
 namespace tb::render {
 

@@ -1,5 +1,8 @@
 // Present fragment: sample the scene and apply the exact piecewise sRGB
 // encode (06-rendering.md §5, §12.5 without bloom/CRT until M13).
+// NOTE: the bloom+CRT composite (u_crt branch, bloom texture) lands in
+// the SAME commit as its present_pass.cpp plumbing — the shader and
+// the C++ must never diverge (blobs are compiled from this file).
 
 Texture2D scene : register(t0, space2);
 SamplerState samp : register(s0, space2);

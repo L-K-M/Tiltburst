@@ -505,6 +505,15 @@ std::vector<ArtPrim> expand_prefab(const std::string& prefab,
         const uint32_t color_b = param_color("color_b", "glow_white");
         // Upper bound too: 1e-7 cell → millions of columns. Cap at a
         // physically meaningful density (cell ≥ 0.5 mm, ≤ 200 cols).
+        // Fail-fast per field (the established loader pattern): w/h
+        // validated before the density check so the JSON pointer names
+        // the offending parameter.
+        if (!(w > 0.0f)) {
+            fail("checkerboard w must be > 0", pointer + "/params/w");
+        }
+        if (!(h > 0.0f)) {
+            fail("checkerboard h must be > 0", pointer + "/params/h");
+        }
         // The epsilon pad makes exactly w/cell == 200 pass (the
         // comparison stays >, not >= — a strict >= would reject
         // the exact-200 case the epsilon exists to protect).
@@ -538,8 +547,11 @@ std::vector<ArtPrim> expand_prefab(const std::string& prefab,
         // + glow with 15% fill — the standard shot arrow.
         const float len = float(param_f("len", 0.030));
         const float w = float(param_f("w", 0.014));
+        if (!(len > 0.0f) || !(w > 0.0f)) {
+            fail("neon_arrow len and w must be > 0", pointer + "/params");
+        }
         const uint32_t color = param_color("color", "primary");
-        const float gi = float(param_f("glow_intensity", 1.4));
+        const float gi = std::clamp(float(param_f("glow_intensity", 1.4)), 0.0f, 2.0f);
         const bool outline_only = params.value("outline_only", true);
         // 15%-alpha fill helper: art colors pack 0xRRGGBBAA (§3.2).
         const auto fill_15 = [color]() {

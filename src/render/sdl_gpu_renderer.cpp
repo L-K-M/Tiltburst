@@ -348,7 +348,9 @@ void SdlGpuRenderer::render_playfield(const RenderFrame& frame) {
                       scene_,
                       bloom_.bloom0(),
                       tex,
-                      bloom_.quality() == BloomChain::Quality::Off ? 0.0f : bloom_strength_,
+                      bloom_.quality() == BloomChain::Quality::Off || bloom_.bloom0() == nullptr
+                          ? 0.0f
+                          : bloom_strength_,
                       crt_,
                       scene_w_,
                       scene_h_);

@@ -229,17 +229,18 @@ void ArtRenderer::emit_prim(const ArtPrim& prim,
         inst.kind = kSdfArc;
         inst.cx = tx;
         inst.cy = ty;
-        // The SDF arc shader takes ABSOLUTE start/end; rot stays 0
-        // (cycle-1: the start angle was applied twice).
+        // The SDF arc takes absolute angles; the prim transform's
+        // rot_deg rotates the whole arc by shifting the range
+        // (cycle-2 — cycle-1's fix dropped the transform entirely).
         inst.rot = 0.0f;
+        const float rel = prim.transform.rot_deg * kPiF / 180.0f;
         const float r = prim.r * sc;
         const float pad = prim.glow.radius * sc;
         inst.hx = inst.hy = r + prim.thickness * 0.5f * sc + pad;
         inst.p0 = r;
         inst.p1 = prim.thickness * 0.5f * sc;
-        inst.p2 = prim.start_deg * kPiF / 180.0f;
-        inst.p3 = prim.end_deg * kPiF / 180.0f; // absolute; rot == 0 for
-                                                // unrotated arcs
+        inst.p2 = prim.start_deg * kPiF / 180.0f + rel;
+        inst.p3 = prim.end_deg * kPiF / 180.0f + rel;
         break;
     }
     case ArtPrim::Kind::Polyline: {

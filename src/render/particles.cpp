@@ -60,8 +60,7 @@ void ParticleSystem::set_palette(const uint32_t (&roles)[8]) {
     }
 }
 
-int ParticleSystem::spawn(Effect effect, float x, float y, const float* dir) {
-    (void)dir; // cone shapes read cone_dir from the Emitter row
+int ParticleSystem::spawn(Effect effect, float x, float y) {
     // §13.4 canonical rows (binding). Role indices follow palette order.
     const int PRIMARY = 2, SECONDARY = 3, ACCENT1 = 4, WARM = 6, BG1 = 1, GLOW = 7, ACCENT2 = 5;
     Emitter e;
@@ -84,10 +83,8 @@ int ParticleSystem::spawn(Effect effect, float x, float y, const float* dir) {
     case Effect::SlingFlash:
         e.burst = 12;
         e.shape = 2;
-        if (dir != nullptr) {
-            e.cone_dir[0] = dir[0];
-            e.cone_dir[1] = dir[1];
-        }
+        e.cone_dir[0] = 0.0f;
+        e.cone_dir[1] = 1.0f; // up-table default (M13b orients per event)
         e.cone_spread_deg = 60.0f;
         e.speed_min = 1.0f;
         e.speed_max = 2.0f;

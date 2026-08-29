@@ -472,7 +472,7 @@ std::vector<ArtPrim> expand_prefab(const std::string& prefab,
             seg.a[1] = y;
             seg.b[0] = w * 0.5f;
             seg.b[1] = y;
-            const float fade = float(i) / float(lines - 1) * 0.6f; // 1.0 → 0.4
+            const float fade = (lines > 1 ? float(i) / float(lines - 1) : 0.0f) * 0.6f; // 1.0 → 0.4
             const uint32_t c =
                 (color & 0xFFFFFF00u) | uint32_t(float(color & 0xFFu) * (1.0f - fade));
             seg.stroke = {0.0012f, c};

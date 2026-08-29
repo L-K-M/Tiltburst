@@ -133,7 +133,7 @@ int resolve_match(const std::string& match,
         // end == start rejects a no-conversion result ("index:")
         // unconditionally — not by the empty-digits check's ordering.
         if (errno == ERANGE || end == nullptr || end == digits.c_str() || *end != '\0' || v < 0 ||
-            v > long long(std::numeric_limits<int>::max())) {
+            v > static_cast<long long>(std::numeric_limits<int>::max())) {
             return -1;
         }
         const int n = int(v);

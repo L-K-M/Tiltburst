@@ -444,9 +444,10 @@ TEST(SegmentDigits, DigitMasksAndGhosting) {
     EXPECT_EQ(render::SegmentDigits::kDigitMask('A'), 0x0000); // fallback
 
     std::vector<render::QuadInstance> quads;
-    // Lit 8: 14 segments.
+    // Lit 8: mask 0x00FF = A..G2 = 8 segments (the diagonals H-M are
+    // unused by digits).
     render::SegmentDigits::emit('8', 0, 0, 64, 96, true, 1, 0.2f, 0.5f, &quads);
-    EXPECT_EQ(quads.size(), 14u);
+    EXPECT_EQ(quads.size(), 8u);
     // All at full brightness.
     for (const auto& q : quads) {
         EXPECT_FLOAT_EQ(q.a, 1.0f);
@@ -454,7 +455,7 @@ TEST(SegmentDigits, DigitMasksAndGhosting) {
     // Ghost: 6%.
     quads.clear();
     render::SegmentDigits::emit('8', 0, 0, 64, 96, false, 1, 0.2f, 0.5f, &quads);
-    EXPECT_EQ(quads.size(), 14u);
+    EXPECT_EQ(quads.size(), 8u);
     for (const auto& q : quads) {
         EXPECT_NEAR(q.a, 0.06f, 1e-5f);
     }

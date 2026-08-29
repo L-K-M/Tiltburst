@@ -62,6 +62,17 @@ struct SimSnapshot {
         int message_style = 0;
         uint32_t message_len = 0;
         char message[kMessageCap + 1] = {};
+
+        // Attract high-score top 10 (11 §7). The table itself is
+        // mutated on the sim thread (insert at game end); the render
+        // thread reads only this copy (cycle-27 review).
+        static constexpr uint32_t kHighScoreCap = 10;
+        uint32_t high_score_count = 0;
+
+        struct HighScoreRow {
+            char initials[4] = {0, 0, 0, 0};
+            uint64_t score = 0;
+        } high_scores[kHighScoreCap];
     } game{};
 };
 

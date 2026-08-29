@@ -1228,6 +1228,21 @@ int run(const CliOptions& cli) {
                 snap.game.game_state = uint8_t(game::GameState::Attract);
                 snap.game.scores[0] = loaded_table->script.player_scores(1).score;
             }
+            {
+                // The high-score table mutates on THIS thread (insert
+                // at game end via the FSM); copy the top 10 here so
+                // the render loop never touches the live object
+                // (cycle-27 review).
+                snap.game.high_score_count = uint32_t(std::min<size_t>(
+                    high_scores.entries().size(), decltype(snap.game)::kHighScoreCap));
+                for (uint32_t i = 0; i < snap.game.high_score_count; ++i) {
+                    snap.game.high_scores[i].initials[0] = high_scores.entries()[i].initials[0];
+                    snap.game.high_scores[i].initials[1] = high_scores.entries()[i].initials[1];
+                    snap.game.high_scores[i].initials[2] = high_scores.entries()[i].initials[2];
+                    snap.game.high_scores[i].initials[3] = '\0';
+                    snap.game.high_scores[i].score = high_scores.entries()[i].score;
+                }
+            }
             if (loaded_table) {
                 const sim::BackglassModel& bm = loaded_table->script.backglass();
                 snap.game.layout = bm.layout;
@@ -1459,11 +1474,9 @@ int run(const CliOptions& cli) {
                 const uint64_t now_bg = tb_now_ns();
                 if (bg_pacer.should_attempt(now_bg)) {
                     bg_built.clear();
-                    // Everything below reads the SNAPSHOT plus the
-                    // main-thread-owned high-score table — no live
-                    // ScriptHost/GameMachine access on this thread (the
-                    // high_scores object is main-thread-only and only
-                    // mutated between games).
+                    // Everything below reads the SNAPSHOT — including
+                    // the attract top-10 — no live game objects on this
+                    // thread at all.
                     render::BackglassContent content;
                     content.in_attract = snap.game.player_count <= 0 ||
                                          snap.game.game_state == uint8_t(game::GameState::Attract);
@@ -1478,13 +1491,15 @@ int run(const CliOptions& cli) {
                     for (int pi = 0; pi < content.player_count; ++pi) {
                         content.scores[size_t(pi)] = snap.game.scores[size_t(pi)];
                     }
-                    for (uint32_t i = 0; i < high_scores.entries().size() && i < 10; ++i) {
-                        auto& row = content.high_scores[i];
-                        row.initials[0] = high_scores.entries()[i].initials[0];
-                        row.initials[1] = high_scores.entries()[i].initials[1];
-                        row.initials[2] = high_scores.entries()[i].initials[2];
-                        row.score = high_scores.entries()[i].score;
-                        ++content.high_score_count;
+                    // Attract top-10: from the snapshot copy (the
+                    // table itself is sim-thread-mutated).
+                    content.high_score_count = std::min<uint32_t>(
+                        snap.game.high_score_count, decltype(snap.game)::kHighScoreCap);
+                    for (uint32_t i = 0; i < content.high_score_count; ++i) {
+                        content.high_scores[i] = {{snap.game.high_scores[i].initials[0],
+                                                   snap.game.high_scores[i].initials[1],
+                                                   snap.game.high_scores[i].initials[2]},
+                                                  snap.game.high_scores[i].score};
                     }
                     sim::BackglassModel model; // rebuilt from the snapshot copy
                     model.layout = snap.game.layout;

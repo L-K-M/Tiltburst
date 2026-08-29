@@ -233,6 +233,7 @@ TEST(DisplayAssign, RefreshRateTiebreak) {
     const auto a = platform::detect(ds, {});
     EXPECT_EQ(a.playfield, 1); // equal area, higher Hz
     EXPECT_EQ(a.backglass, 2); // the NEC: squareness 0.80 beats 0.5625
+    EXPECT_EQ(a.pf_rotation, 90); // the NEC backglass: cabinet (0.80 >= 0.70)
 }
 
 // ---- name glob specifics ----

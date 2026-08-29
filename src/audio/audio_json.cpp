@@ -856,12 +856,12 @@ std::unique_ptr<PatchBank> build_bank(const TableAudio& audio,
     }
 
     // ---- duck triggers (§10): the fixed patch-name list. ----
-    static const char* const kDuckTriggers[] = {
-        "jackpot_hit", "multiball_riser", "extra_ball_fanfare", "tilt_alarm", "drain_womp"};
+    static_assert(sizeof(kDuckTriggers) / sizeof(kDuckTriggers[0]) <= PatchBank::kDuckPatchCap,
+                  "the §10 trigger list outgrew the bank table");
     for (const char* name : kDuckTriggers) {
         const int id = bank->find(name);
-        if (id >= 0 && bank->duck_patch_n < PatchBank::kDuckPatchCap) {
-            bank->duck_patch[bank->duck_patch_n++] = uint16_t(id);
+        if (id >= 0) {
+            (void)bank->duck_patch_add(uint16_t(id)); // can't overflow: list <= cap
         }
     }
     return bank;

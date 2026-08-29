@@ -68,6 +68,17 @@ public:
     // build from the fixed trigger-name list (plus the per-event
     // duck=true flag, which never touches this table).
     static constexpr uint32_t kDuckPatchCap = 8;
+
+    // Bounds-checked append (the cap invariant lives where the array
+    // lives, not in builder loops). Returns false past the cap.
+    bool duck_patch_add(uint16_t id) {
+        if (duck_patch_n >= kDuckPatchCap) {
+            return false;
+        }
+        duck_patch[duck_patch_n++] = id;
+        return true;
+    }
+
     uint16_t duck_patch[kDuckPatchCap] = {};
     uint32_t duck_patch_n = 0;
 

@@ -855,6 +855,10 @@ int run(const CliOptions& cli) {
                         TB_LOG_WARN("main", "displays.json write failed");
                         std::error_code rm_ec;
                         std::filesystem::remove(tmp, rm_ec);
+                        if (rm_ec) {
+                            TB_LOG_WARN(
+                                "main", "displays.json tmp cleanup failed: {}", rm_ec.message());
+                        }
                     }
                 }
                 // T13: single landscape display without a square

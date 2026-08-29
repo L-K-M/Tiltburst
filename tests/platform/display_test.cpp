@@ -509,9 +509,12 @@ TEST(DisplayAssign, SingleDisplayExplicitBackglassDegrades) {
     platform::DisplaysConfig cfg;
     cfg.backglass.match = "index:0";
     const auto a = platform::detect(ds, cfg);
-    // The same-display drop in step 1 resolves the collision.
+    // The post-heuristic collision resolves: playfield keeps the only
+    // display, the backglass drops WITH the warning.
     EXPECT_EQ(a.backglass, -1);
     EXPECT_EQ(a.playfield, 0);
+    ASSERT_EQ(a.warnings.size(), 1u);
+    EXPECT_NE(a.warnings[0].find("same display"), std::string::npos);
 }
 
 } // namespace

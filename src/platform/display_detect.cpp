@@ -332,8 +332,9 @@ Assignment detect(const std::vector<DisplayInfo>& displays, const DisplaysConfig
 
     // Post-heuristic collision: the heuristic playfield can land on
     // the explicitly matched backglass (single-display degradation);
-    // the playfield wins and the backglass drops — same resolution as
-    // the step-1 explicit-explicit collision.
+    // the playfield wins and the backglass drops — the same resolution
+    // the explicit-explicit check applies in step 1, re-run here
+    // because pf is only known AFTER the heuristic.
     if (pf != -1 && pf == bg) {
         a.warnings.push_back("playfield and backglass match the same display; backglass dropped");
         bg = -1;

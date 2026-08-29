@@ -1210,6 +1210,9 @@ int run(const CliOptions& cli) {
             // only the published snapshot, never the live objects
             // (cycle-5 review: the old direct reads were a data race).
             if (machine != nullptr) {
+                // machine exists only when loaded_table && script_loaded
+                // (its construction site ~line 1060); the deref below is
+                // invariant-safe.
                 snap.game.player_count =
                     std::clamp(machine->player_count(), 1, decltype(snap.game)::kMaxPlayers);
                 snap.game.current_player =
@@ -1456,18 +1459,24 @@ int run(const CliOptions& cli) {
                 const uint64_t now_bg = tb_now_ns();
                 if (bg_pacer.should_attempt(now_bg)) {
                     bg_built.clear();
-                    // Everything below reads the SNAPSHOT — the same
-                    // record the playfield frame used (07 §8); no live
-                    // ScriptHost/GameMachine access on this thread.
+                    // Everything below reads the SNAPSHOT plus the
+                    // main-thread-owned high-score table — no live
+                    // ScriptHost/GameMachine access on this thread (the
+                    // high_scores object is main-thread-only and only
+                    // mutated between games).
                     render::BackglassContent content;
-                    content.in_attract =
-                        snap.game.game_state == uint8_t(game::GameState::Attract) ||
-                        snap.game.player_count <= 0;
-                    content.player_count = std::max(1, snap.game.player_count);
-                    content.current_player = snap.game.current_player;
+                    content.in_attract = snap.game.player_count <= 0 ||
+                                         snap.game.game_state == uint8_t(game::GameState::Attract);
+                    // Both bounds: >4 would write past content.scores,
+                    // and the publisher-side clamp is a convention, not
+                    // a type guarantee (cycle-26 review).
+                    content.player_count =
+                        std::clamp(snap.game.player_count, 1, decltype(snap.game)::kMaxPlayers);
+                    content.current_player =
+                        std::clamp(snap.game.current_player, 1, content.player_count);
                     content.ball_number = snap.game.ball_number;
                     for (int pi = 0; pi < content.player_count; ++pi) {
-                        content.scores[size_t(pi)] = snap.game.scores[size_t(std::min(pi, 3))];
+                        content.scores[size_t(pi)] = snap.game.scores[size_t(pi)];
                     }
                     for (uint32_t i = 0; i < high_scores.entries().size() && i < 10; ++i) {
                         auto& row = content.high_scores[i];
@@ -1481,10 +1490,11 @@ int run(const CliOptions& cli) {
                     model.layout = snap.game.layout;
                     model.focus_player = snap.game.focus_player;
                     model.message_style = snap.game.message_style;
-                    model.message_len = snap.game.message_len;
-                    std::memcpy(model.message,
-                                snap.game.message,
-                                std::min(size_t(snap.game.message_len), sizeof(model.message)));
+                    const uint32_t msg_len = uint32_t(
+                        std::min(size_t(snap.game.message_len), sizeof(model.message) - 1));
+                    model.message_len = msg_len;
+                    std::memcpy(model.message, snap.game.message, msg_len);
+                    model.message[msg_len] = '\0';
                     bg_layout.build(content, model, bg_font, &bg_built);
                     render::BackglassFrame bframe;
                     bframe.quads = bg_built.data();

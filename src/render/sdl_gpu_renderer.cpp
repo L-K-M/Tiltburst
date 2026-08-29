@@ -267,6 +267,15 @@ void SdlGpuRenderer::draw_scene(SDL_GPUCommandBuffer* cmd,
     SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(cmd, &tgt, 1, nullptr);
 
     debug_instances_.clear();
+
+    // M13a art: below-ball instances first (layers z < 100).
+    if (frame.art != nullptr && frame.art->below_count > 0) {
+        const SdfInstance* below = static_cast<const SdfInstance*>(frame.art->below);
+        for (uint32_t i = 0; i < frame.art->below_count; ++i) {
+            sdf_.push(below[i]);
+        }
+    }
+
     if (frame.show_colliders && frame.debug_colliders != nullptr) {
         for (uint32_t i = 0; i < frame.debug_collider_count; ++i) {
             collider_instances(frame.debug_colliders[i], view_.ppm, debug_instances_);
@@ -275,6 +284,16 @@ void SdlGpuRenderer::draw_scene(SDL_GPUCommandBuffer* cmd,
     if (frame.snapshot != nullptr) {
         ball_instances(*frame.snapshot, debug_instances_);
     }
+
+    // Above-ball art (layers z >= 100: ramps, wireforms) draws after
+    // the ball so the chrome ball reads through.
+    if (frame.art != nullptr && frame.art->above_count > 0) {
+        const SdfInstance* above = static_cast<const SdfInstance*>(frame.art->above);
+        for (uint32_t i = 0; i < frame.art->above_count; ++i) {
+            sdf_.push(above[i]);
+        }
+    }
+
     sdf_.upload_and_draw(pass);
 
     if (frame.quad_count > 0) {

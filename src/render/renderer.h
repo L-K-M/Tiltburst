@@ -60,12 +60,27 @@ struct BackglassFrame {
 
 // Per-frame description (06 §2). M3 adds the F2 debug-draw inputs; TBArt,
 // text runs, particles, and flash overlay arrive at M13.
+
+// Art draw lists (built by ArtRenderer::build each frame).
+struct ArtInstances {
+    const void* below = nullptr; // SdfInstance array (typed via
+    const void* above = nullptr; // the sdf_batch header)
+    uint32_t below_count = 0;
+    uint32_t above_count = 0;
+};
+
 struct RenderFrame {
     const SimSnapshot* snapshot = nullptr;
     float wall_dt = 0.0f;
     const QuadInstance* quads = nullptr;
     uint32_t quad_count = 0;
     bool show_overlay = true;
+
+    // M13a art: the built below/above-ball instance lists + live
+    // light rows the light_index refers to (06 §14.3).
+    const struct ArtInstances* art = nullptr;
+    const sim::LightState* lights = nullptr;
+    uint32_t light_count = 0;
 
     // F2 debug draw (06 §16.1): colliders from the current table scene.
     const sim::Collider* debug_colliders = nullptr;

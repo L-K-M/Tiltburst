@@ -274,7 +274,9 @@ TEST(Tracker, RowTimingWithin1ms) {
         if (prev < 1e-4f && e >= 1e-4f) {
             if (onsets < 8) {
                 const double expect = double(onsets) * 2.0 * row_samples;
-                EXPECT_NEAR(double(i), expect, 48.0) << "onset " << onsets;
+                // The ±1 ms gate (§M14 test spec) in samples.
+                const double one_ms = double(audio::kTrackerRate) / 1000.0;
+                EXPECT_NEAR(double(i), expect, one_ms) << "onset " << onsets;
             }
             ++onsets;
         }

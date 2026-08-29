@@ -150,6 +150,18 @@ TEST(TbArt, UnknownPrimitiveIsLoadError) {
     std::filesystem::remove_all(dir, ec);
 }
 
+TEST(TbArt, MissingLayersThrowsArtError) {
+    std::filesystem::path dir =
+        std::filesystem::temp_directory_path() / ("tb_art_nol_" + std::to_string(tb_now_ns()));
+    std::filesystem::create_directories(dir);
+    { std::ofstream(dir / "art.json") << R"json({ "palette": "sunset-synth" })json"; }
+    EXPECT_THROW(render::load_art(dir, {}), render::ArtError);
+    { std::ofstream(dir / "art.json") << R"json({ "palette": "x", "layers": [5] })json"; }
+    EXPECT_THROW(render::load_art(dir, {}), render::ArtError);
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
 TEST(TbArt, MissingFileIsNotLoadedNotError) {
     std::filesystem::path dir =
         std::filesystem::temp_directory_path() / ("tb_art_missing_" + std::to_string(tb_now_ns()));

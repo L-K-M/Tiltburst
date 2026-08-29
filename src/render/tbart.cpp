@@ -751,11 +751,19 @@ ArtLoadResult load_art(const std::filesystem::path& dir,
         light_ids.emplace(id, idx);
     }
 
-    const json& layers = doc.at("layers");
-    if (!layers.is_array() || layers.empty() || layers.size() > 32) {
+    // find() not at(): a missing key must route through fail()
+    // (ArtError with a pointer), never a raw json exception
+    // (cycle-10 review).
+    const auto layers_it = doc.find("layers");
+    if (layers_it == doc.end() || !layers_it->is_array() || layers_it->empty() ||
+        layers_it->size() > 32) {
         fail("layers must be 1-32 entries", "/layers");
     }
+    const json& layers = *layers_it;
     for (const json& lj : layers) {
+        if (!lj.is_object()) {
+            fail("layer must be an object", "/layers");
+        }
         ArtLayer layer;
         layer.name = lj.value("name", std::string());
         layer.z = int(lj.value("z", 0));

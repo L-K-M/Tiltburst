@@ -547,8 +547,11 @@ std::vector<ArtPrim> expand_prefab(const std::string& prefab,
         // + glow with 15% fill — the standard shot arrow.
         const float len = float(param_f("len", 0.030));
         const float w = float(param_f("w", 0.014));
-        if (!(len > 0.0f) || !(w > 0.0f)) {
-            fail("neon_arrow len and w must be > 0", pointer + "/params");
+        if (!(len > 0.0f)) {
+            fail("neon_arrow len must be > 0", pointer + "/params/len");
+        }
+        if (!(w > 0.0f)) {
+            fail("neon_arrow w must be > 0", pointer + "/params/w");
         }
         const uint32_t color = param_color("color", "primary");
         const float gi = std::clamp(float(param_f("glow_intensity", 1.4)), 0.0f, 2.0f);

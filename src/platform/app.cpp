@@ -327,6 +327,109 @@ CliOptions parse_cli(int argc, char** argv) {
     return cli;
 }
 
+namespace {
+
+// §8.2 rules-card cache (backglass attract page): static table data,
+// parsed once per loaded content. Keyed on (pointer, content): F5
+// reload mutates def IN PLACE (same object), so a pointer alone would
+// serve a stale card.
+struct RulesCardCache {
+    const LoadedTable* table = nullptr;
+    std::string key;
+    std::vector<std::string> lines;
+};
+
+// One backglass attempt (~30 Hz pacer, 07 §8). Extracted from run()'s
+// frame loop: MSVC inlined the entire loop into one gigantic run()
+// body whose stack frame overflowed (0xC00000FD, M14 PR-17 cycles
+// 22-24) — the function boundary restores sane frames AND states the
+// block's contract in one place: everything reads the SNAPSHOT, never
+// a live game object.
+void render_backglass_frame(bool have_window,
+                            const SimSnapshot& snap,
+                            const LoadedTable* table,
+                            RulesCardCache& card_cache,
+                            const render::BackglassLayout& layout,
+                            const render::Overlay& font,
+                            platform::BackglassPacer& pacer,
+                            std::vector<render::QuadInstance>& built,
+                            render::IRenderer& renderer) {
+    if (!have_window) {
+        return;
+    }
+    const uint64_t now_bg = tb_now_ns();
+    if (!pacer.should_attempt(now_bg)) {
+        return;
+    }
+    built.clear();
+    render::BackglassContent content;
+    content.in_attract =
+        snap.game.player_count <= 0 || snap.game.game_state == uint8_t(game::GameState::Attract);
+    // Attract page machine (§8.2) + the static table data the pages
+    // show (logo name, rules card).
+    content.attract_page = int(snap.game.attract_page);
+    content.attract_page_time_s = snap.game.attract_page_time_s;
+    if (table != nullptr) {
+        content.table_name = table->def.name;
+        if (card_cache.table != table || card_cache.key != table->def.rules_card) {
+            card_cache.table = table;
+            card_cache.key = table->def.rules_card;
+            card_cache.lines.clear();
+            std::istringstream card(table->def.rules_card);
+            std::string line;
+            while (std::getline(card, line)) {
+                if (!line.empty() && line.back() == '\r') {
+                    line.pop_back();
+                }
+                card_cache.lines.push_back(line);
+                if (card_cache.lines.size() >= 8) {
+                    break; // card cap; more is M15 polish
+                }
+            }
+        }
+        content.rules_lines = card_cache.lines;
+    }
+    // Both bounds: >4 would write past content.scores, and the
+    // publisher-side clamp is a convention, not a type guarantee
+    // (cycle-26 review).
+    content.player_count = std::clamp(snap.game.player_count, 1, decltype(snap.game)::kMaxPlayers);
+    content.current_player = std::clamp(snap.game.current_player, 1, content.player_count);
+    content.ball_number = snap.game.ball_number;
+    for (int pi = 0; pi < content.player_count; ++pi) {
+        content.scores[size_t(pi)] = snap.game.scores[size_t(pi)];
+    }
+    // Attract top-10 from the snapshot copy — the table mutates on the
+    // sim thread that fills this copy, never here.
+    content.high_score_count =
+        std::min<uint32_t>(snap.game.high_score_count, decltype(snap.game)::kHighScoreCap);
+    for (uint32_t i = 0; i < content.high_score_count; ++i) {
+        content.high_scores[i] = {{snap.game.high_scores[i].initials[0],
+                                   snap.game.high_scores[i].initials[1],
+                                   snap.game.high_scores[i].initials[2]},
+                                  snap.game.high_scores[i].score};
+    }
+    sim::BackglassModel model; // rebuilt from the snapshot copy
+    model.layout = snap.game.layout;
+    model.focus_player = snap.game.focus_player;
+    model.message_style = snap.game.message_style;
+    const uint32_t msg_len =
+        uint32_t(std::min(size_t(snap.game.message_len), sizeof(model.message) - 1));
+    model.message_len = msg_len;
+    std::memcpy(model.message, snap.game.message, msg_len);
+    model.message[msg_len] = '\0';
+    layout.build(content, model, font, &built);
+    render::BackglassFrame bframe;
+    bframe.quads = built.data();
+    bframe.quad_count = uint32_t(built.size());
+    if (renderer.render_backglass(bframe)) {
+        pacer.report_drawn(now_bg);
+    } else {
+        pacer.report_skipped();
+    }
+}
+
+} // namespace
+
 int run(const CliOptions& cli) {
     // §1 step 2: logger with the in-memory ring only.
     log::init(cli.dev ? LogLevel::Debug : LogLevel::Info);
@@ -931,16 +1034,10 @@ int run(const CliOptions& cli) {
 
         // Backglass content pipeline: layout + ~30 Hz pacer (07 §8).
         render::BackglassLayout bg_layout;
-        // §8.2 rules-card cache (backglass attract page): static table
-        // data parsed once per loaded content — a run()-scope struct,
-        // NOT function-local statics (the statics inside the frame
-        // loop's nested scope overflowed the stack in MSVC's smoke
-        // build; cycle-23 bisect).
-        struct RulesCardCache {
-            const LoadedTable* table = nullptr;
-            std::string key;
-            std::vector<std::string> lines;
-        } card_cache;
+        // §8.2 rules-card cache: parsed once per loaded content; see
+        // render_backglass_frame (the statics version overflowed the
+        // MSVC smoke build's stack; cycle-23 bisect).
+        RulesCardCache card_cache;
         // Invariant: Overlay's glyph emission is stateless
         // (stb_easy_font prints from baked metrics — no init()); if
         // that ever changes, backglass text silently renders nothing
@@ -1641,91 +1738,16 @@ int run(const CliOptions& cli) {
             // Backglass at ~30 Hz, non-blocking (07 §8): the attempt
             // cadence is deadline-driven; a skipped acquire retries
             // next playfield frame without advancing the deadline.
-            if (backglass_window) {
-                const uint64_t now_bg = tb_now_ns();
-                if (bg_pacer.should_attempt(now_bg)) {
-                    bg_built.clear();
-                    // Everything below reads the SNAPSHOT — including
-                    // the attract top-10 — no live game objects on this
-                    // thread at all.
-                    render::BackglassContent content;
-                    content.in_attract = snap.game.player_count <= 0 ||
-                                         snap.game.game_state == uint8_t(game::GameState::Attract);
-                    // Attract page machine (§8.2) + the static table
-                    // data the pages show (logo name, rules card).
-                    content.attract_page = int(snap.game.attract_page);
-                    content.attract_page_time_s = snap.game.attract_page_time_s;
-                    if (loaded_table != nullptr) {
-                        content.table_name = loaded_table->def.name;
-                        // §8.2 rules card: meta.rules_card lines —
-                        // STATIC per table, parsed once per loaded
-                        // object (keyed on pointer + content: F5 reload
-                        // reuses freed addresses, so the pointer alone
-                        // can serve a stale card).
-                        // Keyed on pointer + content: F5 reload
-                        // mutates def IN PLACE (same object), so the
-                        // pointer alone would serve a stale card.
-                        if (card_cache.table != loaded_table.get() ||
-                            card_cache.key != loaded_table->def.rules_card) {
-                            card_cache.table = loaded_table.get();
-                            card_cache.key = loaded_table->def.rules_card;
-                            card_cache.lines.clear();
-                            std::istringstream card(loaded_table->def.rules_card);
-                            std::string line;
-                            while (std::getline(card, line)) {
-                                if (!line.empty() && line.back() == '\r') {
-                                    line.pop_back();
-                                }
-                                card_cache.lines.push_back(line);
-                                if (card_cache.lines.size() >= 8) {
-                                    break; // card cap; more is M15 polish
-                                }
-                            }
-                        }
-                        content.rules_lines = card_cache.lines;
-                    }
-                    // Both bounds: >4 would write past content.scores,
-                    // and the publisher-side clamp is a convention, not
-                    // a type guarantee (cycle-26 review).
-                    content.player_count =
-                        std::clamp(snap.game.player_count, 1, decltype(snap.game)::kMaxPlayers);
-                    content.current_player =
-                        std::clamp(snap.game.current_player, 1, content.player_count);
-                    content.ball_number = snap.game.ball_number;
-                    for (int pi = 0; pi < content.player_count; ++pi) {
-                        content.scores[size_t(pi)] = snap.game.scores[size_t(pi)];
-                    }
-                    // Attract top-10 from the snapshot copy — the
-                    // table itself mutates on the same (sim) thread
-                    // that fills the copy, never here.
-                    content.high_score_count = std::min<uint32_t>(
-                        snap.game.high_score_count, decltype(snap.game)::kHighScoreCap);
-                    for (uint32_t i = 0; i < content.high_score_count; ++i) {
-                        content.high_scores[i] = {{snap.game.high_scores[i].initials[0],
-                                                   snap.game.high_scores[i].initials[1],
-                                                   snap.game.high_scores[i].initials[2]},
-                                                  snap.game.high_scores[i].score};
-                    }
-                    sim::BackglassModel model; // rebuilt from the snapshot copy
-                    model.layout = snap.game.layout;
-                    model.focus_player = snap.game.focus_player;
-                    model.message_style = snap.game.message_style;
-                    const uint32_t msg_len = uint32_t(
-                        std::min(size_t(snap.game.message_len), sizeof(model.message) - 1));
-                    model.message_len = msg_len;
-                    std::memcpy(model.message, snap.game.message, msg_len);
-                    model.message[msg_len] = '\0';
-                    bg_layout.build(content, model, bg_font, &bg_built);
-                    render::BackglassFrame bframe;
-                    bframe.quads = bg_built.data();
-                    bframe.quad_count = uint32_t(bg_built.size());
-                    if (renderer->render_backglass(bframe)) {
-                        bg_pacer.report_drawn(now_bg);
-                    } else {
-                        bg_pacer.report_skipped();
-                    }
-                }
-            }
+            // Extracted: see render_backglass_frame above.
+            render_backglass_frame(backglass_window != nullptr,
+                                   snap,
+                                   loaded_table.get(),
+                                   card_cache,
+                                   bg_layout,
+                                   bg_font,
+                                   bg_pacer,
+                                   bg_built,
+                                   *renderer);
 
             // §14.1 stages 4–5 on the record matching the rendered snapshot.
             input.ring.complete_main(snap.tick, frame_start_ns, tb_now_ns());

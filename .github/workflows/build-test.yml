@@ -130,6 +130,12 @@ jobs:
           Write-Host "smoke exit code (NTSTATUS if negative): $($p2.ExitCode)"
           Write-Host "stderr:"
           if (Test-Path "$smokeDir/stderr.txt") { Get-Content "$smokeDir/stderr.txt" | Select-Object -First 20 }
+          $cdb = "C:/Program Files (x86)/Windows Kits/10/Debuggers/x64/cdb.exe"
+          if (Test-Path $cdb) {
+            Write-Host "cdb stack capture:"
+            & $cdb -g -G -c "g; ~* k 20; q" -logo "$smokeDir/cdb.txt" $bin --render-smoke --frames 120 --screenshot-dir $smokeDir | Out-Null
+            Get-Content "$smokeDir/cdb.txt" | Select-String -Pattern 'tiltburst|STACK|c00000fd|!analyze' -Context 0,18 | Select-Object -First 40
+          } else { Write-Host "cdb not found" }
 
       - name: Renderer smoke (exit 2 = logged skip, see 16-testing-ci.md §5)
         shell: bash

@@ -115,13 +115,9 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $bin = (Get-ChildItem -Recurse -Filter tiltburst.exe build |
-                  Select-Object -First 1).FullName
+          $bin = (Get-ChildItem -Recurse -Filter tiltburst.exe build | Select-Object -First 1).FullName
           Write-Host "exe: $bin"
-          $dumpbin = (Get-ChildItem "C:/Program Files/Microsoft Visual Studio" -Recurse -
-                      Filter dumpbin.exe -ErrorAction SilentlyContinue |
-                      Where-Object { $_.FullName -match 'Hostx64\\x64' } |
-                      Select-Object -First 1).FullName
+          $dumpbin = (Get-ChildItem "C:/Program Files/Microsoft Visual Studio" -Recurse -Filter dumpbin.exe -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match 'Hostx64\\x64' } | Select-Object -First 1).FullName
           if ($dumpbin) { & $dumpbin /DEPENDENTS $bin | Select-String -Pattern '\.dll' }
           else { Write-Host "dumpbin not found" }
           Write-Host "deployed DLLs:"

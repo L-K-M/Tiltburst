@@ -681,6 +681,57 @@ corrections are new entries. Format: 03-process.md §3.1.
   (the M14 attract pages are text/layout; the painted backglass art
   card remains) — tracked under M16/M17 table polish.
 
+## M15 — Validator, autoplay harness & screenshot tool (2026-08-30, in flight)
+
+- tb_validate LANDED (src/table/validator.*): 09 §8 catalog coverage
+  beyond the loader's own checks — spatial V003 (dual-fill watertight:
+  exterior ∩ plunger-reached = leak; the rounded corners' notches are
+  outside the boundary but inside the rect, so a rect test leaks every
+  table), V004 (true extents: flipper swept-arc bbox, gate span/2,
+  1 mm boundary-touch tolerance — the orbit gates and plunger lane
+  touch the boundary BY CONSTRUCTION), V005, V006 (clearance ridge
+  cells per §8.1; chains > 20 mm), V007 (plunger fill seeded from the
+  nearest passable cell — the resting ball hugs the lane's bottom cap
+  so the pos cell itself is impassable; regions touching a flipper's
+  swept volume are excluded: a static fill cannot model a moving bat
+  opening a lane; flipper-area check reads the cell between the two
+  lowest TIPS, not the pivots), V012/V013 (centers >= max(width)+2mm,
+  NOT both widths summed), V014 (state_open sensor gates skipped per
+  §5.2), V015/V016/V024/V025, V027/V029 (metric-path grammar against
+  the §8.2 report schema)/V030/V031, and the authoring lints V032-V035,
+  V037-V039 (gates are NOT scoring elements; art loads via load_art,
+  audio via load_audio_json+build_bank; V039 rides play_music strings).
+  Both shipped tables validate CLEAN under --strict; the lints found
+  genuinely unwired neon-drift lane rollovers/lights (now scored and
+  driven in rules.lua, with literal ids the lint can see).
+- Catalog still open (mechanical transcription, next session): V020
+  (recommended bands need the 09 §4 tables), V026 (unknown keys needs
+  per-type key sets), V036 (ball-path contrast).
+- tb_autoplay SKELETON LANDED (tb_autoplay_main.cpp): full CLI, skill
+  profiles, both session shapes (balls3 with the game stack;
+  seconds300 with script-only + the solver's auto-serve), the §8.2
+  report schema (game-scoped fields null in seconds300), tape replay
+  + golden recording (state_hash every 1000 ticks), --check-bounds
+  with skill/shape applicability, mode/wizard/multiball detection via
+  the §9 music seam, stuck detection + respawn.
+- **BLOCKER FOUND (next session starts here)**: the first real lane
+  traversal in the project's history wedges the ball. Repro:
+  `tb_autoplay tables/test-lab --skill 0 --seconds 60 --seed 7` —
+  the scripted plunge (charge ~1 s → release) launches the ball up
+  the lane, and by t+100 ms the ball sits EMBEDDED in the right
+  boundary at (0.51, 0.28), stationary forever (stuck detection
+  kills + respawns it; the cycle repeats). The framework tests never
+  exercise a real plunge — game_framework_test's launch_ball()
+  TELEPORTS balls out of the lane, so this contact-resolution path
+  (fast ball riding the lane's right wall into the drain-guide
+  corner region) has never run. Likely a sim resting-contact/tunneling
+  issue at the right_drain_guide top node (0.48, 0.27) / boundary
+  junction, or the launch speed mapping. Autoplay.Skill0KeepsBallAlive
+  and the CI smoke gate on this being fixed.
+- tb_screenshot: not started. TB_TOOLS_READY still OFF (flips with
+  working autoplay). Tests (Validate.*, fixture packs, Autoplay.*,
+  Screenshot.*, Tools.*): not started.
+
 ## M14 — Music tracker & attract mode (2026-08-29, in flight)
 
 - Tracker core (src/audio/tracker.*): 4 monophonic channels

@@ -14,6 +14,7 @@ local CONFIG = {
   SCORE_NOSE       = 5000,    -- per N-O-S standup hit
   SCORE_NOS_ALL    = 25000,   -- N-O-S word complete
   SCORE_DRIFT_SHOT = 5000 * 2, -- drift mode: doubled orbit value
+  SCORE_LANE       = 500,      -- inlane/outlane rollover
   DRIFT_MODE_MS    = 15000,   -- drift-corner mode duration (live play)
   SCOOP_DWELL_MS   = 1200,    -- pit scoop dwell before the eject
   SCOOP_EJECT_SPD  = 3.0,     -- scoop eject speed (element default)
@@ -108,13 +109,27 @@ tb.on("switch_hit", function(ev)
   elseif ev.id == "slings_left_sling" or ev.id == "slings_right_sling" then
     tb.score(CONFIG.SCORE_SLING)
 
+  elseif ev.id == "left_lanes_inlane_rollover"
+      or ev.id == "right_lanes_inlane_rollover" then
+    tb.score(CONFIG.SCORE_LANE)
+    tb.light_on(ev.id == "left_lanes_inlane_rollover"
+                and "left_lanes_inlane_light" or "right_lanes_inlane_light")
+
+  elseif ev.id == "left_lanes_outlane_rollover"
+      or ev.id == "right_lanes_outlane_rollover" then
+    tb.score(CONFIG.SCORE_LANE)
+    tb.light_blink(ev.id == "left_lanes_outlane_rollover"
+                   and "left_lanes_outlane_light" or "right_lanes_outlane_light",
+                   "slow_blink")
+
   elseif has_tag(ev, "nos") then
     -- Guard: a switch can land before the first ball_start initialized
     -- the per-player table (switch testing, attract play).
     tb.state.nos = tb.state.nos or { left = false, mid = false, right = false }
     tb.score(CONFIG.SCORE_NOSE)
     local key = (ev.id == "nos_left" and "left")
-        or (ev.id == "nos_mid" and "mid") or "right"
+        or (ev.id == "nos_mid" and "mid")
+        or (ev.id == "nos_right" and "right")
     if not tb.state.nos[key] then
       tb.state.nos[key] = true
       local all = tb.state.nos.left and tb.state.nos.mid and tb.state.nos.right

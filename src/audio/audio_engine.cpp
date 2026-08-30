@@ -533,7 +533,9 @@ uint16_t AudioSystem::debug_music_song(uint32_t slot) const {
 }
 
 uint64_t AudioSystem::debug_music_start_sample(uint32_t slot) const {
-    return slot < kMusicSlots ? impl_->slot_start[slot] : 0;
+    // UINT64_MAX for out-of-range: 0 is a VALID start (the very first
+    // play after init starts at stream sample 0).
+    return slot < kMusicSlots ? impl_->slot_start[slot] : UINT64_MAX;
 }
 
 // ---- device ----

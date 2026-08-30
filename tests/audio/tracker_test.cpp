@@ -498,11 +498,14 @@ TEST(Music, CrossfadeEqualPower) {
     audio::AudioConfig cfg;
     cfg.null_backend = true;
     ASSERT_TRUE(sys.init(cfg));
-    // Two gated tones an octave apart (A-4 vs A-3): same envelope and
-    // volume (so RMS levels compare 1:1) but incommensurate pitches —
-    // the two instances never sum phase-coherently, so the mid-fade
-    // level reflects the equal-power curve itself.
-    sys.publish_bank(tone_bank_notes({{"main", "A-4"}, {"mode", "A-3"}}, 120.0f));
+    // Two gated tones a minor third apart (A-4 vs C-4): same envelope
+    // and volume (RMS levels compare 1:1) and a frequency ratio of
+    // 2^(3/12) — genuinely incommensurate, so the two instances carry
+    // no fixed phase relationship: they add in POWER, and the mid-fade
+    // level reflects the equal-power curve itself. (An octave pair
+    // would be commensurate — a 2:1 ratio has a fixed phase relation;
+    // only the odd-harmonic structure of the 50% square saves it.)
+    sys.publish_bank(tone_bank_notes({{"main", "A-4"}, {"mode", "C-4"}}, 120.0f));
     std::vector<float> buf(512 * 2);
     sys.publish_tick(0);
     ASSERT_TRUE(sys.play_music("main"));
@@ -510,8 +513,8 @@ TEST(Music, CrossfadeEqualPower) {
         sys.render_offline(buf.data(), 512);
     }
     const float rms_a = stereo_rms(buf, 0, buf.size());
-    // Switch: 100 ms equal-power crossfade. Incoherent sources add in
-    // POWER: sqrt(0.707^2 + 0.707^2) = 1.0 at the midpoint.
+    // Switch: 100 ms equal-power crossfade. Incommensurate sources
+    // add in POWER: sqrt(0.707^2 + 0.707^2) = 1.0 at the midpoint.
     ASSERT_TRUE(sys.play_music("mode"));
     for (int i = 0; i < 5; ++i) { // ~53 ms: near the midpoint
         sys.render_offline(buf.data(), 512);

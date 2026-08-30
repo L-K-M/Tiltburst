@@ -268,13 +268,17 @@ bool load_audio_json(const std::filesystem::path& dir, TableAudio& out) {
         }
     }
     if (doc.contains("songs")) {
-        if (!doc.at("songs").is_object()) {
+        const json& sg = doc.at("songs");
+        if (!sg.is_object()) {
             fail("'songs' must be an object", "/songs");
         }
-        // Tracker music lands at M14 (04-milestones.md M11 scope out);
-        // the section is validated for shape and carried as a flag so
-        // the loader accepts complete §6 files today.
-        out.has_songs = true;
+        for (auto it = sg.begin(); it != sg.end(); ++it) {
+            if (it.key().empty()) {
+                fail("song id must be a non-empty string", "/songs");
+            }
+            out.songs.emplace_back(it.key(), *it);
+        }
+        out.has_songs = !out.songs.empty();
     }
     if (doc.contains("map")) {
         const json& mp = doc.at("map");
@@ -314,6 +318,454 @@ void insert_into_bank(PatchBank& bank,
     }
     bank.mutable_names().emplace(name, uint16_t(bank.mutable_entries().size()));
     bank.mutable_entries().push_back(std::move(entry));
+}
+
+// ---- tracker songs (§8.2/§8.3) ----
+
+namespace {
+
+const char* const kSongChannelNames[TrackerPattern::kChannels] = {
+    "pulse1", "pulse2", "wide", "noise"};
+
+// §8.1 wave legality per channel.
+bool wave_legal_for_channel(int ch, Wave w) {
+    switch (ch) {
+    case 0:
+    case 1:
+        return w == Wave::Square;
+    case 2:
+        return w == Wave::Saw || w == Wave::Triangle || w == Wave::Sine;
+    case 3:
+        return w == Wave::Noise;
+    default:
+        return false;
+    }
+}
+
+int hex_digit(char c) {
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    }
+    if (c >= 'a' && c <= 'f') {
+        return c - 'a' + 10;
+    }
+    if (c >= 'A' && c <= 'F') {
+        return c - 'A' + 10;
+    }
+    return -1;
+}
+
+// "C-4" / "A#4" / "---" / "OFF" -> the TrackerCell note encoding.
+uint8_t parse_note_token(const std::string& tok, const std::string& ptr) {
+    if (tok == "---") {
+        return 0;
+    }
+    if (tok == "OFF") {
+        return TrackerCell::kOff;
+    }
+    if (tok.size() != 3 || (tok[1] != '-' && tok[1] != '#')) {
+        fail("bad note token '" + tok + "' (want C-4, A#4, ---, OFF)", ptr);
+    }
+    // Semitone per letter (§8.2): C=0 D=2 E=4 F=5 G=7 A=9 B=11.
+    int sem = -1;
+    switch (tok[0]) {
+    case 'C':
+        sem = 0;
+        break;
+    case 'D':
+        sem = 2;
+        break;
+    case 'E':
+        sem = 4;
+        break;
+    case 'F':
+        sem = 5;
+        break;
+    case 'G':
+        sem = 7;
+        break;
+    case 'A':
+        sem = 9;
+        break;
+    case 'B':
+        sem = 11;
+        break;
+    default:
+        fail("bad note letter '" + tok + "'", ptr);
+    }
+    if (tok[1] == '#') {
+        ++sem;
+    }
+    const int oct = tok[2] - '0';
+    if (tok[2] < '0' || tok[2] > '8') {
+        fail("bad octave in '" + tok + "' (0-8)", ptr);
+    }
+    const int midi = (oct + 1) * 12 + sem;
+    if (midi < 12 || midi > 119) { // C-0 .. B-8 (§8.2)
+        fail("note '" + tok + "' out of the C-0..B-8 range", ptr);
+    }
+    return uint8_t(midi - 11); // 1..108
+}
+
+int parse_int_token(const std::string& tok, int lo, int hi, const std::string& ptr) {
+    int v = 0;
+    if (tok.empty()) {
+        fail("bad number '" + tok + "'", ptr);
+    }
+    for (char c : tok) {
+        if (c < '0' || c > '9') {
+            fail("bad number '" + tok + "'", ptr);
+        }
+        v = v * 10 + (c - '0');
+        if (v > hi) {
+            break; // clamp check below reports with the real value
+        }
+    }
+    if (v < lo || v > hi) {
+        fail("value '" + tok + "' out of " + std::to_string(lo) + "-" + std::to_string(hi), ptr);
+    }
+    return v;
+}
+
+// Parses the fx token (§8.3): A<hex>, S+n/S-n, V<d>,<s>.
+void parse_fx_token(const std::string& tok, TrackerCell& cell, const std::string& ptr) {
+    // +1 for the 'A' itself; longer tokens cannot fit the cell's arp.
+    if (tok.size() >= 2 && tok[0] == 'A' && tok.size() <= 1 + TrackerCell::kArpCap) {
+        cell.arp_n = uint8_t(tok.size() - 1);
+        for (size_t i = 1; i < tok.size(); ++i) {
+            const int d = hex_digit(tok[i]);
+            if (d < 0) {
+                fail("bad arp hex digit in '" + tok + "'", ptr);
+            }
+            cell.arp[i - 1] = uint8_t(d);
+        }
+        cell.fx = 1;
+        return;
+    }
+    if (tok.size() >= 3 && tok[0] == 'S' && (tok[1] == '+' || tok[1] == '-')) {
+        const int n = parse_int_token(tok.substr(2), 1, 12, ptr);
+        cell.slide = int8_t(tok[1] == '-' ? -n : n);
+        cell.fx = 2;
+        return;
+    }
+    if (tok.size() >= 4 && tok[0] == 'V') {
+        const size_t comma = tok.find(',');
+        if (comma == std::string::npos || comma < 2 || comma + 1 >= tok.size()) {
+            fail("bad vibrato '" + tok + "' (want V<d>,<s>)", ptr);
+        }
+        cell.vib_depth = uint8_t(parse_int_token(tok.substr(1, comma - 1), 0, 15, ptr));
+        cell.vib_speed = uint8_t(parse_int_token(tok.substr(comma + 1), 0, 15, ptr));
+        cell.fx = 3;
+        return;
+    }
+    fail("bad fx token '" + tok + "' (A<hex>, S+n, S-n, V<d>,<s>)", ptr);
+}
+
+// Parses `note [inst] [vol] [fx]` (1-4 tokens, `.` skips a middle
+// slot). `inst_name` receives the instrument token when present.
+TrackerCell
+parse_cell_text(const std::string& text, std::string& inst_name, const std::string& ptr) {
+    TrackerCell cell;
+    inst_name.clear();
+    std::array<std::string, 4> tok;
+    int n_tok = 0;
+    size_t i = 0;
+    while (i < text.size()) {
+        while (i < text.size() && std::isspace(unsigned(text[i]))) {
+            ++i;
+        }
+        size_t j = i;
+        while (j < text.size() && !std::isspace(unsigned(text[j]))) {
+            ++j;
+        }
+        if (j > i) {
+            if (n_tok >= 4) {
+                fail("cell has more than 4 tokens: '" + text + "'", ptr);
+            }
+            tok[size_t(n_tok++)] = text.substr(i, j - i);
+        }
+        i = j;
+    }
+    if (n_tok == 0) {
+        return cell; // empty cell: nothing new this row
+    }
+    cell.note = parse_note_token(tok[0], ptr);
+    int pos = 1;
+    if (pos < n_tok) {
+        if (tok[size_t(pos)] != ".") {
+            inst_name = tok[size_t(pos)];
+        }
+        ++pos;
+    }
+    if (pos < n_tok) {
+        if (tok[size_t(pos)] != ".") {
+            cell.vol = uint8_t(parse_int_token(tok[size_t(pos)], 0, 15, ptr));
+        }
+        ++pos;
+    }
+    if (pos < n_tok) {
+        if (tok[size_t(pos)] != ".") {
+            parse_fx_token(tok[size_t(pos)], cell, ptr);
+        }
+        ++pos;
+    }
+    return cell;
+}
+
+} // namespace
+
+TrackerSong parse_song_json(const nlohmann::ordered_json& obj,
+                            const std::map<std::string, SfxPatch>& patches,
+                            const std::string& base) {
+    TrackerSong song;
+    const auto p = [&base](const std::string& leaf) { return base + leaf; };
+
+    if (!obj.is_object()) {
+        fail("song must be an object", base);
+    }
+    for (auto it = obj.begin(); it != obj.end(); ++it) {
+        if (it.key() != "bpm" && it.key() != "ticks_per_row" && it.key() != "patterns" &&
+            it.key() != "order") {
+            fail("unknown song key '" + it.key() + "'", p("/" + it.key()));
+        }
+    }
+    if (!obj.contains("bpm") || !obj.contains("ticks_per_row") || !obj.contains("patterns") ||
+        !obj.contains("order")) {
+        fail("song needs bpm, ticks_per_row, patterns, order", base);
+    }
+    if (!obj.at("bpm").is_number()) {
+        fail("bpm must be a number", p("/bpm"));
+    }
+    const double bpm = obj.at("bpm").get<double>();
+    if (bpm < 40.0 || bpm > 260.0) {
+        fail("bpm out of 40-260", p("/bpm"));
+    }
+    song.bpm = float(bpm);
+    if (!obj.at("ticks_per_row").is_number_unsigned()) {
+        fail("ticks_per_row must be an integer 1-31", p("/ticks_per_row"));
+    }
+    const uint64_t tpr = obj.at("ticks_per_row").get<uint64_t>();
+    if (tpr < 1 || tpr > 31) {
+        fail("ticks_per_row out of 1-31", p("/ticks_per_row"));
+    }
+    song.ticks_per_row = uint32_t(tpr);
+
+    // Patterns: all four channels each, 16 or 32 rows, song-wide
+    // consistent (§8.3).
+    const json& pats = obj.at("patterns");
+    if (!pats.is_object() || pats.empty()) {
+        fail("'patterns' must be a non-empty object", p("/patterns"));
+    }
+    std::vector<
+        std::pair<std::string, std::array<std::vector<std::string>, TrackerPattern::kChannels>>>
+        raw;
+    for (auto it = pats.begin(); it != pats.end(); ++it) {
+        if (it.key().empty()) {
+            fail("pattern name must be non-empty", p("/patterns"));
+        }
+        const std::string pptr = p("/patterns/" + it.key());
+        if (!it->is_object()) {
+            fail("pattern must be an object", pptr);
+        }
+        for (auto pk = it->begin(); pk != it->end(); ++pk) {
+            bool known = false;
+            for (const char* cn : kSongChannelNames) {
+                known = known || pk.key() == cn;
+            }
+            if (!known) {
+                fail("unknown pattern key '" + pk.key() +
+                         "' (channels are pulse1/"
+                         "pulse2/wide/noise, §8.3)",
+                     pptr + "/" + pk.key());
+            }
+        }
+        std::array<std::vector<std::string>, TrackerPattern::kChannels> chans;
+        for (uint32_t c = 0; c < TrackerPattern::kChannels; ++c) {
+            if (!it->contains(kSongChannelNames[c])) {
+                fail(std::string("pattern is missing channel '") + kSongChannelNames[c] + "'",
+                     pptr);
+            }
+            const json& arr = it->at(kSongChannelNames[c]);
+            if (!arr.is_array() || arr.empty()) {
+                fail(std::string("channel '") + kSongChannelNames[c] +
+                         "' must be a non-empty array",
+                     pptr + "/" + kSongChannelNames[c]);
+            }
+            std::vector<std::string> cells;
+            cells.reserve(arr.size());
+            for (size_t r = 0; r < arr.size(); ++r) {
+                if (arr[r].is_null()) {
+                    cells.emplace_back();
+                } else if (arr[r].is_string()) {
+                    cells.push_back(arr[r].get<std::string>());
+                } else {
+                    fail("cells must be strings (or null)",
+                         pptr + "/" + kSongChannelNames[c] + "/" + std::to_string(r));
+                }
+            }
+            if (cells.size() != 16 && cells.size() != 32) {
+                fail("channel rows must be 16 or 32", pptr + "/" + kSongChannelNames[c]);
+            }
+            chans[c] = std::move(cells);
+        }
+        for (uint32_t c = 1; c < TrackerPattern::kChannels; ++c) {
+            if (chans[c].size() != chans[0].size()) {
+                fail("channels disagree on row count inside one pattern", pptr);
+            }
+        }
+        if (!raw.empty() && chans[0].size() != raw.front().second[0].size()) {
+            fail("all patterns in one song must share the row count (§8.3)", pptr);
+        }
+        raw.emplace_back(it.key(), std::move(chans));
+    }
+    const size_t rows = raw.front().second[0].size();
+
+    // Order: 1..128 names, every one defined (§8.3).
+    const json& ord = obj.at("order");
+    if (!ord.is_array() || ord.empty() || ord.size() > 128) {
+        fail("'order' must be an array of 1-128 pattern names", p("/order"));
+    }
+    for (size_t i = 0; i < ord.size(); ++i) {
+        if (!ord[i].is_string()) {
+            fail("order entries must be pattern-name strings", p("/order/" + std::to_string(i)));
+        }
+        song.order.push_back(ord[i].get<std::string>());
+    }
+    for (const std::string& name : song.order) {
+        bool found = false;
+        for (const auto& [pname, chans] : raw) {
+            if (pname == name) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            fail("order names pattern '" + name + "' which is not defined", p("/order"));
+        }
+    }
+
+    // Cells: parse text, collect instruments (dedup, order-preserving),
+    // enforce inst-on-first-note and the §8.1 wave rule per channel.
+    std::vector<std::string> instr_names;
+    const auto intern_instr = [&instr_names, &base](const std::string& n) -> int {
+        for (size_t i = 0; i < instr_names.size(); ++i) {
+            if (instr_names[i] == n) {
+                return int(i);
+            }
+        }
+        if (instr_names.size() >= 0xFF) {
+            // 0xFF is the cell's no-inst sentinel, so legal indices are
+            // 0..254: the song exceeds 255 instruments.
+            fail("song uses more than 255 distinct instruments", base);
+        }
+        instr_names.push_back(n);
+        return int(instr_names.size() - 1);
+    };
+    // First pass: parse + instrument interning.
+    std::vector<std::pair<std::string, TrackerPattern>> parsed;
+    for (auto& [pname, chans] : raw) {
+        TrackerPattern pat;
+        pat.rows = uint32_t(rows);
+        for (uint32_t c = 0; c < TrackerPattern::kChannels; ++c) {
+            pat.chan[c].reserve(rows);
+        }
+        parsed.emplace_back(pname, std::move(pat));
+    }
+    // The sticky-inst rule is per channel across the WHOLE song and
+    // runs in PLAYBACK order (§8.3): `order` decides which pattern's
+    // note is the channel's first, not the patterns object's
+    // declaration order (cycle-2 review). Patterns never referenced
+    // by `order` still parse — each validated standalone.
+    auto parse_pattern_cells =
+        [&](size_t pi, bool(&has_inst)[TrackerPattern::kChannels], bool fresh) {
+            auto& [pname, chans] = raw[pi];
+            TrackerPattern& pat = parsed[pi].second;
+            if (fresh) {
+                for (uint32_t c = 0; c < TrackerPattern::kChannels; ++c) {
+                    has_inst[c] = false;
+                }
+            }
+            const std::string pptr = p("/patterns/" + pname);
+            for (uint32_t c = 0; c < TrackerPattern::kChannels; ++c) {
+                for (size_t r = 0; r < rows; ++r) {
+                    const std::string cptr =
+                        pptr + "/" + kSongChannelNames[c] + "/" + std::to_string(r);
+                    std::string inst_name;
+                    TrackerCell cell = parse_cell_text(chans[c][r], inst_name, cptr);
+                    if (!inst_name.empty()) {
+                        cell.inst = uint8_t(intern_instr(inst_name));
+                    }
+                    if (cell.note != 0 && cell.note != TrackerCell::kOff && !has_inst[c] &&
+                        cell.inst == 0xFF) {
+                        fail(std::string("channel '") + kSongChannelNames[c] +
+                                 "' needs an inst on its first PLAYED note (§8.3)",
+                             cptr);
+                    }
+                    if (cell.inst != 0xFF) {
+                        has_inst[c] = true;
+                    }
+                    pat.chan[c].push_back(cell);
+                }
+            }
+        };
+    bool has_inst[TrackerPattern::kChannels] = {false, false, false, false};
+    std::vector<bool> played(raw.size(), false);
+    for (const std::string& name : song.order) {
+        for (size_t pi = 0; pi < raw.size(); ++pi) {
+            if (raw[pi].first == name) {
+                if (!played[pi]) {
+                    parse_pattern_cells(pi, has_inst, /*fresh=*/false);
+                    played[pi] = true;
+                }
+                break;
+            }
+        }
+    }
+    for (size_t pi = 0; pi < raw.size(); ++pi) {
+        if (!played[pi]) {
+            parse_pattern_cells(pi, has_inst, /*fresh=*/true);
+        }
+    }
+    // Resolve instruments through the merged patch map; enforce the
+    // §8.1 wave rule at every use site (the same patch may be legal on
+    // one channel and not another).
+    for (const std::string& n : instr_names) {
+        const auto it = patches.find(n);
+        if (it == patches.end()) {
+            fail("instrument '" + n +
+                     "' does not resolve to a patch or built-in (wav ids cannot be "
+                     "tracker instruments, §8.1)",
+                 base);
+        }
+        const SfxPatch& sp = it->second;
+        TrackerInstr ti;
+        ti.wave = sp.wave;
+        ti.duty = sp.duty;
+        // §5.1-mapped seconds (x^2 * 2.268).
+        ti.attack = sp.attack * sp.attack * 2.268f;
+        ti.sustain = sp.sustain;
+        ti.release = sp.decay * sp.decay * 2.268f;
+        ti.gain = db_to_amp(sp.volume_db);
+        song.instruments.push_back(ti);
+    }
+    for (auto& [pname, pat] : parsed) {
+        for (uint32_t c = 0; c < TrackerPattern::kChannels; ++c) {
+            for (TrackerCell& cell : pat.chan[c]) {
+                if (cell.inst == 0xFF) {
+                    continue;
+                }
+                const SfxPatch& sp = patches.at(instr_names[cell.inst]);
+                if (!wave_legal_for_channel(int(c), sp.wave)) {
+                    fail("instrument '" + instr_names[cell.inst] + "' (wave " +
+                             std::to_string(int(sp.wave)) + ") is illegal on channel '" +
+                             kSongChannelNames[c] + "' (§8.1)",
+                         p("/patterns/" + pname));
+                }
+            }
+        }
+    }
+    song.patterns = std::move(parsed);
+    return song;
 }
 
 std::unique_ptr<PatchBank> build_bank(const TableAudio& audio,
@@ -387,6 +839,32 @@ std::unique_ptr<PatchBank> build_bank(const TableAudio& audio,
                  "/map/" + key);
         }
         purpose_patch[purpose] = id;
+    }
+
+    // ---- tracker songs (§8): instruments resolve against the merged
+    // built-ins + table patch map (wavs are not synth patches and
+    // cannot be tracker instruments — §8.1 names patch fields). ----
+    std::map<std::string, SfxPatch> patch_map;
+    for (const auto& [name, params] : PatchBank::built_in_params()) {
+        patch_map.emplace(name, params);
+    }
+    for (const auto& [name, patch] : audio.patches) {
+        patch_map[name] = patch; // override by name (§5.5)
+    }
+    for (const auto& [id, raw] : audio.songs) {
+        bank->mutable_songs().push_back({id, parse_song_json(raw, patch_map, "/songs/" + id)});
+    }
+
+    // ---- duck triggers (§10): the fixed patch-name list. ----
+    static const char* const kDuckTriggers[] = {
+        "jackpot_hit", "multiball_riser", "extra_ball_fanfare", "tilt_alarm", "drain_womp"};
+    static_assert(sizeof(kDuckTriggers) / sizeof(kDuckTriggers[0]) <= PatchBank::kDuckPatchCap,
+                  "the §10 trigger list outgrew the bank table");
+    for (const char* name : kDuckTriggers) {
+        const int id = bank->find(name);
+        if (id >= 0) {
+            (void)bank->duck_patch_add(uint16_t(id)); // can't overflow: list <= cap
+        }
     }
     return bank;
 }

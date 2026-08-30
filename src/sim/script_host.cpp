@@ -1,6 +1,7 @@
 #include "sim/script_host.h"
 
 #include "core/log.h"
+#include "sim/music_sink.h"
 #include "sim/solver.h"
 
 #include <sol/sol.hpp>
@@ -107,6 +108,7 @@ struct ScriptHostImpl {
     std::vector<ScriptAction> actions;
     PlayerScoreState scores[4];
     BackglassModel backglass_model;
+    MusicSink* music_sink = nullptr; // §9 seam (M14)
     size_t heap_used = 0;
 
     // Static build data copied at load: id → TableDef element index.
@@ -428,6 +430,10 @@ void ScriptHost::set_timers_frozen(bool frozen) {
     impl_->timers_frozen = frozen;
 }
 
+void ScriptHost::set_music_sink(MusicSink* sink) {
+    impl_->music_sink = sink;
+}
+
 void ScriptHost::load(const std::string& rules_source, SimState& state) {
     if (impl_->L != nullptr) {
         // A second load would leak the lua_State and keep stale handlers
@@ -619,8 +625,26 @@ void ScriptHost::load(const std::string& rules_source, SimState& state) {
         }
         (void)impl_->sim->sound_queue->push(ev); // full: dropped (§4.1)
     });
-    tb.set_function("play_music", [](const std::string&) {});
-    tb.set_function("stop_music", []() {});
+    tb.set_function("play_music", [this](const char* id) {
+        // §9: song id; a table may define any subset — unknown ids are
+        // the app sink's "silence in that state", not a script error.
+        if (id == nullptr || id[0] == '\0') {
+            TB_LOG_WARN("script", "tb.play_music: id must be a non-empty string");
+            return;
+        }
+        if (impl_->music_sink == nullptr) {
+            TB_LOG_WARN("script", "tb.play_music: no music sink installed");
+            return;
+        }
+        impl_->music_sink->play_music(id);
+    });
+    tb.set_function("stop_music", [this]() {
+        if (impl_->music_sink == nullptr) {
+            TB_LOG_WARN("script", "tb.stop_music: no music sink installed");
+            return;
+        }
+        impl_->music_sink->stop_music();
+    });
 
     // ---- physical elements (§3.4): latched to next tick ----
     auto latch = [this](ScriptAction a, const std::string& id) -> uint16_t {

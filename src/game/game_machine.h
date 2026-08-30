@@ -2,6 +2,7 @@
 
 #include "game/high_scores.h"
 #include "game/initials_entry.h"
+#include "sim/music_sink.h"
 #include "sim/solver.h"
 
 #include <cstdint>
@@ -93,6 +94,35 @@ public:
     // the backglass / tests).
     const std::vector<int>& qualifying_players() const { return qualifying_; }
 
+    // ---- music + attract (12-audio.md §9, 11 §8.2; M14) ----
+    // Music requests route to the sink on transitions: "attract" on
+    // entering Attract, stop on leaving it, "game_over" on game end.
+    // A sink resolving nothing = silence (legal subset, §9). Installing
+    // while already in Attract (app/test wiring order: construct, then
+    // wire) arms the attract song immediately.
+    void set_music_sink(sim::MusicSink* sink) {
+        // Replacing/detaching while in Attract must not orphan the
+        // outgoing sink mid-song: give it the same stop the Attract
+        // exit makes before the pointer drops (cycle-9 review).
+        if (music_sink_ != nullptr && music_sink_ != sink) {
+            music_sink_->stop_music();
+        }
+        const bool changed = music_sink_ != sink;
+        music_sink_ = sink;
+        if (!changed) {
+            return; // re-wiring the SAME sink is a no-op (no restart)
+        }
+        if (sink != nullptr && state_ == GameState::Attract) {
+            sink->play_music("attract");
+        }
+    }
+
+    // Attract page machine (§8.2). Pages: 0 Logo, 1 high scores (top
+    // half), 2 high scores (bottom half), 3 rules card, 4 press start.
+    int attract_page() const { return attract_page_; }
+
+    float attract_page_time_s() const { return float(attract_page_ticks_) / 1000.0f; }
+
     // Persistence seam: set when an initials commit inserted a row;
     // the app saves the file and clears the flag (§7: immediately
     // after each commit).
@@ -116,6 +146,7 @@ private:
     void enter_player_change();
     void enter_high_score_entry();
     void enter_game_over();
+    void step_attract(bool left_edge, bool right_edge); // §8.2 pages + lights
 
     // ---- per-tick helpers ----
     void consume_sim_events();
@@ -193,6 +224,13 @@ private:
     bool p1_bonus_seen_ = false;
     // §2.5 serve window: ticks since the last serve command.
     uint32_t serve_window_ticks_ = 0;
+
+    // Music seam (§9): framework-selected songs; null = silence.
+    sim::MusicSink* music_sink_ = nullptr;
+    // Attract page machine (§8.2): 5 pages, per-page tick budget.
+    static constexpr uint32_t kAttractPages = 5;
+    int attract_page_ = 0;
+    uint32_t attract_page_ticks_ = 0;
 };
 
 } // namespace tb::game

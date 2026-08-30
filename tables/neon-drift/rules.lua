@@ -40,10 +40,20 @@ local function drift_active()
   return tb.state.drift ~= nil
 end
 
+-- 12-audio.md §9 state stack (v1: two overlays): the current theme is
+-- main, unless multiball (deepest) or the drift mode is active.
+local function play_current_theme()
+  if tb.state.mb_active then tb.play_music("multiball")
+  elseif drift_active()   then tb.play_music("mode")
+  else                         tb.play_music("main")
+  end
+end
+
 local function end_drift_mode()
   if not drift_active() then return end   -- timer/drain double-fire guard
   tb.state.drift = nil
   tb.magnet_off("drift_magnet")
+  play_current_theme()                    -- multiball outranks "main"
   tb.show_message("DRIFT OVER", { style = "info" })
 end
 
@@ -63,6 +73,8 @@ tb.on("ball_start", function()
   tb.state.gear = 1
   tb.state.spin_count = 0
   tb.state.nos = { left = false, mid = false, right = false }
+  tb.state.mb_active = false             -- fresh ball: no multiball carryover
+  play_current_theme()                   -- 12-audio.md §9: script selects
   tb.light_blink("light_rpm_r", "slow_blink")
   tb.ball_save(CONFIG.BALL_SAVE_MS)
 end)
@@ -125,6 +137,7 @@ tb.on("bank_complete", function(ev)
   if ev.bank_id ~= "gear_bank" then return end
   tb.score(CONFIG.SCORE_BANK)
   tb.state.gear = math.min((tb.state.gear or 1) + 1, 9)
+  tb.play_sound("nd_gearshift", { duck = true })
   tb.show_message("GEAR " .. tb.state.gear, { style = "mode" })
   tb.timer(600, function() tb.drop_bank_reset("gear_bank") end)
 end)
@@ -139,6 +152,7 @@ tb.on("ramp_made", function(ev)
     local drift_token = {}
     tb.state.drift = drift_token
     tb.magnet_on("drift_magnet")
+    play_current_theme()                   -- drift-corner theme (mb still wins)
     tb.show_message("DRIFT CORNER", { style = "mode" })
     tb.timer(CONFIG.DRIFT_MODE_MS, function()
       if tb.state.drift == drift_token then end_drift_mode() end
@@ -168,8 +182,22 @@ tb.on("ball_lock", function(ev)
   tb.show_message("BALL " .. ev.count .. " LOCKED", { style = "mode" })
   if ev.count >= CONFIG.LOCK_TO_MB then
     tb.release_lock("drift_lock", CONFIG.LOCK_TO_MB)
+    tb.play_sound("nd_nitro_hit")         -- the table's jackpot stab
     tb.show_message("MULTIBALL", { style = "jackpot" })
   end
+end)
+
+-- Multiball edges (framework events): theme swap per 12-audio.md §9.
+-- mb_active rides the framework events so drift-end/multiball-end
+-- restore whichever theme is actually still running.
+tb.on("multiball_start", function()
+  tb.state.mb_active = true
+  play_current_theme()
+end)
+
+tb.on("multiball_end", function()
+  tb.state.mb_active = false
+  play_current_theme()
 end)
 
 tb.on("drain", function(ev)

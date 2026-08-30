@@ -1,0 +1,224 @@
+{
+  // neon-drift — full audio pack. Canon: PLAN.md 5.8, 15-launch-tables.md
+  // §1.6. Patches: the seven table deltas (unlisted events keep the
+  // built-ins, 12-audio.md §6.2); instruments for the six reserved song
+  // states (§9): attract 92 BPM neon ballad, main 118 synthwave groove,
+  // mode 128 driving, multiball 140 double-time, wizard 150 peak, and a
+  // 4-bar engine-down game_over sting.
+  "patches": {
+    // ---- §1.6 deltas ----
+    "nd_shift_clack":  { "wave": "square", "base_freq": 0.09, "punch": 0.3,
+                         "sustain": 0.02, "decay": 0.12, "volume_db": -2,
+                         "priority": 6 },
+    "nd_horn":         { "wave": "saw", "base_freq": 0.32, "sustain": 0.06,
+                         "decay": 0.20, "volume_db": -3, "priority": 6 },
+    "nd_tach":         { "wave": "square", "base_freq": 0.50, "freq_slide": 0.4,
+                         "sustain": 0.0, "decay": 0.08, "volume_db": -2,
+                         "priority": 5 },
+    "nd_drift_skid":   { "wave": "noise", "base_freq": 0.30, "sustain": 0.45,
+                         "decay": 0.25, "lpf_cutoff": 0.40, "hpf_cutoff": 0.05,
+                         "volume_db": -4, "priority": 6 },
+    "nd_boost":        { "wave": "noise", "base_freq": 0.25, "freq_slide": 0.8,
+                         "sustain": 0.25, "decay": 0.15, "hpf_cutoff": 0.10,
+                         "volume_db": -2, "priority": 7 },
+    "nd_gearshift":    { "wave": "saw", "base_freq": 0.20, "freq_slide": 0.9,
+                         "punch": 0.4, "sustain": 0.30, "decay": 0.20,
+                         "volume_db": -2, "priority": 8 },
+    "nd_nitro_hit":    { "wave": "saw", "base_freq": 0.40, "freq_slide": -0.7,
+                         "punch": 0.6, "sustain": 0.15, "decay": 0.30,
+                         "volume_db": 1, "priority": 9 },
+    // ---- tracker instruments (§8.1; shared across the six songs) ----
+    "nd_lead":  { "wave": "square", "duty": 0.25, "attack": 0.02, "sustain": 0.4,
+                  "decay": 0.25, "volume_db": -3 },
+    "nd_stab":  { "wave": "square", "duty": 0.5, "sustain": 0.0, "decay": 0.12,
+                  "volume_db": -6 },
+    "nd_bass":  { "wave": "saw", "sustain": 0.5, "decay": 0.2, "volume_db": -2 },
+    "nd_kit":   { "wave": "noise", "sustain": 0, "decay": 0.18, "volume_db": -4 },
+    "nd_hat":   { "wave": "noise", "sustain": 0, "decay": 0.06, "volume_db": -10 }
+  },
+  "map": {
+    "flipper": "nd_shift_clack",
+    "pop_bumper": "nd_horn",
+    "spinner": "nd_tach",
+    "magnet": "nd_drift_skid",
+    "ramp_made": "nd_boost"
+  },
+  "songs": {
+    // 92 BPM neon ballad: Am - F - C - G, slow vibrato lead, half-note
+    // bass, sparse shimmer.
+    "attract": {
+      "bpm": 92, "ticks_per_row": 12,
+      "patterns": {
+        "A": {
+          "pulse1": ["E-5 nd_lead 9 V3,3", "---", "---", "---",
+                     "C-5 . . V3,3", "---", "---", "---",
+                     "D-5 . . V3,3", "---", "---", "---",
+                     "B-4 . . V3,3", "---", "---", "OFF"],
+          "pulse2": ["---", "---", "---", "---",
+                     "A-4 nd_stab 6", "---", "---", "---",
+                     "---", "---", "---", "---",
+                     "G-4 nd_stab 6", "---", "---", "---"],
+          "wide":   ["A-2 nd_bass 11", "---", "---", "---",
+                     "F-2 . 11", "---", "---", "---",
+                     "C-3 . 11", "---", "---", "---",
+                     "G-2 . 11", "---", "---", "---"],
+          "noise":  ["---", "---", "C-6 nd_hat 4", "---",
+                     "---", "---", "C-6 . 4", "---",
+                     "---", "---", "C-6 . 4", "---",
+                     "---", "---", "C-6 . 4", "---"]
+        }
+      },
+      "order": ["A"]
+    },
+    // 118 BPM synthwave groove: driving 8th bass, kick/snare kit,
+    // A-minor stabs with arps (the §8.5 progression transposed).
+    "main": {
+      "bpm": 118, "ticks_per_row": 12,
+      "patterns": {
+        "A": {
+          "pulse1": ["E-5 nd_lead 10", "---", "C-5", "---",
+                     "D-5", "E-5", "C-5", "---",
+                     "F-5 . . V3,5", "---", "E-5", "---",
+                     "C-5", "---", "A-4", "OFF"],
+          "pulse2": ["---", "A-4 nd_stab 8 A037", "---", "A-4 . . A037",
+                     "---", "A-4 . . A037", "---", "A-4 . . A037",
+                     "---", "F-4 . . A047", "---", "F-4 . . A047",
+                     "---", "F-4 . . A047", "---", "F-4 . . A047"],
+          "wide":   ["A-2 nd_bass 12", "A-2", "A-3", "A-2",
+                     "A-2", "A-3", "A-2", "A-3",
+                     "F-2", "F-2", "F-3", "F-2",
+                     "F-2", "F-3", "F-2", "F-3"],
+          "noise":  ["C-2 nd_kit 15", "C-6 . 4", "A-4 . 12", "C-6 . 4",
+                     "C-2 . 15", "C-6 . 4", "A-4 . 12", "C-6 . 4",
+                     "C-2 . 15", "C-6 . 4", "A-4 . 12", "C-6 . 4",
+                     "C-2 . 15", "C-6 . 4", "A-4 . 12", "C-6 . 4"]
+        },
+        "B": {
+          "pulse1": ["G-5 nd_lead 10", "---", "E-5", "---",
+                     "D-5", "E-5", "G-5", "---",
+                     "D-5 . . V3,5", "---", "B-4", "---",
+                     "G-4", "---", "A-4", "OFF"],
+          "pulse2": ["---", "C-5 nd_stab 8 A047", "---", "C-5 . . A047",
+                     "---", "C-5 . . A047", "---", "C-5 . . A047",
+                     "---", "G-4 . . A047", "---", "G-4 . . A047",
+                     "---", "G-4 . . A047", "---", "G-4 . . A047"],
+          "wide":   ["C-3 nd_bass 12", "C-3", "C-4", "C-3",
+                     "C-3", "C-4", "C-3", "C-4",
+                     "G-2", "G-2", "G-3", "G-2",
+                     "G-2", "G-3", "G-2", "G-3"],
+          "noise":  ["C-2 nd_kit 15", "C-6 . 4", "A-4 . 12", "C-6 . 4",
+                     "C-2 . 15", "C-6 . 4", "A-4 . 12", "C-6 . 4",
+                     "C-2 . 15", "C-6 . 4", "A-4 . 12", "C-6 . 4",
+                     "C-2 . 15", "C-6 . 4", "A-4 . 12", "C-6 . 4"]
+        }
+      },
+      "order": ["A", "A", "B", "B"]
+    },
+    // 128 BPM driving (drift corner): D-minor, denser arp, kit every
+    // other row.
+    "mode": {
+      "bpm": 128, "ticks_per_row": 12,
+      "patterns": {
+        "A": {
+          "pulse1": ["D-5 nd_lead 10", "F-5", "A-5", "F-5",
+                     "D-5", "F-5", "A-5", "F-5",
+                     "C-5", "E-5", "G-5", "E-5",
+                     "C-5", "E-5", "G-5", "OFF"],
+          "pulse2": ["D-4 nd_stab 7 A037", "---", "D-4 . . A037", "---",
+                     "D-4 . . A037", "---", "D-4 . . A037", "---",
+                     "C-4 . . A047", "---", "C-4 . . A047", "---",
+                     "C-4 . . A047", "---", "C-4 . . A047", "---"],
+          "wide":   ["D-2 nd_bass 12", "D-2", "D-3", "D-2",
+                     "D-2", "D-3", "D-2", "D-3",
+                     "C-2", "C-2", "C-3", "C-2",
+                     "C-2", "C-3", "C-2", "C-3"],
+          "noise":  ["C-2 nd_kit 15", "C-6 . 5", "A-4 . 12", "C-6 . 5",
+                     "C-2 . 15", "C-6 . 5", "A-4 . 12", "C-6 . 5",
+                     "C-2 . 15", "C-6 . 5", "A-4 . 12", "C-6 . 5",
+                     "C-2 . 15", "C-6 . 5", "A-4 . 12", "A-4 . 12"]
+        }
+      },
+      "order": ["A"]
+    },
+    // 140 BPM double-time: kit on every row, pumping root-octave bass.
+    "multiball": {
+      "bpm": 140, "ticks_per_row": 12,
+      "patterns": {
+        "A": {
+          "pulse1": ["A-4 nd_lead 11", "A-4", "C-5", "A-4",
+                     "E-5", "C-5", "A-4", "C-5",
+                     "F-4", "F-4", "A-4", "F-4",
+                     "C-5", "A-4", "F-4", "OFF"],
+          "pulse2": ["A-3 nd_stab 9 A037", "A-3 . . A037", "A-3 . . A037",
+                     "A-3 . . A037",
+                     "A-3 . . A037", "A-3 . . A037", "A-3 . . A037",
+                     "A-3 . . A037",
+                     "F-3 . . A047", "F-3 . . A047", "F-3 . . A047",
+                     "F-3 . . A047",
+                     "F-3 . . A047", "F-3 . . A047", "F-3 . . A047",
+                     "F-3 . . A047"],
+          "wide":   ["A-2 nd_bass 13", "A-3", "A-2", "A-3",
+                     "A-2", "A-3", "A-2", "A-3",
+                     "F-2", "F-3", "F-2", "F-3",
+                     "F-2", "F-3", "F-2", "F-3"],
+          "noise":  ["C-2 nd_kit 15", "C-6 . 6", "A-4 . 12", "C-6 . 6",
+                     "C-2 . 15", "C-6 . 6", "A-4 . 12", "C-6 . 6",
+                     "C-2 . 15", "C-6 . 6", "A-4 . 12", "C-6 . 6",
+                     "C-2 . 15", "C-6 . 6", "A-4 . 12", "C-2 . 15"]
+        }
+      },
+      "order": ["A"]
+    },
+    // 150 BPM peak: alarm stabs — octave arps on both pulses.
+    "wizard": {
+      "bpm": 150, "ticks_per_row": 12,
+      "patterns": {
+        "A": {
+          "pulse1": ["E-5 nd_lead 12", "A-5", "E-5", "A-5",
+                     "E-5", "A-5", "E-5", "A-5",
+                     "D-5", "A-5", "D-5", "A-5",
+                     "D-5", "A-5", "D-5", "OFF"],
+          "pulse2": ["E-4 nd_stab 10", "B-4", "E-4", "B-4",
+                     "E-4", "B-4", "E-4", "B-4",
+                     "D-4", "A-4", "D-4", "A-4",
+                     "D-4", "A-4", "D-4", "A-4"],
+          "wide":   ["E-2 nd_bass 13", "E-2", "E-3", "E-2",
+                     "E-2", "E-3", "E-2", "E-3",
+                     "D-2", "D-2", "D-3", "D-2",
+                     "D-2", "D-3", "D-2", "D-3"],
+          "noise":  ["C-2 nd_kit 15", "C-6 . 6", "C-2 . 15", "C-6 . 6",
+                     "C-2 . 15", "C-6 . 6", "C-2 . 15", "C-6 . 6",
+                     "C-2 . 15", "C-6 . 6", "C-2 . 15", "C-6 . 6",
+                     "C-2 . 15", "C-6 . 6", "C-2 . 15", "C-2 . 15"]
+        }
+      },
+      "order": ["A"]
+    },
+    // Game-over sting: 4 bars, engine tach falling into idle. Slides
+    // descend over each bar; the attract crossfade ends it.
+    "game_over": {
+      "bpm": 104, "ticks_per_row": 12,
+      "patterns": {
+        "A": {
+          "pulse1": ["A-4 nd_lead 10 S-4", "---", "---", "---",
+                     "G-4 . . S-4", "---", "---", "---",
+                     "E-4 . . S-3", "---", "---", "---",
+                     "D-4 . . S-3", "---", "---", "OFF"],
+          "pulse2": ["---", "---", "A-4 nd_stab 6", "---",
+                     "---", "---", "G-4 nd_stab 6", "---",
+                     "---", "---", "E-4 nd_stab 6", "---",
+                     "---", "---", "D-4 nd_stab 6", "---"],
+          "wide":   ["A-2 nd_bass 12 S-5", "---", "---", "---",
+                     "G-2 . 12 S-5", "---", "---", "---",
+                     "E-2 . 11 S-4", "---", "---", "---",
+                     "D-2 . 10 S-4", "---", "---", "---"],
+          "noise":  ["C-2 nd_kit 14", "---", "C-6 . 4", "---",
+                     "C-2 . 12", "---", "C-6 . 4", "---",
+                     "C-2 . 10", "---", "C-6 . 4", "---",
+                     "C-2 . 8", "---", "C-6 . 3", "---"]
+        }
+      },
+      "order": ["A"]
+    }
+  }
+}

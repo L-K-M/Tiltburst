@@ -9,6 +9,7 @@ add_executable(tb_tests
     core/scaffold_test.cpp
     core/time_test.cpp
     audio/audio_test.cpp
+    audio/tracker_test.cpp
     game/game_framework_test.cpp
     sim/det_replay_flipper_test.cpp
     platform/display_test.cpp

@@ -22,6 +22,7 @@
 #include "render/renderer.h"
 #include "render/sdl_gpu_renderer.h"
 #include "render/tbart.h"
+#include "sim/music_sink.h"
 #include "sim/script_host.h"
 #include "sim/sim_thread.h"
 #include "sim/snapshot.h"
@@ -39,6 +40,7 @@
 #include <deque>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <sstream>
 #include <vector>
 
@@ -324,6 +326,109 @@ CliOptions parse_cli(int argc, char** argv) {
     }
     return cli;
 }
+
+namespace {
+
+// §8.2 rules-card cache (backglass attract page): static table data,
+// parsed once per loaded content. Keyed on (pointer, content): F5
+// reload mutates def IN PLACE (same object), so a pointer alone would
+// serve a stale card.
+struct RulesCardCache {
+    const LoadedTable* table = nullptr;
+    std::string key;
+    std::vector<std::string> lines;
+};
+
+// One backglass attempt (~30 Hz pacer, 07 §8). Extracted from run()'s
+// frame loop: MSVC inlined the entire loop into one gigantic run()
+// body whose stack frame overflowed (0xC00000FD, M14 PR-17 cycles
+// 22-24) — the function boundary restores sane frames AND states the
+// block's contract in one place: everything reads the SNAPSHOT, never
+// a live game object.
+void render_backglass_frame(bool have_window,
+                            const SimSnapshot& snap,
+                            const LoadedTable* table,
+                            RulesCardCache& card_cache,
+                            const render::BackglassLayout& layout,
+                            const render::Overlay& font,
+                            platform::BackglassPacer& pacer,
+                            std::vector<render::QuadInstance>& built,
+                            render::IRenderer& renderer) {
+    if (!have_window) {
+        return;
+    }
+    const uint64_t now_bg = tb_now_ns();
+    if (!pacer.should_attempt(now_bg)) {
+        return;
+    }
+    built.clear();
+    render::BackglassContent content;
+    content.in_attract =
+        snap.game.player_count <= 0 || snap.game.game_state == uint8_t(game::GameState::Attract);
+    // Attract page machine (§8.2) + the static table data the pages
+    // show (logo name, rules card).
+    content.attract_page = int(snap.game.attract_page);
+    content.attract_page_time_s = snap.game.attract_page_time_s;
+    if (table != nullptr) {
+        content.table_name = table->def.name;
+        if (card_cache.table != table || card_cache.key != table->def.rules_card) {
+            card_cache.table = table;
+            card_cache.key = table->def.rules_card;
+            card_cache.lines.clear();
+            std::istringstream card(table->def.rules_card);
+            std::string line;
+            while (std::getline(card, line)) {
+                if (!line.empty() && line.back() == '\r') {
+                    line.pop_back();
+                }
+                card_cache.lines.push_back(line);
+                if (card_cache.lines.size() >= 8) {
+                    break; // card cap; more is M15 polish
+                }
+            }
+        }
+        content.rules_lines = card_cache.lines;
+    }
+    // Both bounds: >4 would write past content.scores, and the
+    // publisher-side clamp is a convention, not a type guarantee
+    // (cycle-26 review).
+    content.player_count = std::clamp(snap.game.player_count, 1, decltype(snap.game)::kMaxPlayers);
+    content.current_player = std::clamp(snap.game.current_player, 1, content.player_count);
+    content.ball_number = snap.game.ball_number;
+    for (int pi = 0; pi < content.player_count; ++pi) {
+        content.scores[size_t(pi)] = snap.game.scores[size_t(pi)];
+    }
+    // Attract top-10 from the snapshot copy — the table mutates on the
+    // sim thread that fills this copy, never here.
+    content.high_score_count =
+        std::min<uint32_t>(snap.game.high_score_count, decltype(snap.game)::kHighScoreCap);
+    for (uint32_t i = 0; i < content.high_score_count; ++i) {
+        content.high_scores[i] = {{snap.game.high_scores[i].initials[0],
+                                   snap.game.high_scores[i].initials[1],
+                                   snap.game.high_scores[i].initials[2]},
+                                  snap.game.high_scores[i].score};
+    }
+    sim::BackglassModel model; // rebuilt from the snapshot copy
+    model.layout = snap.game.layout;
+    model.focus_player = snap.game.focus_player;
+    model.message_style = snap.game.message_style;
+    const uint32_t msg_len =
+        uint32_t(std::min(size_t(snap.game.message_len), sizeof(model.message) - 1));
+    model.message_len = msg_len;
+    std::memcpy(model.message, snap.game.message, msg_len);
+    model.message[msg_len] = '\0';
+    layout.build(content, model, font, &built);
+    render::BackglassFrame bframe;
+    bframe.quads = built.data();
+    bframe.quad_count = uint32_t(built.size());
+    if (renderer.render_backglass(bframe)) {
+        pacer.report_drawn(now_bg);
+    } else {
+        pacer.report_skipped();
+    }
+}
+
+} // namespace
 
 int run(const CliOptions& cli) {
     // §1 step 2: logger with the in-memory ring only.
@@ -929,6 +1034,10 @@ int run(const CliOptions& cli) {
 
         // Backglass content pipeline: layout + ~30 Hz pacer (07 §8).
         render::BackglassLayout bg_layout;
+        // §8.2 rules-card cache: parsed once per loaded content; see
+        // render_backglass_frame (the statics version overflowed the
+        // MSVC smoke build's stack; cycle-23 bisect).
+        RulesCardCache card_cache;
         // Invariant: Overlay's glyph emission is stateless
         // (stb_easy_font prints from baked metrics — no init()); if
         // that ever changes, backglass text silently renders nothing
@@ -966,6 +1075,58 @@ int run(const CliOptions& cli) {
             tb::sim::make_synthetic_scene(sim_state, 424242);
         }
         tb::sim::Solver solver;
+
+        // Music bridge (12-audio.md §9, M14): the script host and the
+        // GameMachine call this ON THE SIM THREAD; requests queue under
+        // a mutex (song changes are human-rate) and the main loop
+        // drains them into AudioSystem. Built before both the machine
+        // and the audio system; `audio` binds after its init.
+        struct MusicBridge final : sim::MusicSink {
+            struct Request {
+                std::string id; // empty = stop
+            };
+
+            std::mutex mu;
+            std::vector<Request> pending;
+            tb::audio::AudioSystem* audio = nullptr;
+
+            void play_music(const char* song_id) override {
+                if (song_id == nullptr || song_id[0] == '\0') {
+                    return;
+                }
+                std::lock_guard<std::mutex> lock(mu);
+                pending.push_back({song_id});
+            }
+
+            void stop_music() override {
+                std::lock_guard<std::mutex> lock(mu);
+                pending.push_back({});
+            }
+
+            // Main thread, once per frame.
+            void drain() {
+                std::vector<Request> take;
+                {
+                    std::lock_guard<std::mutex> lock(mu);
+                    take.swap(pending);
+                }
+                if (audio == nullptr) {
+                    return;
+                }
+                for (const Request& r : take) {
+                    // play_music owns the §9 semantics: unknown ids are
+                    // SILENCE (it stops the current song, warn-once) —
+                    // do not pre-filter here.
+                    if (r.id.empty()) {
+                        audio->stop_music();
+                    } else {
+                        (void)audio->play_music(r.id);
+                    }
+                }
+            }
+        };
+
+        MusicBridge music_bridge;
 
         // M10 game framework (11-game-framework.md): only for a loaded
         // table with rules; synthetic scenes run bare.
@@ -1077,6 +1238,10 @@ int run(const CliOptions& cli) {
             }
             machine = std::make_unique<tb::game::GameMachine>(
                 loaded_table->script, sim_state, high_scores, fcfg);
+            // §9 music seam: script (tb.play_music) + framework
+            // (attract/game_over autoplay) route through the bridge.
+            loaded_table->script.set_music_sink(&music_bridge);
+            machine->set_music_sink(&music_bridge);
             sim_state.nudge_level = std::clamp(settings.nudge_level, 1, 3);
             sim_state.fsm_ctx = machine.get();
             sim_state.fsm_step = [](void* ctx, tb::sim::SimState& s, const tb::sim::TickInput& in) {
@@ -1100,6 +1265,7 @@ int run(const CliOptions& cli) {
             if (!audio.init(acfg) && !cli.audio_null) {
                 TB_LOG_WARN("main", "continuing without audio");
             }
+            music_bridge.audio = &audio; // §9 bridge binds post-init
         }
         std::vector<std::string> intern_names;          // owns the strings
         std::vector<tb::sim::PatchIntern> patch_intern; // views into them
@@ -1240,6 +1406,10 @@ int run(const CliOptions& cli) {
                 for (int pi = 1; pi <= snap.game.player_count; ++pi) {
                     snap.game.scores[size_t(pi - 1)] = loaded_table->script.player_scores(pi).score;
                 }
+                // Attract page machine (§8.2): published for the
+                // backglass layout.
+                snap.game.attract_page = uint8_t(machine->attract_page());
+                snap.game.attract_page_time_s = machine->attract_page_time_s();
             } else if (loaded_table) {
                 // No framework attached: attract EXPLICITLY — never by
                 // relying on GameState::Attract == 0.
@@ -1273,6 +1443,21 @@ int run(const CliOptions& cli) {
                 snap.game.message_len = msg_len;
                 std::memcpy(snap.game.message, bm.message, msg_len);
                 snap.game.message[msg_len] = '\0';
+            }
+            // Light bitmap (M14): the sim-thread lights at phase-3
+            // exit — script show or framework attract choreography —
+            // published for the render thread's scene copy.
+            {
+                const uint32_t n =
+                    uint32_t(std::min<size_t>(sim_state.lights.size(), SimSnapshot::kLightCap));
+                snap.light_count = n;
+                for (uint32_t i = 0; i < n; ++i) {
+                    if (sim_state.lights[i].on) {
+                        snap.light_bits[i >> 3] |= uint8_t(1u << (i & 7));
+                    } else {
+                        snap.light_bits[i >> 3] &= uint8_t(~(1u << (i & 7)));
+                    }
+                }
             }
             snapshots.publish(snap);
 
@@ -1345,7 +1530,8 @@ int run(const CliOptions& cli) {
         bool show_overlay = true;
 
         while (!g_quit.load(std::memory_order_acquire)) {
-            audio.pump(); // reclaim retired patch banks (12 §2.3)
+            audio.pump();         // reclaim retired patch banks (12 §2.3)
+            music_bridge.drain(); // §9: sim-thread music -> commands
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
                 switch (event.type) {
@@ -1494,6 +1680,20 @@ int run(const CliOptions& cli) {
                 }
             }
 
+            // M14: apply the snapshot's light bitmap to the render
+            // scene copy — light-bound art follows the script show and
+            // the §8.2 attract choreography. light_on() bounds-checks
+            // against kLightCap; n is additionally capped by the
+            // scene's own light list.
+            {
+                const uint32_t n =
+                    std::min<uint32_t>(uint32_t(render_scene.lights.size()),
+                                       std::min(snap.light_count, SimSnapshot::kLightCap));
+                for (uint32_t i = 0; i < n; ++i) {
+                    render_scene.lights[i].on = snap.light_on(i);
+                }
+            }
+
             if (debug_level >= 1) {
                 // Insert lights drawn as debug circles (04-milestones.md M5).
                 for (const auto& light : render_scene.lights) {
@@ -1538,58 +1738,16 @@ int run(const CliOptions& cli) {
             // Backglass at ~30 Hz, non-blocking (07 §8): the attempt
             // cadence is deadline-driven; a skipped acquire retries
             // next playfield frame without advancing the deadline.
-            if (backglass_window) {
-                const uint64_t now_bg = tb_now_ns();
-                if (bg_pacer.should_attempt(now_bg)) {
-                    bg_built.clear();
-                    // Everything below reads the SNAPSHOT — including
-                    // the attract top-10 — no live game objects on this
-                    // thread at all.
-                    render::BackglassContent content;
-                    content.in_attract = snap.game.player_count <= 0 ||
-                                         snap.game.game_state == uint8_t(game::GameState::Attract);
-                    // Both bounds: >4 would write past content.scores,
-                    // and the publisher-side clamp is a convention, not
-                    // a type guarantee (cycle-26 review).
-                    content.player_count =
-                        std::clamp(snap.game.player_count, 1, decltype(snap.game)::kMaxPlayers);
-                    content.current_player =
-                        std::clamp(snap.game.current_player, 1, content.player_count);
-                    content.ball_number = snap.game.ball_number;
-                    for (int pi = 0; pi < content.player_count; ++pi) {
-                        content.scores[size_t(pi)] = snap.game.scores[size_t(pi)];
-                    }
-                    // Attract top-10 from the snapshot copy — the
-                    // table itself mutates on the same (sim) thread
-                    // that fills the copy, never here.
-                    content.high_score_count = std::min<uint32_t>(
-                        snap.game.high_score_count, decltype(snap.game)::kHighScoreCap);
-                    for (uint32_t i = 0; i < content.high_score_count; ++i) {
-                        content.high_scores[i] = {{snap.game.high_scores[i].initials[0],
-                                                   snap.game.high_scores[i].initials[1],
-                                                   snap.game.high_scores[i].initials[2]},
-                                                  snap.game.high_scores[i].score};
-                    }
-                    sim::BackglassModel model; // rebuilt from the snapshot copy
-                    model.layout = snap.game.layout;
-                    model.focus_player = snap.game.focus_player;
-                    model.message_style = snap.game.message_style;
-                    const uint32_t msg_len = uint32_t(
-                        std::min(size_t(snap.game.message_len), sizeof(model.message) - 1));
-                    model.message_len = msg_len;
-                    std::memcpy(model.message, snap.game.message, msg_len);
-                    model.message[msg_len] = '\0';
-                    bg_layout.build(content, model, bg_font, &bg_built);
-                    render::BackglassFrame bframe;
-                    bframe.quads = bg_built.data();
-                    bframe.quad_count = uint32_t(bg_built.size());
-                    if (renderer->render_backglass(bframe)) {
-                        bg_pacer.report_drawn(now_bg);
-                    } else {
-                        bg_pacer.report_skipped();
-                    }
-                }
-            }
+            // Extracted: see render_backglass_frame above.
+            render_backglass_frame(backglass_window != nullptr,
+                                   snap,
+                                   loaded_table.get(),
+                                   card_cache,
+                                   bg_layout,
+                                   bg_font,
+                                   bg_pacer,
+                                   bg_built,
+                                   *renderer);
 
             // §14.1 stages 4–5 on the record matching the rendered snapshot.
             input.ring.complete_main(snap.tick, frame_start_ns, tb_now_ns());
@@ -1624,6 +1782,14 @@ int run(const CliOptions& cli) {
 
         sim.request_stop();
         sim.join();
+        // The sim thread (the only music-sink caller) is gone: drop
+        // the raw registrations before anything they point at unwinds.
+        if (loaded_table != nullptr) {
+            loaded_table->script.set_music_sink(nullptr);
+        }
+        if (machine != nullptr) {
+            machine->set_music_sink(nullptr);
+        }
         input.stop();
         renderer->shutdown();
         window.reset();

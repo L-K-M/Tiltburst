@@ -21,7 +21,15 @@ struct BackglassContent {
     int current_player = 1; // 1-based
     int ball_number = 1;
     uint64_t scores[4] = {}; // player_count entries valid
-    bool in_attract = true;  // attract shows the high-score list
+    bool in_attract = true;  // attract runs the §8.2 page rotation
+
+    // Attract pages (11 §8.2, M14): 0 logo, 1/2 high scores, 3 rules
+    // card, 4 press start. `attract_page_time_s` drives the 1 Hz
+    // press-start pulse (the only time dependence in this layout).
+    int attract_page = 0;
+    float attract_page_time_s = 0.0f;
+    std::string table_name;               // logo page subtitle
+    std::vector<std::string> rules_lines; // rules card (§8.2)
 
     // Attract high scores (11 §7): up to 10 rows.
     struct HighScoreRow {
@@ -39,8 +47,8 @@ struct BackglassContent {
 // pass the Overlay instance they already own.
 class BackglassLayout {
 public:
-    // Appends background + text quads to out. Deterministic in its
-    // inputs (no time dependence — blink/marquee are M13 polish).
+    // Deterministic in its inputs: the only time dependence is the
+    // explicit attract_page_time_s input (the press-start pulse).
     void build(const BackglassContent& content,
                const sim::BackglassModel& model,
                const class Overlay& font,

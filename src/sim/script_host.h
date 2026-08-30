@@ -16,6 +16,7 @@ namespace tb::sim {
 struct SimState;
 struct SimEvent;
 struct ScriptHostImpl; // sol-backed; defined in script_host.cpp
+class MusicSink;       // music_sink.h — kept opaque here
 
 // A physical action latched by a script call, applied by the solver at
 // the start of the next tick's phase 1 (10-scripting.md §2.2).
@@ -110,6 +111,11 @@ public:
     void end_game();
     void set_current_player(int index);
     void set_timers_frozen(bool frozen); // §3.6: freeze outside BALL_IN_PLAY
+
+    // Music seam (12-audio.md §9, M14): tb.play_music/stop_music call
+    // straight through on the sim thread. Null = the API warns and
+    // no-ops (tests / attract, where no script runs at all).
+    void set_music_sink(MusicSink* sink);
 
     // Framework seams (M10, 11-game-framework.md).
     void add_player();              // mid-game join during P1 ball 1

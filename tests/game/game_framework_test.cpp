@@ -11,6 +11,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -622,4 +623,187 @@ TEST(ExtraBall, SamePlayerShootsAgain) {
     EXPECT_EQ(ball_no, 1);
     ASSERT_TRUE(rig.host.state_read_int(1, "last_player", ball_no));
     EXPECT_EQ(ball_no, 1);
+}
+
+// ---- M14: attract pages + framework music (11 §8.2, 12 §9) ----
+
+struct MusicLog : sim::MusicSink {
+    std::vector<std::string> plays;
+    int stops = 0;
+
+    void play_music(const char* id) override { plays.emplace_back(id); }
+
+    void stop_music() override { ++stops; }
+
+    bool played(const char* id) const {
+        return std::find(plays.begin(), plays.end(), std::string(id)) != plays.end();
+    }
+};
+
+TEST(Attract, CyclesAndInterrupts) {
+    Rig rig;
+    rig.load(kRules);
+    // Lights for the §7.2 show: three bands (bottom/middle/top).
+    rig.state->lights = {
+        {{0.10f, 0.10f}, 0.012f, false, 0},
+        {{0.26f, 0.50f}, 0.012f, false, 1},
+        {{0.40f, 0.90f}, 0.012f, false, 2},
+    };
+    MusicLog music;
+    HighScoreTable scores;
+    auto m = std::make_unique<GameMachine>(rig.host, *rig.state, scores, base_cfg());
+    m->set_music_sink(&music);
+    rig.state->fsm_ctx = m.get();
+    rig.state->fsm_step = [](void* ctx, sim::SimState& s, const sim::TickInput& in) {
+        static_cast<GameMachine*>(ctx)->step(in);
+    };
+
+    // Entry: attract song auto-played (§9), page 0 (Logo).
+    EXPECT_TRUE(music.played("attract"));
+    EXPECT_EQ(m->attract_page(), 0);
+
+    // Page schedule: Logo 8 s -> high scores at exactly 8000 ticks.
+    for (int t = 0; t < 7999; ++t) {
+        rig.solver.step(*rig.state, sim::TickInput{0});
+    }
+    EXPECT_EQ(m->attract_page(), 0);
+    rig.solver.step(*rig.state, sim::TickInput{0});
+    EXPECT_EQ(m->attract_page(), 1); // high scores, top half
+
+    // Manual paging: left flipper goes back a page and resets the
+    // timer (§8.2) — the page then holds for its full 8 s again.
+    rig.solver.step(*rig.state, sim::TickInput{1u << 0});
+    EXPECT_EQ(m->attract_page(), 0);
+    for (int t = 0; t < 7998; ++t) {
+        rig.solver.step(*rig.state, sim::TickInput{0});
+    }
+    EXPECT_EQ(m->attract_page(), 0); // timer restarted, still page 0
+    rig.solver.step(*rig.state, sim::TickInput{0});
+    EXPECT_EQ(m->attract_page(), 1);
+
+    // The full cycle: pages 1->2->3->4->0 over their durations.
+    for (int t = 0; t < 4000; ++t) { // 2: 4 s page
+        rig.solver.step(*rig.state, sim::TickInput{0});
+    }
+    EXPECT_EQ(m->attract_page(), 2);
+    for (int t = 0; t < 4000; ++t) { // 3: rules card
+        rig.solver.step(*rig.state, sim::TickInput{0});
+    }
+    EXPECT_EQ(m->attract_page(), 3);
+    for (int t = 0; t < 10000; ++t) { // 4: press start
+        rig.solver.step(*rig.state, sim::TickInput{0});
+    }
+    EXPECT_EQ(m->attract_page(), 4);
+    for (int t = 0; t < 5000; ++t) { // wraps to 0
+        rig.solver.step(*rig.state, sim::TickInput{0});
+    }
+    EXPECT_EQ(m->attract_page(), 0);
+
+    // Light show (§7.2): a fresh machine restarts the loop clock at
+    // entry; tick to t = 2.1 s inside the breathe window. Band phases
+    // at t = 2.1: band 0 -> 0.1 (on), band 2 -> 0.3 (on), band 4 ->
+    // 2.1 - 1.6 = 0.5 (off: the wave has not climbed there yet).
+    rig.state->fsm_ctx = nullptr; // no window where it points at the old machine
+    m = std::make_unique<GameMachine>(rig.host, *rig.state, scores, base_cfg());
+    m->set_music_sink(&music);
+    rig.state->fsm_ctx = m.get();
+    for (int t = 0; t < 2100; ++t) {
+        rig.solver.step(*rig.state, sim::TickInput{0});
+    }
+    EXPECT_TRUE(rig.state->lights[0].on);
+    EXPECT_TRUE(rig.state->lights[1].on);
+    EXPECT_FALSE(rig.state->lights[2].on);
+
+    // Start exits within 1 tick (§8.2 "instant interrupt"): the first
+    // tick carrying the Start edge leaves Attract, and the attract
+    // music stops (§2.3 exit column).
+    const int stops_before = music.stops;
+    rig.solver.step(*rig.state, sim::TickInput{0});
+    rig.solver.step(*rig.state, sim::TickInput{1u << 8});
+    EXPECT_NE(m->state(), GameState::Attract);
+    EXPECT_EQ(music.stops, stops_before + 1);
+}
+
+TEST(Attract, LightsDarkBeatAndChase) {
+    Rig rig;
+    rig.load(kRules);
+    rig.state->lights = {
+        {{0.10f, 0.10f}, 0.012f, true, 0},
+        {{0.26f, 0.50f}, 0.012f, true, 1},
+    };
+    MusicLog music;
+    HighScoreTable scores;
+    auto m = std::make_unique<GameMachine>(rig.host, *rig.state, scores, base_cfg());
+    m->set_music_sink(&music);
+    rig.state->fsm_ctx = m.get();
+    rig.state->fsm_step = [](void* ctx, sim::SimState& s, const sim::TickInput& in) {
+        static_cast<GameMachine*>(ctx)->step(in);
+    };
+    // Chase window (8 s): exactly one light on, and it MARCHES — the
+    // §7.1 rate is 80 ms/lamp, so +80 ms moves the lit lamp one over.
+    for (int t = 0; t < 8050; ++t) {
+        rig.solver.step(*rig.state, sim::TickInput{0});
+    }
+    EXPECT_TRUE(rig.state->lights[0].on && !rig.state->lights[1].on) << "chase starts at lamp 0";
+    for (int t = 0; t < 80; ++t) {
+        rig.solver.step(*rig.state, sim::TickInput{0});
+    }
+    EXPECT_TRUE(!rig.state->lights[0].on && rig.state->lights[1].on)
+        << "chase advances to lamp 1 after 80 ms";
+    // Run to the dark beat (13 s): everything off.
+    for (int t = 0; t < 5000; ++t) {
+        rig.solver.step(*rig.state, sim::TickInput{0});
+    }
+    EXPECT_FALSE(rig.state->lights[0].on);
+    EXPECT_FALSE(rig.state->lights[1].on);
+}
+
+TEST(Attract, GameOverPlaysSongAndGameOverPageFlow) {
+    Rig rig;
+    rig.load(kRules);
+    MusicLog music;
+    HighScoreTable scores;
+    auto m = std::make_unique<GameMachine>(rig.host, *rig.state, scores, base_cfg());
+    m->set_music_sink(&music);
+    rig.state->fsm_ctx = m.get();
+    rig.state->fsm_step = [](void* ctx, sim::SimState& s, const sim::TickInput& in) {
+        static_cast<GameMachine*>(ctx)->step(in);
+    };
+    // Start a game and run it to GameOver (drain every ball).
+    rig.solver.step(*rig.state, sim::TickInput{1u << 8}); // TableSelect
+    rig.solver.step(*rig.state, sim::TickInput{0});
+    rig.solver.step(*rig.state, sim::TickInput{1u << 8}); // GameStarting
+    for (int ball_i = 0; ball_i < 40 && m->state() != GameState::GameOver; ++ball_i) {
+        for (int t = 0; t < 100'000; ++t) {
+            if (m->state() == GameState::BallReady) {
+                launch_ball(rig, *m);
+            } else if (m->state() == GameState::HighScoreEntry) {
+                rig.solver.step(*rig.state, sim::TickInput{1u << 8});
+                rig.solver.step(*rig.state, sim::TickInput{0});
+                continue;
+            }
+            if (m->state() == GameState::BallInPlay || m->state() == GameState::GameOver) {
+                break;
+            }
+            rig.solver.step(*rig.state, sim::TickInput{0});
+        }
+        if (m->state() == GameState::GameOver) {
+            break;
+        }
+        if (m->state() != GameState::BallInPlay) {
+            continue;
+        }
+        wait_out_ball_save(rig, *m);
+        for (int t = 0; t < 100'000 && m->state() == GameState::BallInPlay; ++t) {
+            for (auto& b : rig.state->balls) {
+                if (b.live && b.mode == sim::BallMode::Free) {
+                    b.pos = {0.2f, 0.012f};
+                    b.vel = {0.0f, 0.0f};
+                }
+            }
+            rig.solver.step(*rig.state, sim::TickInput{0});
+        }
+    }
+    EXPECT_EQ(m->state(), GameState::GameOver);
+    EXPECT_TRUE(music.played("game_over"));
 }

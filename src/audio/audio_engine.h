@@ -8,6 +8,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
+#include <vector>
 
 struct ma_device;
 struct ma_context;
@@ -69,11 +71,18 @@ private:
 // main → audio commands (§2.3): volumes ramp; UI sounds start at the
 // next buffer (no tick mapping); panic stop.
 struct AudioCommand {
-    enum class Kind : uint8_t { Volume = 0, PlayUi, StopAll };
+    enum class Kind : uint8_t { Volume = 0, PlayUi, StopAll, PlaySong, StopMusic };
     Kind kind = Kind::Volume;
     uint8_t bus = 0;    // 0 sfx, 1 ui, 2 music, 3 master
-    float value = 0.0f; // volume 0..100 (Volume) / unused (PlayUi)
-    uint16_t patch = 0; // PlayUi patch id
+    float value = 0.0f; // volume 0..100 (Volume); >0.5 = attract (PlaySong)
+                        // or immediate stop (StopMusic)
+    uint16_t patch = 0; // PlayUi patch id / PlaySong bank song index
+    // PlaySong only: the publish epoch the song index was resolved
+    // against (full width — PatchBank::epoch is 64-bit; a narrower
+    // field would alias after 2^N publishes and replay a stale index
+    // against a renumbered song list). A bank swap between push and
+    // pop renumbers the list; the handler drops stale requests.
+    uint64_t epoch = 0;
 };
 
 class CommandQueue {
@@ -164,9 +173,22 @@ public:
     // ---- main thread ----
     // Publishes a bank by atomic pointer + epoch; the previous bank is
     // reclaimed once the callback acks (pump() does the freeing).
+    // Publishing also stops any playing music: tracker instances hold
+    // song pointers INTO the retiring bank (§2.3 epoch protocol).
     void publish_bank(std::unique_ptr<PatchBank> bank);
     bool push_command(const AudioCommand& cmd);
     void pump(); // each frame: reclaim retired banks
+
+    // ---- music (12-audio.md §9, main thread) ----
+    // Resolves the id against the published bank's song list and
+    // crossfades to it. "attract" carries the -12 dB music-bus offset
+    // while active. Returns false (and logs once) for unknown ids —
+    // a table may define any subset of song states (§9).
+    bool play_music(const std::string& song_id);
+    void stop_music(); // 100 ms fade out (§9)
+    // True when the published bank defines the song id (a missing id
+    // is legal silence — callers use this to skip silently).
+    bool has_song(const std::string& song_id) const;
 
     const AudioStats& stats() const { return stats_; }
 
@@ -198,6 +220,17 @@ public:
 
     uint32_t debug_starts(uint32_t count, DebugStart* out) const;
 
+    // Test seams for the §9 music state: which bank song index each
+    // slot holds (0xFFFF = empty) and the absolute stream sample that
+    // slot STARTED at (a same-id no-op must leave both unchanged —
+    // an RMS level cannot see a phase reset on a steady tone). The
+    // start accessor returns UINT64_MAX for an out-of-range slot: 0
+    // is a VALID start (the first play after init starts at 0).
+    static constexpr uint32_t kMusicSlots = 2;
+
+    uint16_t debug_music_song(uint32_t slot) const;
+    uint64_t debug_music_start_sample(uint32_t slot) const;
+
 private:
     static void dataCallback(ma_device* device, void* out, const void* input, unsigned int frames);
     // The whole callback core; also the offline path.
@@ -215,6 +248,8 @@ private:
     bool null_backend_ = false;
     std::atomic<uint64_t> latest_tick_{0};
     SoundEventQueue* sounds_ = nullptr; // owned by impl_ (placement order)
+    std::vector<std::string> song_ids_; // published bank's song ids
+    std::string last_unknown_song_;     // log-once guard for play_music
 };
 
 } // namespace tb::audio

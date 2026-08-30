@@ -80,6 +80,17 @@ void GameMachine::latch_action(ScriptAction::Kind kind, bool flag) {
 }
 
 void GameMachine::enter(GameState next) {
+    // §2.3 exit column: leaving Attract stops the attract music (the
+    // script's ball_start -> main crossfade owns the game-side handoff)
+    // and drops the framework light show off the table's lights.
+    if (state_ == GameState::Attract && next != GameState::Attract) {
+        if (music_sink_ != nullptr) {
+            music_sink_->stop_music();
+        }
+        for (sim::LightState& light : s_.lights) {
+            light.on = false;
+        }
+    }
     state_ = next;
     state_ticks_ = 0;
     switch (next) {
@@ -127,6 +138,68 @@ void GameMachine::enter_attract() {
     host_.set_timers_frozen(true);
     host_.set_ledger_frozen(true);
     command_flipper_coil_restore();
+    // Page machine restarts (§8.2) and the framework auto-plays the
+    // attract song of the loaded table (12 §9) — the sink resolves
+    // nothing for a song-less table, which is legal silence.
+    attract_page_ = 0;
+    attract_page_ticks_ = 0;
+    if (music_sink_ != nullptr) {
+        music_sink_->play_music("attract");
+    }
+}
+
+void GameMachine::step_attract(bool left_edge, bool right_edge) {
+    // §8.2 page rotation: Logo 8 s / high scores 2x4 s / rules card
+    // 10 s / press start 5 s; manual paging via flippers resets the
+    // page timer.
+    static constexpr uint32_t kPageTicks[kAttractPages] = {8000, 4000, 4000, 10000, 5000};
+    if (left_edge) {
+        attract_page_ = (attract_page_ + int(kAttractPages) - 1) % int(kAttractPages);
+        attract_page_ticks_ = 0;
+    }
+    if (right_edge) {
+        attract_page_ = (attract_page_ + 1) % int(kAttractPages);
+        attract_page_ticks_ = 0;
+    }
+    if (++attract_page_ticks_ >= kPageTicks[size_t(attract_page_)]) {
+        attract_page_ = (attract_page_ + 1) % int(kAttractPages);
+        attract_page_ticks_ = 0;
+    }
+    // Framework light show (13 §7.2 v1): a fixed routine over the
+    // loaded table's lights — no Lua runs in Attract (§8.2). Sim ticks
+    // keep wall-clock pace here (nothing freezes the integrator in
+    // Attract), so tick ms == wall ms. Function-tag / light-group
+    // personalization lands with the tables that declare them
+    // (M16/M17 authoring); v1 runs the loop over every light.
+    const uint64_t ms = state_ticks_; // in-state clock, 1 tick == 1 ms
+    const uint32_t phase = uint32_t(ms % 15000);
+    const size_t n = s_.lights.size();
+    for (size_t li = 0; li < n; ++li) {
+        sim::LightState& light = s_.lights[li];
+        bool on = false;
+        if (phase < 8000) {
+            // Step 1: breathe, phase-offset bottom-to-top across five
+            // bands of table_h/5 (0.208 m on the default field), so
+            // the wave climbs the table (§7.2 step 1). The continuous
+            // clock (no % 15000 wrap) keeps the wave phase-smooth.
+            const int band = std::clamp(int(light.pos.y / 0.208f), 0, 4);
+            const double local = double(ms) * 0.001 - 0.4 * double(band) + 8.0;
+            on = std::fmod(local, 1.0) < 0.5; // 1 Hz breath
+        } else if (phase < 12000) {
+            // Step 2: chase along declaration order at the §7.1
+            // 80 ms/lamp rate — clamped down only when n lamps do not
+            // fit the 4 s window at that rate (n > 50), so no lamp is
+            // systematically dark (cycle-22 review: the fixed rate
+            // only ever reached lamp 50).
+            const uint32_t per = n > 0 ? std::clamp(4000u / uint32_t(n), 1u, 80u) : 80u;
+            on = n > 0 && li == size_t(((ms - 8000) / per) % n);
+        } else if (phase < 13000) {
+            // Step 3: strobe (fast regular blink).
+            on = ((ms / 62u) & 1u) != 0u;
+        }
+        // Step 4 (13000-15000): dark beat — everything off.
+        light.on = on;
+    }
 }
 
 void GameMachine::enter_table_select() {
@@ -245,6 +318,11 @@ void GameMachine::enter_high_score_entry() {
 
 void GameMachine::enter_game_over() {
     host_.end_game(); // fires game_end {winner, scores} synchronously
+    // §9: the framework plays the game_over song on game end (a table
+    // without one stays silent — legal subset).
+    if (music_sink_ != nullptr) {
+        music_sink_->play_music("game_over");
+    }
 }
 
 // ---- per-tick machinery ----
@@ -640,6 +718,7 @@ void GameMachine::step(const sim::TickInput& input) {
 
     switch (state_) {
     case GameState::Attract:
+        step_attract(left_edge, right_edge);
         if (start_edge) {
             enter(GameState::TableSelect); // T3
         }

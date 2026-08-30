@@ -17,8 +17,18 @@ add_library(tb_audio STATIC
     audio_engine.cpp
     audio_json.cpp
     sfx_synth.cpp
+    tracker.cpp
 )
 
 target_include_directories(tb_audio PUBLIC ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(tb_audio PUBLIC tb_core nlohmann_json::nlohmann_json
                                       miniaudio::miniaudio)
+
+# Determinism (12-audio.md §8): the tracker's golden-hash PCM must be
+# bit-identical across platforms — no FMA contraction drift (the same
+# rule tb_sim carries, 08 §2.2).
+if(MSVC)
+    target_compile_options(tb_audio PRIVATE /fp:precise)
+else()
+    target_compile_options(tb_audio PRIVATE -ffp-contract=off)
+endif()

@@ -1647,20 +1647,32 @@ int run(const CliOptions& cli) {
                     content.attract_page_time_s = snap.game.attract_page_time_s;
                     if (loaded_table != nullptr) {
                         content.table_name = loaded_table->def.name;
-                        // §8.2 rules card: meta.rules_card lines. The
-                        // table object is immutable at runtime (loads
-                        // and F5 reloads happen with the sim stopped).
-                        std::istringstream card(loaded_table->def.rules_card);
-                        std::string line;
-                        while (std::getline(card, line)) {
-                            if (!line.empty() && line.back() == '\r') {
-                                line.pop_back();
-                            }
-                            content.rules_lines.push_back(line);
-                            if (content.rules_lines.size() >= 8) {
-                                break; // card cap; more is M15 polish
+                        // §8.2 rules card: meta.rules_card lines —
+                        // STATIC per table, parsed once per loaded
+                        // object (keyed on pointer + content: F5 reload
+                        // reuses freed addresses, so the pointer alone
+                        // can serve a stale card).
+                        static const LoadedTable* card_table = nullptr;
+                        static std::string card_key;
+                        static std::vector<std::string> card_lines;
+                        if (card_table != loaded_table.get() ||
+                            card_key != loaded_table->def.rules_card) {
+                            card_table = loaded_table.get();
+                            card_key = loaded_table->def.rules_card;
+                            card_lines.clear();
+                            std::istringstream card(loaded_table->def.rules_card);
+                            std::string line;
+                            while (std::getline(card, line)) {
+                                if (!line.empty() && line.back() == '\r') {
+                                    line.pop_back();
+                                }
+                                card_lines.push_back(line);
+                                if (card_lines.size() >= 8) {
+                                    break; // card cap; more is M15 polish
+                                }
                             }
                         }
+                        content.rules_lines = card_lines;
                     }
                     // Both bounds: >4 would write past content.scores,
                     // and the publisher-side clamp is a convention, not

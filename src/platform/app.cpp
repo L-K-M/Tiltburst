@@ -931,6 +931,16 @@ int run(const CliOptions& cli) {
 
         // Backglass content pipeline: layout + ~30 Hz pacer (07 §8).
         render::BackglassLayout bg_layout;
+        // §8.2 rules-card cache (backglass attract page): static table
+        // data parsed once per loaded content — a run()-scope struct,
+        // NOT function-local statics (the statics inside the frame
+        // loop's nested scope overflowed the stack in MSVC's smoke
+        // build; cycle-23 bisect).
+        struct RulesCardCache {
+            const LoadedTable* table = nullptr;
+            std::string key;
+            std::vector<std::string> lines;
+        } card_cache;
         // Invariant: Overlay's glyph emission is stateless
         // (stb_easy_font prints from baked metrics — no init()); if
         // that ever changes, backglass text silently renders nothing
@@ -1652,27 +1662,27 @@ int run(const CliOptions& cli) {
                         // object (keyed on pointer + content: F5 reload
                         // reuses freed addresses, so the pointer alone
                         // can serve a stale card).
-                        static const LoadedTable* card_table = nullptr;
-                        static std::string card_key;
-                        static std::vector<std::string> card_lines;
-                        if (card_table != loaded_table.get() ||
-                            card_key != loaded_table->def.rules_card) {
-                            card_table = loaded_table.get();
-                            card_key = loaded_table->def.rules_card;
-                            card_lines.clear();
+                        // Keyed on pointer + content: F5 reload
+                        // mutates def IN PLACE (same object), so the
+                        // pointer alone would serve a stale card.
+                        if (card_cache.table != loaded_table.get() ||
+                            card_cache.key != loaded_table->def.rules_card) {
+                            card_cache.table = loaded_table.get();
+                            card_cache.key = loaded_table->def.rules_card;
+                            card_cache.lines.clear();
                             std::istringstream card(loaded_table->def.rules_card);
                             std::string line;
                             while (std::getline(card, line)) {
                                 if (!line.empty() && line.back() == '\r') {
                                     line.pop_back();
                                 }
-                                card_lines.push_back(line);
-                                if (card_lines.size() >= 8) {
+                                card_cache.lines.push_back(line);
+                                if (card_cache.lines.size() >= 8) {
                                     break; // card cap; more is M15 polish
                                 }
                             }
                         }
-                        content.rules_lines = card_lines;
+                        content.rules_lines = card_cache.lines;
                     }
                     // Both bounds: >4 would write past content.scores,
                     // and the publisher-side clamp is a convention, not

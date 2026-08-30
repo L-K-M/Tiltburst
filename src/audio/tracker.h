@@ -24,7 +24,11 @@ inline constexpr uint32_t kTrackerRate = 48000;
 // rendered PCM is bit-identical across platforms, which the
 // golden-hash determinism test relies on (16-testing-ci.md runs 3
 // OSes). Do NOT introduce std::pow/std::sin/std::exp here - those DO
-// differ in low bits across libms.
+// differ in low bits across libms. The guarantee additionally needs
+// the BUILD rules tb_audio already carries (see src/audio/
+// CMakeLists.txt, same as tb_sim per 08 §2.2): -ffp-contract=off (no
+// FMA contraction; arm64 contracts by default and shifts rounding)
+// and no fast-math anywhere in the chain.
 //
 // Song PARSING lives in audio_json.h (it shares AudioLoadError and the
 // patch map); this header is the data + the audio-thread player.

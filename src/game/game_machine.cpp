@@ -187,8 +187,12 @@ void GameMachine::step_attract(bool left_edge, bool right_edge) {
             on = std::fmod(local, 1.0) < 0.5; // 1 Hz breath
         } else if (phase < 12000) {
             // Step 2: chase along declaration order at the §7.1
-            // 80 ms/lamp rate.
-            on = n > 0 && li == size_t(((ms - 8000) / 80) % n);
+            // 80 ms/lamp rate — clamped down only when n lamps do not
+            // fit the 4 s window at that rate (n > 50), so no lamp is
+            // systematically dark (cycle-22 review: the fixed rate
+            // only ever reached lamp 50).
+            const uint32_t per = n > 0 ? std::clamp(4000u / uint32_t(n), 1u, 80u) : 80u;
+            on = n > 0 && li == size_t(((ms - 8000) / per) % n);
         } else if (phase < 13000) {
             // Step 3: strobe (fast regular blink).
             on = ((ms / 62u) & 1u) != 0u;

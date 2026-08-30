@@ -1653,9 +1653,16 @@ int run(const CliOptions& cli) {
                         // churn; F5 reload swaps the table pointer,
                         // which re-keys the cache by construction).
                         static const LoadedTable* card_table = nullptr;
+                        static std::string card_key;
                         static std::vector<std::string> card_lines;
-                        if (card_table != loaded_table.get()) {
+                        // Key on (pointer, content): F5 reload reuses
+                        // freed addresses (same-size struct, LIFO
+                        // allocator), so a pointer alone can serve a
+                        // stale card after an edit (cycle-23 review).
+                        if (card_table != loaded_table.get() ||
+                            card_key != loaded_table->def.rules_card) {
                             card_table = loaded_table.get();
+                            card_key = loaded_table->def.rules_card;
                             card_lines.clear();
                             std::istringstream card(loaded_table->def.rules_card);
                             std::string line;

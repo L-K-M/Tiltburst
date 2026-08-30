@@ -17,10 +17,14 @@ inline constexpr uint32_t kTrackerRate = 48000;
 // channels (pulse1/pulse2/wide/noise), sample-accurate rows via the
 // float tick accumulator, and chip-flavored naive oscillators.
 //
-// Sample math is deliberately libm-free (literal LUTs for 2^(k/12),
-// sin, and root-finding by Newton iteration): the rendered PCM is
-// bit-identical across platforms, which the golden-hash determinism
-// test relies on (16-testing-ci.md runs 3 OSes).
+// Sample math is deliberately portable-exact: literal LUTs for
+// 2^(k/12) and sin, root-finding by Newton iteration, and only
+// exactly-defined IEEE-754 operations elsewhere (std::floor/fmod are
+// exact, NOT approximation-drifted like std::pow/std::sin). The
+// rendered PCM is bit-identical across platforms, which the
+// golden-hash determinism test relies on (16-testing-ci.md runs 3
+// OSes). Do NOT introduce std::pow/std::sin/std::exp here - those DO
+// differ in low bits across libms.
 //
 // Song PARSING lives in audio_json.h (it shares AudioLoadError and the
 // patch map); this header is the data + the audio-thread player.
@@ -77,8 +81,9 @@ struct TrackerSong {
 };
 
 // The audio-thread player. One instance renders one song; the engine
-// runs two for §9 crossfades. No allocation, locks, or libm calls
-// between start() and going inactive.
+// runs two for §9 crossfades. No allocation or locks between start()
+// and going inactive; math is portable-exact per the header comment
+// above (floor/fmod are exact; pow/sin/exp are not — see there).
 class TrackerPlayer {
 public:
     static constexpr uint32_t kChannels = TrackerPattern::kChannels;

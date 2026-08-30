@@ -108,6 +108,27 @@ jobs:
             done
           fi
 
+      # TEMPORARY (M14 windows smoke 127 diagnosis): dump the exe's
+      # imported DLLs and probe a trivial --version run so the log
+      # shows whether the failure is a load-time dependency or later.
+      - name: Smoke diagnostics (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $bin = (Get-ChildItem -Recurse -Filter tiltburst.exe build |
+                  Select-Object -First 1).FullName
+          Write-Host "exe: $bin"
+          $dumpbin = (Get-ChildItem "C:/Program Files/Microsoft Visual Studio" -Recurse -
+                      Filter dumpbin.exe -ErrorAction SilentlyContinue |
+                      Where-Object { $_.FullName -match 'Hostx64\\x64' } |
+                      Select-Object -First 1).FullName
+          if ($dumpbin) { & $dumpbin /DEPENDENTS $bin | Select-String -Pattern '\.dll' }
+          else { Write-Host "dumpbin not found" }
+          Write-Host "deployed DLLs:"
+          Get-ChildItem (Split-Path $bin) -Filter *.dll | ForEach-Object { Write-Host "  $($_.Name)" }
+          $p = Start-Process -FilePath $bin -ArgumentList '--version' -PassThru -Wait -NoNewWindow
+          Write-Host "--version exit code: $($p.ExitCode)"
+
       - name: Renderer smoke (exit 2 = logged skip, see 16-testing-ci.md §5)
         shell: bash
         run: |

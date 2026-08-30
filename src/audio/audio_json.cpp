@@ -366,7 +366,7 @@ uint8_t parse_note_token(const std::string& tok, const std::string& ptr) {
     if (tok.size() != 3 || (tok[1] != '-' && tok[1] != '#')) {
         fail("bad note token '" + tok + "' (want C-4, A#4, ---, OFF)", ptr);
     }
-    // Semitone per letter: C..G in slots 0,2,4,5,7; A,B in 8,10.
+    // Semitone per letter (§8.2): C=0 D=2 E=4 F=5 G=7 A=9 B=11.
     int sem = -1;
     switch (tok[0]) {
     case 'C':

@@ -108,38 +108,6 @@ jobs:
             done
           fi
 
-      # TEMPORARY (M14 windows smoke 127 diagnosis): dump the exe's
-      # imported DLLs and probe a trivial --version run so the log
-      # shows whether the failure is a load-time dependency or later.
-      - name: Smoke diagnostics (windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $bin = (Get-ChildItem -Recurse -Filter tiltburst.exe build | Select-Object -First 1).FullName
-          Write-Host "exe: $bin"
-          $dumpbin = (Get-ChildItem "C:/Program Files/Microsoft Visual Studio" -Recurse -Filter dumpbin.exe -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match 'Hostx64\\x64' } | Select-Object -First 1).FullName
-          if ($dumpbin) { & $dumpbin /DEPENDENTS $bin | Select-String -Pattern '\.dll' }
-          else { Write-Host "dumpbin not found" }
-          Write-Host "deployed DLLs:"
-          Get-ChildItem (Split-Path $bin) -Filter *.dll | ForEach-Object { Write-Host "  $($_.Name)" }
-          $p = Start-Process -FilePath $bin -ArgumentList '--version' -PassThru -Wait -NoNewWindow
-          Write-Host "--version exit code: $($p.ExitCode)"
-          $smokeDir = "build/smoke"
-          New-Item -ItemType Directory -Force -Path $smokeDir | Out-Null
-          $p2 = Start-Process -FilePath $bin -ArgumentList "--render-smoke --frames 120 --screenshot-dir $smokeDir" -PassThru -Wait -NoNewWindow -RedirectStandardError "$smokeDir/stderr.txt" -RedirectStandardOutput "$smokeDir/stdout.txt"
-          Write-Host "smoke exit code (NTSTATUS if negative): $($p2.ExitCode)"
-          Write-Host "stderr:"
-          if (Test-Path "$smokeDir/stderr.txt") { Get-Content "$smokeDir/stderr.txt" | Select-Object -First 20 }
-          $cdb = "C:/Program Files (x86)/Windows Kits/10/Debuggers/x64/cdb.exe"
-          if (Test-Path $cdb) {
-            Write-Host "cdb stack capture:"
-            & $cdb -g -G -c "g; ~* k 20; q" -logo "$smokeDir/cdb.txt" $bin --render-smoke --frames 120 --screenshot-dir $smokeDir | Out-Null
-            # cdb exits with the debuggee's status; do not fail the step.
-            $global:LASTEXITCODE = 0
-            Get-Content "$smokeDir/cdb.txt" | Select-String -Pattern 'tiltburst|STACK|c00000fd' -Context 0,12 | Select-Object -First 30
-          } else { Write-Host "cdb not found" }
-          exit 0
-
       - name: Renderer smoke (exit 2 = logged skip, see 16-testing-ci.md §5)
         shell: bash
         run: |

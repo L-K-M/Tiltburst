@@ -763,6 +763,18 @@ corrections are new entries. Format: 03-process.md §3.1.
   drift mode; drift end/multiball end restore the RIGHT theme),
   backglass fixed rank column + page-2 emptiness, chase-march
   asserted, MusicSink lifetime contract documented.
+- The windows-only smoke saga (cycles 22-24): a 24-line cache block
+  in run() tipped MSVC's inlining of the ENTIRE frame loop into a
+  single run() body whose stack frame exceeded the 1MB main-thread
+  stack (0xC00000FD; bash surfaced it as exit 127). Diagnosis needed
+  CI-side forensics: dumpbin/DEPENDENTS + a PowerShell probe (exes
+  load fine, --version exits 0) and finally a cdb stack capture on
+  the runner (FOUR frames deep — a giant frame, not recursion). Fix:
+  the backglass frame block is now render_backglass_frame() (also
+  states the snapshot-only contract in one place). Bisecting on CI
+  costs ~10 min/iteration — the forensics paid for themselves. Also:
+  cdb exits with the debuggee's status; guard $LASTEXITCODE or the
+  diagnostics step itself fails.
 - Deferred: playfield particle wiring for attract ("music and
   particles" — ParticleSystem exists as a tested library but has no
   GPU draw path yet; lands with the screenshot tooling that needs

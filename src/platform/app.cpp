@@ -724,14 +724,6 @@ int run(const CliOptions& cli) {
 
         sim.request_stop();
         sim.join();
-        // The sim thread (the only music-sink caller) is gone: drop
-        // the raw registrations before anything they point at unwinds.
-        if (loaded_table != nullptr) {
-            loaded_table->script.set_music_sink(nullptr);
-        }
-        if (machine != nullptr) {
-            machine->set_music_sink(nullptr);
-        }
         input.stop();
 
         if (csv != nullptr) {

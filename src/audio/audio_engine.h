@@ -77,12 +77,12 @@ struct AudioCommand {
     float value = 0.0f; // volume 0..100 (Volume); >0.5 = attract (PlaySong)
                         // or immediate stop (StopMusic)
     uint16_t patch = 0; // PlayUi patch id / PlaySong bank song index
-    // PlaySong only: the publish_epoch the song index was resolved
-    // against. A bank swap between push and pop renumbers the song
-    // list; the handler drops stale requests instead of playing the
-    // wrong song.
-    uint16_t epoch = 0;
-    uint16_t _pad = 0;
+    // PlaySong only: the publish epoch the song index was resolved
+    // against (full width — PatchBank::epoch is 64-bit; a narrower
+    // field would alias after 2^N publishes and replay a stale index
+    // against a renumbered song list). A bank swap between push and
+    // pop renumbers the list; the handler drops stale requests.
+    uint64_t epoch = 0;
 };
 
 class CommandQueue {
@@ -223,7 +223,9 @@ public:
     // Test seams for the §9 music state: which bank song index each
     // slot holds (0xFFFF = empty) and the absolute stream sample that
     // slot STARTED at (a same-id no-op must leave both unchanged —
-    // an RMS level cannot see a phase reset on a steady tone).
+    // an RMS level cannot see a phase reset on a steady tone). The
+    // start accessor returns UINT64_MAX for an out-of-range slot: 0
+    // is a VALID start (the first play after init starts at 0).
     static constexpr uint32_t kMusicSlots = 2;
 
     uint16_t debug_music_song(uint32_t slot) const;

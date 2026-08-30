@@ -498,9 +498,9 @@ TEST(Music, CrossfadeEqualPower) {
     audio::AudioConfig cfg;
     cfg.null_backend = true;
     ASSERT_TRUE(sys.init(cfg));
-    // Two gated tones a minor third apart (A-4 vs C-4): same envelope
+    // Two gated tones a major sixth apart (A-4 vs C-4): same envelope
     // and volume (RMS levels compare 1:1) and a frequency ratio of
-    // 2^(3/12) — genuinely incommensurate, so the two instances carry
+    // 2^(9/12) — genuinely incommensurate, so the two instances carry
     // no fixed phase relationship: they add in POWER, and the mid-fade
     // level reflects the equal-power curve itself. (An octave pair
     // would be commensurate — a 2:1 ratio has a fixed phase relation;

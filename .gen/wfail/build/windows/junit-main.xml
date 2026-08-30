@@ -1,0 +1,2883 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="(empty)"
+	tests="178"
+	failures="0"
+	disabled="0"
+	skipped="1"
+	hostname=""
+	time="11"
+	timestamp="2026-08-30T01:06:46"
+	>
+	<testcase name="unit_config.round_trip" classname="unit_config.round_trip" time="0.0430845" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_config.round_trip
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_config
+[ RUN      ] unit_config.round_trip
+[       OK ] unit_config.round_trip (8 ms)
+[----------] 1 test from unit_config (8 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (8 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_config.unknown_keys_preserved" classname="unit_config.unknown_keys_preserved" time="0.0449125" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_config.unknown_keys_preserved
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_config
+[ RUN      ] unit_config.unknown_keys_preserved
+[       OK ] unit_config.unknown_keys_preserved (10 ms)
+[----------] 1 test from unit_config (10 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (10 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_config.out_of_range_clamped" classname="unit_config.out_of_range_clamped" time="0.0356052" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_config.out_of_range_clamped
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_config
+[ RUN      ] unit_config.out_of_range_clamped
+[WARN  ] [main] video.max_fps value 5000 out of range [30, 1000]; clamped
+[WARN  ] [main] video.brightness value 9 out of range [0.5, 1.5]; clamped
+[WARN  ] [main] balls_per_game 7 is neither 3 nor 5; using 3
+[       OK ] unit_config.out_of_range_clamped (1 ms)
+[----------] 1 test from unit_config (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_hash.fnv1a64_known_answer" classname="unit_hash.fnv1a64_known_answer" time="0.0337567" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_hash.fnv1a64_known_answer
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_hash
+[ RUN      ] unit_hash.fnv1a64_known_answer
+[       OK ] unit_hash.fnv1a64_known_answer (0 ms)
+[----------] 1 test from unit_hash (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_rng.known_sequence" classname="unit_rng.known_sequence" time="0.0331375" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_rng.known_sequence
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_rng
+[ RUN      ] unit_rng.known_sequence
+[       OK ] unit_rng.known_sequence (0 ms)
+[----------] 1 test from unit_rng (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_rng.next_below_uniform" classname="unit_rng.next_below_uniform" time="0.035601" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_rng.next_below_uniform
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_rng
+[ RUN      ] unit_rng.next_below_uniform
+[       OK ] unit_rng.next_below_uniform (2 ms)
+[----------] 1 test from unit_rng (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_scaffold.sanity" classname="unit_scaffold.sanity" time="0.0331016" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_scaffold.sanity
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_scaffold
+[ RUN      ] unit_scaffold.sanity
+[       OK ] unit_scaffold.sanity (0 ms)
+[----------] 1 test from unit_scaffold (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_time.monotonic_non_decreasing" classname="unit_time.monotonic_non_decreasing" time="0.0341996" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_time.monotonic_non_decreasing
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_time
+[ RUN      ] unit_time.monotonic_non_decreasing
+[       OK ] unit_time.monotonic_non_decreasing (1 ms)
+[----------] 1 test from unit_time (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_time.sleep_until_reaches_target" classname="unit_time.sleep_until_reaches_target" time="0.0369043" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_time.sleep_until_reaches_target
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_time
+[ RUN      ] unit_time.sleep_until_reaches_target
+[       OK ] unit_time.sleep_until_reaches_target (2 ms)
+[----------] 1 test from unit_time (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="SfxSynth.PatchRendersDeterministicPcm" classname="SfxSynth.PatchRendersDeterministicPcm" time="0.098214" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = SfxSynth.PatchRendersDeterministicPcm
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from SfxSynth
+[ RUN      ] SfxSynth.PatchRendersDeterministicPcm
+[       OK ] SfxSynth.PatchRendersDeterministicPcm (63 ms)
+[----------] 1 test from SfxSynth (63 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (63 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Scheduler.TickToSampleWithin1ms" classname="Scheduler.TickToSampleWithin1ms" time="0.0715113" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Scheduler.TickToSampleWithin1ms
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Scheduler
+[ RUN      ] Scheduler.TickToSampleWithin1ms
+[       OK ] Scheduler.TickToSampleWithin1ms (37 ms)
+[----------] 1 test from Scheduler (37 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (37 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Scheduler.DriftConvergesAndStallReanchors" classname="Scheduler.DriftConvergesAndStallReanchors" time="0.0733143" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Scheduler.DriftConvergesAndStallReanchors
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Scheduler
+[ RUN      ] Scheduler.DriftConvergesAndStallReanchors
+[       OK ] Scheduler.DriftConvergesAndStallReanchors (39 ms)
+[----------] 1 test from Scheduler (39 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (39 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Mixer.VoiceStealOldestNoClick" classname="Mixer.VoiceStealOldestNoClick" time="0.0719333" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Mixer.VoiceStealOldestNoClick
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Mixer
+[ RUN      ] Mixer.VoiceStealOldestNoClick
+[       OK ] Mixer.VoiceStealOldestNoClick (37 ms)
+[----------] 1 test from Mixer (37 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (37 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Mixer.CallbackAllocationFree" classname="Mixer.CallbackAllocationFree" time="0.109543" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Mixer.CallbackAllocationFree
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Mixer
+[ RUN      ] Mixer.CallbackAllocationFree
+[       OK ] Mixer.CallbackAllocationFree (74 ms)
+[----------] 1 test from Mixer (74 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (74 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Mixer.LimiterGainReduction" classname="Mixer.LimiterGainReduction" time="0.0724015" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Mixer.LimiterGainReduction
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Mixer
+[ RUN      ] Mixer.LimiterGainReduction
+[       OK ] Mixer.LimiterGainReduction (37 ms)
+[----------] 1 test from Mixer (37 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (37 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="AudioSmoke.DeviceOpens" classname="AudioSmoke.DeviceOpens" time="0.077607" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = AudioSmoke.DeviceOpens
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from AudioSmoke
+[ RUN      ] AudioSmoke.DeviceOpens
+[       OK ] AudioSmoke.DeviceOpens (39 ms)
+[----------] 1 test from AudioSmoke (39 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (39 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="AudioBank.AssetsMirrorMatchesBuiltIns" classname="AudioBank.AssetsMirrorMatchesBuiltIns" time="0.0724622" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = AudioBank.AssetsMirrorMatchesBuiltIns
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from AudioBank
+[ RUN      ] AudioBank.AssetsMirrorMatchesBuiltIns
+[       OK ] AudioBank.AssetsMirrorMatchesBuiltIns (38 ms)
+[----------] 1 test from AudioBank (38 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (38 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="AudioJson.LoadsTestLabAndValidates" classname="AudioJson.LoadsTestLabAndValidates" time="0.0813881" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = AudioJson.LoadsTestLabAndValidates
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from AudioJson
+[ RUN      ] AudioJson.LoadsTestLabAndValidates
+[       OK ] AudioJson.LoadsTestLabAndValidates (47 ms)
+[----------] 1 test from AudioJson (47 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (47 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="AudioJson.RejectsBadMapKeyAndNonePatch" classname="AudioJson.RejectsBadMapKeyAndNonePatch" time="0.0370964" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = AudioJson.RejectsBadMapKeyAndNonePatch
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from AudioJson
+[ RUN      ] AudioJson.RejectsBadMapKeyAndNonePatch
+[       OK ] AudioJson.RejectsBadMapKeyAndNonePatch (3 ms)
+[----------] 1 test from AudioJson (3 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (3 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="AudioJson.NoneDisablesPurpose" classname="AudioJson.NoneDisablesPurpose" time="0.0738639" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = AudioJson.NoneDisablesPurpose
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from AudioJson
+[ RUN      ] AudioJson.NoneDisablesPurpose
+[       OK ] AudioJson.NoneDisablesPurpose (39 ms)
+[----------] 1 test from AudioJson (39 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (39 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="AudioJson.WavLoadsFromAbsolutePackDir" classname="AudioJson.WavLoadsFromAbsolutePackDir" time="0.075546" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = AudioJson.WavLoadsFromAbsolutePackDir
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from AudioJson
+[ RUN      ] AudioJson.WavLoadsFromAbsolutePackDir
+[       OK ] AudioJson.WavLoadsFromAbsolutePackDir (40 ms)
+[----------] 1 test from AudioJson (40 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (40 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="AudioJson.WavGuardRejectsEscapes" classname="AudioJson.WavGuardRejectsEscapes" time="0.234411" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = AudioJson.WavGuardRejectsEscapes
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from AudioJson
+[ RUN      ] AudioJson.WavGuardRejectsEscapes
+[ERROR ] [audio] wav path '/escape.wav' escapes the pack
+[ERROR ] [audio] wav path '\escape.wav' escapes the pack
+[ERROR ] [audio] wav path '//server/share/x.wav' escapes the pack
+[ERROR ] [audio] wav path 'C:escape.wav' escapes the pack
+[ERROR ] [audio] wav path 'assets/../../escape.wav' escapes the pack
+[       OK ] AudioJson.WavGuardRejectsEscapes (199 ms)
+[----------] 1 test from AudioJson (199 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (199 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="AudioJson.NeonDriftSongsLoad" classname="AudioJson.NeonDriftSongsLoad" time="0.0892637" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = AudioJson.NeonDriftSongsLoad
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from AudioJson
+[ RUN      ] AudioJson.NeonDriftSongsLoad
+[       OK ] AudioJson.NeonDriftSongsLoad (53 ms)
+[----------] 1 test from AudioJson (53 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (53 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TrackerSongParse.ReferenceSongParses" classname="TrackerSongParse.ReferenceSongParses" time="0.0341428" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TrackerSongParse.ReferenceSongParses
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TrackerSongParse
+[ RUN      ] TrackerSongParse.ReferenceSongParses
+[       OK ] TrackerSongParse.ReferenceSongParses (0 ms)
+[----------] 1 test from TrackerSongParse (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TrackerSongParse.RejectsIllegalWaveForChannel" classname="TrackerSongParse.RejectsIllegalWaveForChannel" time="0.0332791" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TrackerSongParse.RejectsIllegalWaveForChannel
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TrackerSongParse
+[ RUN      ] TrackerSongParse.RejectsIllegalWaveForChannel
+[       OK ] TrackerSongParse.RejectsIllegalWaveForChannel (0 ms)
+[----------] 1 test from TrackerSongParse (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TrackerSongParse.RejectsMissingInstOnFirstNote" classname="TrackerSongParse.RejectsMissingInstOnFirstNote" time="0.0335786" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TrackerSongParse.RejectsMissingInstOnFirstNote
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TrackerSongParse
+[ RUN      ] TrackerSongParse.RejectsMissingInstOnFirstNote
+[       OK ] TrackerSongParse.RejectsMissingInstOnFirstNote (0 ms)
+[----------] 1 test from TrackerSongParse (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TrackerSongParse.RejectsBadNoteBpmAndOrder" classname="TrackerSongParse.RejectsBadNoteBpmAndOrder" time="0.0333949" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TrackerSongParse.RejectsBadNoteBpmAndOrder
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TrackerSongParse
+[ RUN      ] TrackerSongParse.RejectsBadNoteBpmAndOrder
+[       OK ] TrackerSongParse.RejectsBadNoteBpmAndOrder (0 ms)
+[----------] 1 test from TrackerSongParse (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Tracker.SongRendersDeterministicPcm" classname="Tracker.SongRendersDeterministicPcm" time="0.0449956" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Tracker.SongRendersDeterministicPcm
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Tracker
+[ RUN      ] Tracker.SongRendersDeterministicPcm
+[       OK ] Tracker.SongRendersDeterministicPcm (11 ms)
+[----------] 1 test from Tracker (11 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (11 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Tracker.RowTimingWithin1ms" classname="Tracker.RowTimingWithin1ms" time="0.0360889" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Tracker.RowTimingWithin1ms
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Tracker
+[ RUN      ] Tracker.RowTimingWithin1ms
+[       OK ] Tracker.RowTimingWithin1ms (2 ms)
+[----------] 1 test from Tracker (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Tracker.LoopSeamless" classname="Tracker.LoopSeamless" time="0.0382279" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Tracker.LoopSeamless
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Tracker
+[ RUN      ] Tracker.LoopSeamless
+[       OK ] Tracker.LoopSeamless (4 ms)
+[----------] 1 test from Tracker (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (4 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Tracker.RetriggerTailContinuity" classname="Tracker.RetriggerTailContinuity" time="0.0348917" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Tracker.RetriggerTailContinuity
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Tracker
+[ RUN      ] Tracker.RetriggerTailContinuity
+[       OK ] Tracker.RetriggerTailContinuity (1 ms)
+[----------] 1 test from Tracker (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Music.PlaySongStartsAndNoOpsSameId" classname="Music.PlaySongStartsAndNoOpsSameId" time="0.115508" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Music.PlaySongStartsAndNoOpsSameId
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Music
+[ RUN      ] Music.PlaySongStartsAndNoOpsSameId
+[WARN  ] [audio] play_music: no song 'wizard' in this bank (silence, §9)
+[       OK ] Music.PlaySongStartsAndNoOpsSameId (81 ms)
+[----------] 1 test from Music (81 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (81 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Music.StopMusicFadesOut" classname="Music.StopMusicFadesOut" time="0.115475" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Music.StopMusicFadesOut
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Music
+[ RUN      ] Music.StopMusicFadesOut
+[       OK ] Music.StopMusicFadesOut (80 ms)
+[----------] 1 test from Music (80 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (80 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Music.CrossfadeEqualPower" classname="Music.CrossfadeEqualPower" time="0.116659" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Music.CrossfadeEqualPower
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Music
+[ RUN      ] Music.CrossfadeEqualPower
+[       OK ] Music.CrossfadeEqualPower (81 ms)
+[----------] 1 test from Music (81 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (81 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Music.AttractSongSitsAtMinus12dB" classname="Music.AttractSongSitsAtMinus12dB" time="0.115636" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Music.AttractSongSitsAtMinus12dB
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Music
+[ RUN      ] Music.AttractSongSitsAtMinus12dB
+[       OK ] Music.AttractSongSitsAtMinus12dB (81 ms)
+[----------] 1 test from Music (81 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (81 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Music.CallbackAllocationFreeWithTracker" classname="Music.CallbackAllocationFreeWithTracker" time="0.115221" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Music.CallbackAllocationFreeWithTracker
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Music
+[ RUN      ] Music.CallbackAllocationFreeWithTracker
+[       OK ] Music.CallbackAllocationFreeWithTracker (80 ms)
+[----------] 1 test from Music (80 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (80 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Duck.SfxDucksMusicAndRecovers" classname="Duck.SfxDucksMusicAndRecovers" time="0.118559" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Duck.SfxDucksMusicAndRecovers
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Duck
+[ RUN      ] Duck.SfxDucksMusicAndRecovers
+[       OK ] Duck.SfxDucksMusicAndRecovers (81 ms)
+[----------] 1 test from Duck (81 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (82 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="GameMachine.TransitionTableGolden" classname="GameMachine.TransitionTableGolden" time="0.0441285" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = GameMachine.TransitionTableGolden
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from GameMachine
+[ RUN      ] GameMachine.TransitionTableGolden
+[       OK ] GameMachine.TransitionTableGolden (10 ms)
+[----------] 1 test from GameMachine (10 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (10 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Players.FourPlayerRotationOrder" classname="Players.FourPlayerRotationOrder" time="0.535039" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Players.FourPlayerRotationOrder
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Players
+[ RUN      ] Players.FourPlayerRotationOrder
+[       OK ] Players.FourPlayerRotationOrder (499 ms)
+[----------] 1 test from Players (499 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (499 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Tilt.WarningsThenTiltAtThreshold" classname="Tilt.WarningsThenTiltAtThreshold" time="1.549" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Tilt.WarningsThenTiltAtThreshold
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Tilt
+[ RUN      ] Tilt.WarningsThenTiltAtThreshold
+[       OK ] Tilt.WarningsThenTiltAtThreshold (1512 ms)
+[----------] 1 test from Tilt (1512 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1512 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Tilt.FlippersDeadAfterTilt" classname="Tilt.FlippersDeadAfterTilt" time="0.0501397" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Tilt.FlippersDeadAfterTilt
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Tilt
+[ RUN      ] Tilt.FlippersDeadAfterTilt
+[       OK ] Tilt.FlippersDeadAfterTilt (14 ms)
+[----------] 1 test from Tilt (14 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (14 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="HighScores.PersistRoundTripAndOrdering" classname="HighScores.PersistRoundTripAndOrdering" time="0.045721" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = HighScores.PersistRoundTripAndOrdering
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from HighScores
+[ RUN      ] HighScores.PersistRoundTripAndOrdering
+[       OK ] HighScores.PersistRoundTripAndOrdering (12 ms)
+[----------] 1 test from HighScores (12 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (12 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="HighScores.SeedsDeclaredDefaultsElseStartsEmpty" classname="HighScores.SeedsDeclaredDefaultsElseStartsEmpty" time="0.0406018" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = HighScores.SeedsDeclaredDefaultsElseStartsEmpty
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from HighScores
+[ RUN      ] HighScores.SeedsDeclaredDefaultsElseStartsEmpty
+[       OK ] HighScores.SeedsDeclaredDefaultsElseStartsEmpty (7 ms)
+[----------] 1 test from HighScores (7 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (7 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="ExtraBall.SamePlayerShootsAgain" classname="ExtraBall.SamePlayerShootsAgain" time="0.0816519" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = ExtraBall.SamePlayerShootsAgain
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from ExtraBall
+[ RUN      ] ExtraBall.SamePlayerShootsAgain
+[       OK ] ExtraBall.SamePlayerShootsAgain (47 ms)
+[----------] 1 test from ExtraBall (47 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (47 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Attract.CyclesAndInterrupts" classname="Attract.CyclesAndInterrupts" time="0.186793" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Attract.CyclesAndInterrupts
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Attract
+[ RUN      ] Attract.CyclesAndInterrupts
+[       OK ] Attract.CyclesAndInterrupts (152 ms)
+[----------] 1 test from Attract (152 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (152 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Attract.LightsDarkBeatAndChase" classname="Attract.LightsDarkBeatAndChase" time="0.0831916" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Attract.LightsDarkBeatAndChase
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Attract
+[ RUN      ] Attract.LightsDarkBeatAndChase
+[       OK ] Attract.LightsDarkBeatAndChase (47 ms)
+[----------] 1 test from Attract (47 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (48 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Attract.GameOverPlaysSongAndGameOverPageFlow" classname="Attract.GameOverPlaysSongAndGameOverPageFlow" time="0.170491" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Attract.GameOverPlaysSongAndGameOverPageFlow
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Attract
+[ RUN      ] Attract.GameOverPlaysSongAndGameOverPageFlow
+[       OK ] Attract.GameOverPlaysSongAndGameOverPageFlow (132 ms)
+[----------] 1 test from Attract (132 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (132 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.PortraitPlusSquare" classname="DisplayAssign.PortraitPlusSquare" time="0.0347227" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.PortraitPlusSquare
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.PortraitPlusSquare
+[       OK ] DisplayAssign.PortraitPlusSquare (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.TruePortraitNoRotation" classname="DisplayAssign.TruePortraitNoRotation" time="0.0335332" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.TruePortraitNoRotation
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.TruePortraitNoRotation
+[       OK ] DisplayAssign.TruePortraitNoRotation (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.SingleDisplayPlayfieldOnly" classname="DisplayAssign.SingleDisplayPlayfieldOnly" time="0.0331924" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.SingleDisplayPlayfieldOnly
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.SingleDisplayPlayfieldOnly
+[       OK ] DisplayAssign.SingleDisplayPlayfieldOnly (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.LargerLandscapeWins" classname="DisplayAssign.LargerLandscapeWins" time="0.0328639" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.LargerLandscapeWins
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.LargerLandscapeWins
+[       OK ] DisplayAssign.LargerLandscapeWins (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.LandscapeReportedPortraitRotates" classname="DisplayAssign.LandscapeReportedPortraitRotates" time="0.033015" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.LandscapeReportedPortraitRotates
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.LandscapeReportedPortraitRotates
+[       OK ] DisplayAssign.LandscapeReportedPortraitRotates (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.ThreeDisplaysPicksSquarest" classname="DisplayAssign.ThreeDisplaysPicksSquarest" time="0.0332338" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.ThreeDisplaysPicksSquarest
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.ThreeDisplaysPicksSquarest
+[       OK ] DisplayAssign.ThreeDisplaysPicksSquarest (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.LargerPortraitWinsBetweenPortraits" classname="DisplayAssign.LargerPortraitWinsBetweenPortraits" time="0.0331343" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.LargerPortraitWinsBetweenPortraits
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.LargerPortraitWinsBetweenPortraits
+[       OK ] DisplayAssign.LargerPortraitWinsBetweenPortraits (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.OverrideBeatsHeuristic" classname="DisplayAssign.OverrideBeatsHeuristic" time="0.112336" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.OverrideBeatsHeuristic
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.OverrideBeatsHeuristic
+[       OK ] DisplayAssign.OverrideBeatsHeuristic (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.StaleMatchWarnsAndFallsBack" classname="DisplayAssign.StaleMatchWarnsAndFallsBack" time="0.0369113" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.StaleMatchWarnsAndFallsBack
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.StaleMatchWarnsAndFallsBack
+[       OK ] DisplayAssign.StaleMatchWarnsAndFallsBack (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.IdenticalDisplaysDeterministicTie" classname="DisplayAssign.IdenticalDisplaysDeterministicTie" time="0.13991" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.IdenticalDisplaysDeterministicTie
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.IdenticalDisplaysDeterministicTie
+[       OK ] DisplayAssign.IdenticalDisplaysDeterministicTie (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.EmptyListNoAssignment" classname="DisplayAssign.EmptyListNoAssignment" time="0.0415277" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.EmptyListNoAssignment
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.EmptyListNoAssignment
+[       OK ] DisplayAssign.EmptyListNoAssignment (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.ExplicitRotationPassthrough" classname="DisplayAssign.ExplicitRotationPassthrough" time="0.041363" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.ExplicitRotationPassthrough
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.ExplicitRotationPassthrough
+[       OK ] DisplayAssign.ExplicitRotationPassthrough (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.BackglassDisabledNoRotation" classname="DisplayAssign.BackglassDisabledNoRotation" time="0.0570551" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.BackglassDisabledNoRotation
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.BackglassDisabledNoRotation
+[       OK ] DisplayAssign.BackglassDisabledNoRotation (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.LastAutoStability" classname="DisplayAssign.LastAutoStability" time="0.0391764" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.LastAutoStability
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.LastAutoStability
+[       OK ] DisplayAssign.LastAutoStability (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.LastAutoStaleFallsBackToHeuristic" classname="DisplayAssign.LastAutoStaleFallsBackToHeuristic" time="0.0349183" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.LastAutoStaleFallsBackToHeuristic
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.LastAutoStaleFallsBackToHeuristic
+[       OK ] DisplayAssign.LastAutoStaleFallsBackToHeuristic (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.RefreshRateTiebreak" classname="DisplayAssign.RefreshRateTiebreak" time="0.0363168" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.RefreshRateTiebreak
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.RefreshRateTiebreak
+[       OK ] DisplayAssign.RefreshRateTiebreak (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.NameGlobMatching" classname="DisplayAssign.NameGlobMatching" time="0.0375005" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.NameGlobMatching
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.NameGlobMatching
+[       OK ] DisplayAssign.NameGlobMatching (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.AmbiguousNameGlobLowestIndex" classname="DisplayAssign.AmbiguousNameGlobLowestIndex" time="0.0375418" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.AmbiguousNameGlobLowestIndex
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.AmbiguousNameGlobLowestIndex
+[       OK ] DisplayAssign.AmbiguousNameGlobLowestIndex (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.SameDisplayForBothRolesDropsBackglass" classname="DisplayAssign.SameDisplayForBothRolesDropsBackglass" time="0.0353465" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.SameDisplayForBothRolesDropsBackglass
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.SameDisplayForBothRolesDropsBackglass
+[       OK ] DisplayAssign.SameDisplayForBothRolesDropsBackglass (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.FailedBackglassMatchFallsBackToHeuristic" classname="DisplayAssign.FailedBackglassMatchFallsBackToHeuristic" time="0.0377608" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.FailedBackglassMatchFallsBackToHeuristic
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.FailedBackglassMatchFallsBackToHeuristic
+[       OK ] DisplayAssign.FailedBackglassMatchFallsBackToHeuristic (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.LastAutoNoBackglassDoesNotBlockDiscovery" classname="DisplayAssign.LastAutoNoBackglassDoesNotBlockDiscovery" time="0.0422514" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.LastAutoNoBackglassDoesNotBlockDiscovery
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.LastAutoNoBackglassDoesNotBlockDiscovery
+[       OK ] DisplayAssign.LastAutoNoBackglassDoesNotBlockDiscovery (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.MalformedIndexMatchRejected" classname="DisplayAssign.MalformedIndexMatchRejected" time="0.0373207" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.MalformedIndexMatchRejected
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.MalformedIndexMatchRejected
+[       OK ] DisplayAssign.MalformedIndexMatchRejected (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.AmbiguousGlobWarns" classname="DisplayAssign.AmbiguousGlobWarns" time="0.0377922" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.AmbiguousGlobWarns
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.AmbiguousGlobWarns
+[       OK ] DisplayAssign.AmbiguousGlobWarns (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.DisabledBackglassSurvivesStabilityReuse" classname="DisplayAssign.DisabledBackglassSurvivesStabilityReuse" time="0.0362012" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.DisabledBackglassSurvivesStabilityReuse
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.DisabledBackglassSurvivesStabilityReuse
+[       OK ] DisplayAssign.DisabledBackglassSurvivesStabilityReuse (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.OverflowIndexRejected" classname="DisplayAssign.OverflowIndexRejected" time="0.134641" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.OverflowIndexRejected
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.OverflowIndexRejected
+[       OK ] DisplayAssign.OverflowIndexRejected (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.HeuristicPlayfieldSkipsExplicitBackglass" classname="DisplayAssign.HeuristicPlayfieldSkipsExplicitBackglass" time="0.0330174" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.HeuristicPlayfieldSkipsExplicitBackglass
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.HeuristicPlayfieldSkipsExplicitBackglass
+[       OK ] DisplayAssign.HeuristicPlayfieldSkipsExplicitBackglass (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.SingleDisplayExplicitBackglassDegrades" classname="DisplayAssign.SingleDisplayExplicitBackglassDegrades" time="0.0331972" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.SingleDisplayExplicitBackglassDegrades
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.SingleDisplayExplicitBackglassDegrades
+[       OK ] DisplayAssign.SingleDisplayExplicitBackglassDegrades (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.EmptyRecordingWithDuplicateNamesFallsThrough" classname="DisplayAssign.EmptyRecordingWithDuplicateNamesFallsThrough" time="0.0326885" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.EmptyRecordingWithDuplicateNamesFallsThrough
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.EmptyRecordingWithDuplicateNamesFallsThrough
+[       OK ] DisplayAssign.EmptyRecordingWithDuplicateNamesFallsThrough (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.ThirdDisplayDoesNotBreakReuse" classname="DisplayAssign.ThirdDisplayDoesNotBreakReuse" time="0.032804" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.ThirdDisplayDoesNotBreakReuse
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.ThirdDisplayDoesNotBreakReuse
+[       OK ] DisplayAssign.ThirdDisplayDoesNotBreakReuse (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplayAssign.DisabledBackglassTwoMonitorsReusesPlayfield" classname="DisplayAssign.DisabledBackglassTwoMonitorsReusesPlayfield" time="0.0332949" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplayAssign.DisabledBackglassTwoMonitorsReusesPlayfield
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplayAssign
+[ RUN      ] DisplayAssign.DisabledBackglassTwoMonitorsReusesPlayfield
+[       OK ] DisplayAssign.DisabledBackglassTwoMonitorsReusesPlayfield (0 ms)
+[----------] 1 test from DisplayAssign (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplaysJson.PersistRoundTrip" classname="DisplaysJson.PersistRoundTrip" time="0.0333087" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplaysJson.PersistRoundTrip
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplaysJson
+[ RUN      ] DisplaysJson.PersistRoundTrip
+[       OK ] DisplaysJson.PersistRoundTrip (0 ms)
+[----------] 1 test from DisplaysJson (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplaysJson.UnknownVersionRefused" classname="DisplaysJson.UnknownVersionRefused" time="0.0330404" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplaysJson.UnknownVersionRefused
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplaysJson
+[ RUN      ] DisplaysJson.UnknownVersionRefused
+[       OK ] DisplaysJson.UnknownVersionRefused (0 ms)
+[----------] 1 test from DisplaysJson (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DisplaysJson.NonIntegerVersionRefused" classname="DisplaysJson.NonIntegerVersionRefused" time="0.034727" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DisplaysJson.NonIntegerVersionRefused
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DisplaysJson
+[ RUN      ] DisplaysJson.NonIntegerVersionRefused
+[       OK ] DisplaysJson.NonIntegerVersionRefused (0 ms)
+[----------] 1 test from DisplaysJson (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="BackglassPacing.SkipNeverBlocks" classname="BackglassPacing.SkipNeverBlocks" time="0.0354949" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = BackglassPacing.SkipNeverBlocks
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from BackglassPacing
+[ RUN      ] BackglassPacing.SkipNeverBlocks
+[       OK ] BackglassPacing.SkipNeverBlocks (0 ms)
+[----------] 1 test from BackglassPacing (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="BackglassLayout.BuildsContentForBothModes" classname="BackglassLayout.BuildsContentForBothModes" time="0.0348538" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = BackglassLayout.BuildsContentForBothModes
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from BackglassLayout
+[ RUN      ] BackglassLayout.BuildsContentForBothModes
+[       OK ] BackglassLayout.BuildsContentForBothModes (0 ms)
+[----------] 1 test from BackglassLayout (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="input_latch.edges_apply_in_order_and_levels_track" classname="input_latch.edges_apply_in_order_and_levels_track" time="0.033725" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = input_latch.edges_apply_in_order_and_levels_track
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from input_latch
+[ RUN      ] input_latch.edges_apply_in_order_and_levels_track
+[       OK ] input_latch.edges_apply_in_order_and_levels_track (0 ms)
+[----------] 1 test from input_latch (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="input_latch.at_most_64_edges_drain_per_tick" classname="input_latch.at_most_64_edges_drain_per_tick" time="0.0334618" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = input_latch.at_most_64_edges_drain_per_tick
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from input_latch
+[ RUN      ] input_latch.at_most_64_edges_drain_per_tick
+[       OK ] input_latch.at_most_64_edges_drain_per_tick (0 ms)
+[----------] 1 test from input_latch (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="input_latch.sdl_gameplay_suppressed_while_raw_active" classname="input_latch.sdl_gameplay_suppressed_while_raw_active" time="0.0339982" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = input_latch.sdl_gameplay_suppressed_while_raw_active
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from input_latch
+[ RUN      ] input_latch.sdl_gameplay_suppressed_while_raw_active
+[       OK ] input_latch.sdl_gameplay_suppressed_while_raw_active (0 ms)
+[----------] 1 test from input_latch (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="input_latch.focus_gate_drops_gameplay_only" classname="input_latch.focus_gate_drops_gameplay_only" time="0.0343504" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = input_latch.focus_gate_drops_gameplay_only
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from input_latch
+[ RUN      ] input_latch.focus_gate_drops_gameplay_only
+[       OK ] input_latch.focus_gate_drops_gameplay_only (0 ms)
+[----------] 1 test from input_latch (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="latency_histogram.percentiles_are_bin_upper_edges_ns" classname="latency_histogram.percentiles_are_bin_upper_edges_ns" time="0.0330006" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = latency_histogram.percentiles_are_bin_upper_edges_ns
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from latency_histogram
+[ RUN      ] latency_histogram.percentiles_are_bin_upper_edges_ns
+[       OK ] latency_histogram.percentiles_are_bin_upper_edges_ns (0 ms)
+[----------] 1 test from latency_histogram (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Slingshot.FiresOnBandCrossing" classname="Slingshot.FiresOnBandCrossing" time="0.0338417" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Slingshot.FiresOnBandCrossing
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Slingshot
+[ RUN      ] Slingshot.FiresOnBandCrossing
+[       OK ] Slingshot.FiresOnBandCrossing (0 ms)
+[----------] 1 test from Slingshot (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="PopBumper.KickVectorRadial" classname="PopBumper.KickVectorRadial" time="0.0346875" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = PopBumper.KickVectorRadial
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PopBumper
+[ RUN      ] PopBumper.KickVectorRadial
+[       OK ] PopBumper.KickVectorRadial (0 ms)
+[----------] 1 test from PopBumper (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Standup.EmitsSwitchHitOnce" classname="Standup.EmitsSwitchHitOnce" time="0.034418" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Standup.EmitsSwitchHitOnce
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Standup
+[ RUN      ] Standup.EmitsSwitchHitOnce
+[       OK ] Standup.EmitsSwitchHitOnce (0 ms)
+[----------] 1 test from Standup (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Gate.OneWayBlocksReverse" classname="Gate.OneWayBlocksReverse" time="0.0335014" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Gate.OneWayBlocksReverse
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Gate
+[ RUN      ] Gate.OneWayBlocksReverse
+[       OK ] Gate.OneWayBlocksReverse (0 ms)
+[----------] 1 test from Gate (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Rollover.TriggersAtOverlap" classname="Rollover.TriggersAtOverlap" time="0.0331199" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Rollover.TriggersAtOverlap
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Rollover
+[ RUN      ] Rollover.TriggersAtOverlap
+[       OK ] Rollover.TriggersAtOverlap (0 ms)
+[----------] 1 test from Rollover (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Spinner.SpinCountFromBallSpeed" classname="Spinner.SpinCountFromBallSpeed" time="0.0336724" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Spinner.SpinCountFromBallSpeed
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Spinner
+[ RUN      ] Spinner.SpinCountFromBallSpeed
+[       OK ] Spinner.SpinCountFromBallSpeed (0 ms)
+[----------] 1 test from Spinner (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Spinner.BuilderBakesPerpendicularSegment" classname="Spinner.BuilderBakesPerpendicularSegment" time="0.0338808" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Spinner.BuilderBakesPerpendicularSegment
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Spinner
+[ RUN      ] Spinner.BuilderBakesPerpendicularSegment
+[       OK ] Spinner.BuilderBakesPerpendicularSegment (0 ms)
+[----------] 1 test from Spinner (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Determinism.TestLabAllElementsReplay" classname="Determinism.TestLabAllElementsReplay" time="0.10419" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Determinism.TestLabAllElementsReplay
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Determinism
+[ RUN      ] Determinism.TestLabAllElementsReplay
+[       OK ] Determinism.TestLabAllElementsReplay (70 ms)
+[----------] 1 test from Determinism (70 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (70 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Determinism.FullElementSetReplay" classname="Determinism.FullElementSetReplay" time="0.110185" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Determinism.FullElementSetReplay
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Determinism
+[ RUN      ] Determinism.FullElementSetReplay
+[       OK ] Determinism.FullElementSetReplay (75 ms)
+[----------] 1 test from Determinism (75 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (75 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Determinism.ScriptRngReplayStable" classname="Determinism.ScriptRngReplayStable" time="0.0393785" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Determinism.ScriptRngReplayStable
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Determinism
+[ RUN      ] Determinism.ScriptRngReplayStable
+[       OK ] Determinism.ScriptRngReplayStable (5 ms)
+[----------] 1 test from Determinism (5 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (5 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Determinism.NeonDriftGreyboxReplay" classname="Determinism.NeonDriftGreyboxReplay" time="0.21435" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Determinism.NeonDriftGreyboxReplay
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Determinism
+[ RUN      ] Determinism.NeonDriftGreyboxReplay
+[       OK ] Determinism.NeonDriftGreyboxReplay (179 ms)
+[----------] 1 test from Determinism (179 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (179 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Kicker.CaptureDwellEject" classname="Kicker.CaptureDwellEject" time="0.0367158" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Kicker.CaptureDwellEject
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Kicker
+[ RUN      ] Kicker.CaptureDwellEject
+[       OK ] Kicker.CaptureDwellEject (0 ms)
+[----------] 1 test from Kicker (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="DropBank.CompletesAndResets" classname="DropBank.CompletesAndResets" time="0.0338992" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = DropBank.CompletesAndResets
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DropBank
+[ RUN      ] DropBank.CompletesAndResets
+[       OK ] DropBank.CompletesAndResets (0 ms)
+[----------] 1 test from DropBank (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="CaptiveBall.StaysInLane" classname="CaptiveBall.StaysInLane" time="0.0352716" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = CaptiveBall.StaysInLane
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from CaptiveBall
+[ RUN      ] CaptiveBall.StaysInLane
+[       OK ] CaptiveBall.StaysInLane (2 ms)
+[----------] 1 test from CaptiveBall (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="CaptiveBall.FullTravelEmitsOnceAfterSwitchHit" classname="CaptiveBall.FullTravelEmitsOnceAfterSwitchHit" time="0.0350359" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = CaptiveBall.FullTravelEmitsOnceAfterSwitchHit
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from CaptiveBall
+[ RUN      ] CaptiveBall.FullTravelEmitsOnceAfterSwitchHit
+[       OK ] CaptiveBall.FullTravelEmitsOnceAfterSwitchHit (0 ms)
+[----------] 1 test from CaptiveBall (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Trough.CountsNeverGoNegative" classname="Trough.CountsNeverGoNegative" time="0.0347392" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Trough.CountsNeverGoNegative
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Trough
+[ RUN      ] Trough.CountsNeverGoNegative
+[       OK ] Trough.CountsNeverGoNegative (0 ms)
+[----------] 1 test from Trough (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="BallSave.TimerServesWithinWindow" classname="BallSave.TimerServesWithinWindow" time="0.0340818" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = BallSave.TimerServesWithinWindow
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from BallSave
+[ RUN      ] BallSave.TimerServesWithinWindow
+[       OK ] BallSave.TimerServesWithinWindow (0 ms)
+[----------] 1 test from BallSave (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="MultiBall.ThreeActiveDeterministic" classname="MultiBall.ThreeActiveDeterministic" time="0.0482841" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = MultiBall.ThreeActiveDeterministic
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from MultiBall
+[ RUN      ] MultiBall.ThreeActiveDeterministic
+[       OK ] MultiBall.ThreeActiveDeterministic (13 ms)
+[----------] 1 test from MultiBall (13 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (14 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Ramp.ClimbConservesPlausibleEnergy" classname="Ramp.ClimbConservesPlausibleEnergy" time="0.0334891" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Ramp.ClimbConservesPlausibleEnergy
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Ramp
+[ RUN      ] Ramp.ClimbConservesPlausibleEnergy
+[       OK ] Ramp.ClimbConservesPlausibleEnergy (0 ms)
+[----------] 1 test from Ramp (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Ramp.SlowBallRollsBack" classname="Ramp.SlowBallRollsBack" time="0.0336431" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Ramp.SlowBallRollsBack
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Ramp
+[ RUN      ] Ramp.SlowBallRollsBack
+[       OK ] Ramp.SlowBallRollsBack (0 ms)
+[----------] 1 test from Ramp (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Ramp.RidesDownFromLayer1" classname="Ramp.RidesDownFromLayer1" time="0.0345672" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Ramp.RidesDownFromLayer1
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Ramp
+[ RUN      ] Ramp.RidesDownFromLayer1
+[       OK ] Ramp.RidesDownFromLayer1 (0 ms)
+[----------] 1 test from Ramp (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Layer.MasksIsolateColliders" classname="Layer.MasksIsolateColliders" time="0.0334847" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Layer.MasksIsolateColliders
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Layer
+[ RUN      ] Layer.MasksIsolateColliders
+[       OK ] Layer.MasksIsolateColliders (0 ms)
+[----------] 1 test from Layer (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Magnet.CaptureEnvelope" classname="Magnet.CaptureEnvelope" time="0.0356552" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Magnet.CaptureEnvelope
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Magnet
+[ RUN      ] Magnet.CaptureEnvelope
+[       OK ] Magnet.CaptureEnvelope (2 ms)
+[----------] 1 test from Magnet (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="feel_scenarios.ft09_magnet_catch_throw" classname="feel_scenarios.ft09_magnet_catch_throw" time="0.134025" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = feel_scenarios.ft09_magnet_catch_throw
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from feel_scenarios
+[ RUN      ] feel_scenarios.ft09_magnet_catch_throw
+[       OK ] feel_scenarios.ft09_magnet_catch_throw (2 ms)
+[----------] 1 test from feel_scenarios (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (3 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="feel_scenarios.ft10_ramp_make_rollback" classname="feel_scenarios.ft10_ramp_make_rollback" time="0.0335168" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = feel_scenarios.ft10_ramp_make_rollback
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from feel_scenarios
+[ RUN      ] feel_scenarios.ft10_ramp_make_rollback
+[       OK ] feel_scenarios.ft10_ramp_make_rollback (0 ms)
+[----------] 1 test from feel_scenarios (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="feel_scenarios.ft01_dead_bounce" classname="feel_scenarios.ft01_dead_bounce" time="0.0334356" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = feel_scenarios.ft01_dead_bounce
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from feel_scenarios
+[ RUN      ] feel_scenarios.ft01_dead_bounce
+[       OK ] feel_scenarios.ft01_dead_bounce (0 ms)
+[----------] 1 test from feel_scenarios (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="feel_scenarios.ft02_live_catch" classname="feel_scenarios.ft02_live_catch" time="0.0363217" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = feel_scenarios.ft02_live_catch
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from feel_scenarios
+[ RUN      ] feel_scenarios.ft02_live_catch
+[       OK ] feel_scenarios.ft02_live_catch (3 ms)
+[----------] 1 test from feel_scenarios (3 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (3 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="feel_scenarios.ft03_cradle_hold" classname="feel_scenarios.ft03_cradle_hold" time="0.0490731" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = feel_scenarios.ft03_cradle_hold
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from feel_scenarios
+[ RUN      ] feel_scenarios.ft03_cradle_hold
+[       OK ] feel_scenarios.ft03_cradle_hold (14 ms)
+[----------] 1 test from feel_scenarios (14 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (14 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="feel_scenarios.ft04_backhand" classname="feel_scenarios.ft04_backhand" time="0.0386891" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = feel_scenarios.ft04_backhand
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from feel_scenarios
+[ RUN      ] feel_scenarios.ft04_backhand
+[       OK ] feel_scenarios.ft04_backhand (5 ms)
+[----------] 1 test from feel_scenarios (5 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (5 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="feel_scenarios.ft05_post_pass" classname="feel_scenarios.ft05_post_pass" time="0.0388727" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = feel_scenarios.ft05_post_pass
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from feel_scenarios
+[ RUN      ] feel_scenarios.ft05_post_pass
+[       OK ] feel_scenarios.ft05_post_pass (5 ms)
+[----------] 1 test from feel_scenarios (5 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (5 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="feel_scenarios.ft06_tap_pass" classname="feel_scenarios.ft06_tap_pass" time="0.0399056" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = feel_scenarios.ft06_tap_pass
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from feel_scenarios
+[ RUN      ] feel_scenarios.ft06_tap_pass
+[       OK ] feel_scenarios.ft06_tap_pass (6 ms)
+[----------] 1 test from feel_scenarios (6 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (7 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="feel_scenarios.ft07_tip_shot_power" classname="feel_scenarios.ft07_tip_shot_power" time="0.0332379" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = feel_scenarios.ft07_tip_shot_power
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from feel_scenarios
+[ RUN      ] feel_scenarios.ft07_tip_shot_power
+[       OK ] feel_scenarios.ft07_tip_shot_power (0 ms)
+[----------] 1 test from feel_scenarios (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="feel_scenarios.ft08_cradle_escape_slap" classname="feel_scenarios.ft08_cradle_escape_slap" time="0.0385617" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = feel_scenarios.ft08_cradle_escape_slap
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from feel_scenarios
+[ RUN      ] feel_scenarios.ft08_cradle_escape_slap
+[       OK ] feel_scenarios.ft08_cradle_escape_slap (5 ms)
+[----------] 1 test from feel_scenarios (5 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (5 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Sandbox.IoOsRequireLoadAreNil" classname="Sandbox.IoOsRequireLoadAreNil" time="0.0336688" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Sandbox.IoOsRequireLoadAreNil
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Sandbox
+[ RUN      ] Sandbox.IoOsRequireLoadAreNil
+[       OK ] Sandbox.IoOsRequireLoadAreNil (0 ms)
+[----------] 1 test from Sandbox (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Sandbox.WatchdogKillsRunawayHandler" classname="Sandbox.WatchdogKillsRunawayHandler" time="0.0336464" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Sandbox.WatchdogKillsRunawayHandler
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Sandbox
+[ RUN      ] Sandbox.WatchdogKillsRunawayHandler
+[ERROR ] [script] handler switch_hit disabled: budget overrun
+[       OK ] Sandbox.WatchdogKillsRunawayHandler (0 ms)
+[----------] 1 test from Sandbox (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Sandbox.WatchdogKillsPcallLoop" classname="Sandbox.WatchdogKillsPcallLoop" time="0.0344616" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Sandbox.WatchdogKillsPcallLoop
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Sandbox
+[ RUN      ] Sandbox.WatchdogKillsPcallLoop
+[ERROR ] [script] handler switch_hit disabled: budget overrun
+[       OK ] Sandbox.WatchdogKillsPcallLoop (0 ms)
+[----------] 1 test from Sandbox (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Sandbox.WatchdogKillsCoroutineWrapLoop" classname="Sandbox.WatchdogKillsCoroutineWrapLoop" time="0.0341667" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Sandbox.WatchdogKillsCoroutineWrapLoop
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Sandbox
+[ RUN      ] Sandbox.WatchdogKillsCoroutineWrapLoop
+[ERROR ] [script] handler switch_hit disabled: budget overrun
+[       OK ] Sandbox.WatchdogKillsCoroutineWrapLoop (0 ms)
+[----------] 1 test from Sandbox (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Api.EveryCanonNameExists" classname="Api.EveryCanonNameExists" time="0.0338677" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Api.EveryCanonNameExists
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Api
+[ RUN      ] Api.EveryCanonNameExists
+[       OK ] Api.EveryCanonNameExists (0 ms)
+[----------] 1 test from Api (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Api.RngRangeRejectsOutOfBounds" classname="Api.RngRangeRejectsOutOfBounds" time="0.0338687" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Api.RngRangeRejectsOutOfBounds
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Api
+[ RUN      ] Api.RngRangeRejectsOutOfBounds
+[       OK ] Api.RngRangeRejectsOutOfBounds (0 ms)
+[----------] 1 test from Api (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Api.OnRejectsUnknownEventName" classname="Api.OnRejectsUnknownEventName" time="0.034467" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Api.OnRejectsUnknownEventName
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Api
+[ RUN      ] Api.OnRejectsUnknownEventName
+[       OK ] Api.OnRejectsUnknownEventName (0 ms)
+[----------] 1 test from Api (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Events.PayloadGoldenPerType" classname="Events.PayloadGoldenPerType" time="0.0339597" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Events.PayloadGoldenPerType
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Events
+[ RUN      ] Events.PayloadGoldenPerType
+[       OK ] Events.PayloadGoldenPerType (0 ms)
+[----------] 1 test from Events (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Events.DrainPayloadExcludesDrainingBall" classname="Events.DrainPayloadExcludesDrainingBall" time="0.034838" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Events.DrainPayloadExcludesDrainingBall
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Events
+[ RUN      ] Events.DrainPayloadExcludesDrainingBall
+[       OK ] Events.DrainPayloadExcludesDrainingBall (0 ms)
+[----------] 1 test from Events (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="NeonDrift.ScriptedGameReachesGameEnd" classname="NeonDrift.ScriptedGameReachesGameEnd" time="0.134294" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = NeonDrift.ScriptedGameReachesGameEnd
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from NeonDrift
+[ RUN      ] NeonDrift.ScriptedGameReachesGameEnd
+[WARN  ] [script] tb.play_music: no music sink installed
+[WARN  ] [script] tb.play_music: no music sink installed
+[WARN  ] [script] tb.play_music: no music sink installed
+[       OK ] NeonDrift.ScriptedGameReachesGameEnd (97 ms)
+[----------] 1 test from NeonDrift (97 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (97 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TableLoader.TestLabParses" classname="TableLoader.TestLabParses" time="0.0352651" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TableLoader.TestLabParses
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TableLoader
+[ RUN      ] TableLoader.TestLabParses
+[       OK ] TableLoader.TestLabParses (0 ms)
+[----------] 1 test from TableLoader (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TableLoader.NeonDriftParsesMergedLane" classname="TableLoader.NeonDriftParsesMergedLane" time="0.0339386" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TableLoader.NeonDriftParsesMergedLane
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TableLoader
+[ RUN      ] TableLoader.NeonDriftParsesMergedLane
+[       OK ] TableLoader.NeonDriftParsesMergedLane (0 ms)
+[----------] 1 test from TableLoader (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TableLoader.EveryM5ElementRoundTrips" classname="TableLoader.EveryM5ElementRoundTrips" time="0.133632" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TableLoader.EveryM5ElementRoundTrips
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TableLoader
+[ RUN      ] TableLoader.EveryM5ElementRoundTrips
+[       OK ] TableLoader.EveryM5ElementRoundTrips (2 ms)
+[----------] 1 test from TableLoader (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TableLoader.BadFieldReportsJsonPointer" classname="TableLoader.BadFieldReportsJsonPointer" time="0.0356291" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TableLoader.BadFieldReportsJsonPointer
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TableLoader
+[ RUN      ] TableLoader.BadFieldReportsJsonPointer
+[       OK ] TableLoader.BadFieldReportsJsonPointer (2 ms)
+[----------] 1 test from TableLoader (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TableLoader.UnknownElementTypeIsPathQualified" classname="TableLoader.UnknownElementTypeIsPathQualified" time="0.035148" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TableLoader.UnknownElementTypeIsPathQualified
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TableLoader
+[ RUN      ] TableLoader.UnknownElementTypeIsPathQualified
+[       OK ] TableLoader.UnknownElementTypeIsPathQualified (1 ms)
+[----------] 1 test from TableLoader (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TableLoader.MalformedTypesArePathQualified" classname="TableLoader.MalformedTypesArePathQualified" time="0.0443476" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TableLoader.MalformedTypesArePathQualified
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TableLoader
+[ RUN      ] TableLoader.MalformedTypesArePathQualified
+[       OK ] TableLoader.MalformedTypesArePathQualified (10 ms)
+[----------] 1 test from TableLoader (10 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (10 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TableLoader.DegenerateArcRejected" classname="TableLoader.DegenerateArcRejected" time="0.0348805" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TableLoader.DegenerateArcRejected
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TableLoader
+[ RUN      ] TableLoader.DegenerateArcRejected
+[       OK ] TableLoader.DegenerateArcRejected (1 ms)
+[----------] 1 test from TableLoader (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TableLoader.EveryShippedPackParses" classname="TableLoader.EveryShippedPackParses" time="0.0341141" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TableLoader.EveryShippedPackParses
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TableLoader
+[ RUN      ] TableLoader.EveryShippedPackParses
+[       OK ] TableLoader.EveryShippedPackParses (0 ms)
+[----------] 1 test from TableLoader (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Plunger.PullToSpeedCurveMatchesSpec" classname="Plunger.PullToSpeedCurveMatchesSpec" time="0.0356768" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Plunger.PullToSpeedCurveMatchesSpec
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Plunger
+[ RUN      ] Plunger.PullToSpeedCurveMatchesSpec
+[       OK ] Plunger.PullToSpeedCurveMatchesSpec (1 ms)
+[----------] 1 test from Plunger (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Prefab.FlipperPairExpansionGolden" classname="Prefab.FlipperPairExpansionGolden" time="0.0361957" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Prefab.FlipperPairExpansionGolden
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Prefab
+[ RUN      ] Prefab.FlipperPairExpansionGolden
+[       OK ] Prefab.FlipperPairExpansionGolden (0 ms)
+[----------] 1 test from Prefab (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Prefab.SlingPairSidesCorrect" classname="Prefab.SlingPairSidesCorrect" time="0.0330782" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Prefab.SlingPairSidesCorrect
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Prefab
+[ RUN      ] Prefab.SlingPairSidesCorrect
+[       OK ] Prefab.SlingPairSidesCorrect (0 ms)
+[----------] 1 test from Prefab (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Prefab.LaneOrbitMergeIsOrderIndependent" classname="Prefab.LaneOrbitMergeIsOrderIndependent" time="0.0353852" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Prefab.LaneOrbitMergeIsOrderIndependent
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Prefab
+[ RUN      ] Prefab.LaneOrbitMergeIsOrderIndependent
+[       OK ] Prefab.LaneOrbitMergeIsOrderIndependent (1 ms)
+[----------] 1 test from Prefab (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TbArt.SchemaRoundTripAllPrimitives" classname="TbArt.SchemaRoundTripAllPrimitives" time="0.0353603" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TbArt.SchemaRoundTripAllPrimitives
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TbArt
+[ RUN      ] TbArt.SchemaRoundTripAllPrimitives
+[       OK ] TbArt.SchemaRoundTripAllPrimitives (2 ms)
+[----------] 1 test from TbArt (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TbArt.UnknownPrimitiveIsLoadError" classname="TbArt.UnknownPrimitiveIsLoadError" time="0.0369929" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TbArt.UnknownPrimitiveIsLoadError
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TbArt
+[ RUN      ] TbArt.UnknownPrimitiveIsLoadError
+[       OK ] TbArt.UnknownPrimitiveIsLoadError (2 ms)
+[----------] 1 test from TbArt (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TbArt.MissingLayersThrowsArtError" classname="TbArt.MissingLayersThrowsArtError" time="0.0358231" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TbArt.MissingLayersThrowsArtError
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TbArt
+[ RUN      ] TbArt.MissingLayersThrowsArtError
+[       OK ] TbArt.MissingLayersThrowsArtError (2 ms)
+[----------] 1 test from TbArt (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TbArt.MissingFileIsNotLoadedNotError" classname="TbArt.MissingFileIsNotLoadedNotError" time="0.0348707" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TbArt.MissingFileIsNotLoadedNotError
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TbArt
+[ RUN      ] TbArt.MissingFileIsNotLoadedNotError
+[       OK ] TbArt.MissingFileIsNotLoadedNotError (1 ms)
+[----------] 1 test from TbArt (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TbArt.UnknownLightIdIsLoadError" classname="TbArt.UnknownLightIdIsLoadError" time="0.035171" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TbArt.UnknownLightIdIsLoadError
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TbArt
+[ RUN      ] TbArt.UnknownLightIdIsLoadError
+[       OK ] TbArt.UnknownLightIdIsLoadError (2 ms)
+[----------] 1 test from TbArt (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="TbArt.NeonDriftArtLoads" classname="TbArt.NeonDriftArtLoads" time="0.0342686" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = TbArt.NeonDriftArtLoads
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from TbArt
+[ RUN      ] TbArt.NeonDriftArtLoads
+[       OK ] TbArt.NeonDriftArtLoads (0 ms)
+[----------] 1 test from TbArt (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Particles.PoolNeverExceedsCapacity" classname="Particles.PoolNeverExceedsCapacity" time="0.35517" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Particles.PoolNeverExceedsCapacity
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Particles
+[ RUN      ] Particles.PoolNeverExceedsCapacity
+[       OK ] Particles.PoolNeverExceedsCapacity (320 ms)
+[----------] 1 test from Particles (320 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (320 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Particles.UpdateExpiresAndFades" classname="Particles.UpdateExpiresAndFades" time="0.0352181" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Particles.UpdateExpiresAndFades
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Particles
+[ RUN      ] Particles.UpdateExpiresAndFades
+[       OK ] Particles.UpdateExpiresAndFades (0 ms)
+[----------] 1 test from Particles (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Text.GlyphMetricsGolden" classname="Text.GlyphMetricsGolden" time="0.0547786" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Text.GlyphMetricsGolden
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Text
+[ RUN      ] Text.GlyphMetricsGolden
+[       OK ] Text.GlyphMetricsGolden (21 ms)
+[----------] 1 test from Text (21 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (21 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Crt.OffByDefaultAndDefaultAndBranchMatchesSpec" classname="Crt.OffByDefaultAndDefaultAndBranchMatchesSpec" time="0.0333971" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Crt.OffByDefaultAndDefaultAndBranchMatchesSpec
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Crt
+[ RUN      ] Crt.OffByDefaultAndDefaultAndBranchMatchesSpec
+[       OK ] Crt.OffByDefaultAndDefaultAndBranchMatchesSpec (0 ms)
+[----------] 1 test from Crt (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="Bloom.DisabledFallbackRenders" classname="Bloom.DisabledFallbackRenders" time="0.0330018" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = Bloom.DisabledFallbackRenders
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Bloom
+[ RUN      ] Bloom.DisabledFallbackRenders
+[       OK ] Bloom.DisabledFallbackRenders (0 ms)
+[----------] 1 test from Bloom (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="SegmentDigits.DigitMasksAndGhosting" classname="SegmentDigits.DigitMasksAndGhosting" time="0.0325548" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = SegmentDigits.DigitMasksAndGhosting
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from SegmentDigits
+[ RUN      ] SegmentDigits.DigitMasksAndGhosting
+[       OK ] SegmentDigits.DigitMasksAndGhosting (0 ms)
+[----------] 1 test from SegmentDigits (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="ArtRenderer.LayerSplitAndLightBinding" classname="ArtRenderer.LayerSplitAndLightBinding" time="0.0352822" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = ArtRenderer.LayerSplitAndLightBinding
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from ArtRenderer
+[ RUN      ] ArtRenderer.LayerSplitAndLightBinding
+[       OK ] ArtRenderer.LayerSplitAndLightBinding (2 ms)
+[----------] 1 test from ArtRenderer (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="ArtRenderer.BudgetTruncatesAndReports" classname="ArtRenderer.BudgetTruncatesAndReports" time="0.034633" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = ArtRenderer.BudgetTruncatesAndReports
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from ArtRenderer
+[ RUN      ] ArtRenderer.BudgetTruncatesAndReports
+[WARN  ] [render] art instance budget exceeded; truncating
+[       OK ] ArtRenderer.BudgetTruncatesAndReports (1 ms)
+[----------] 1 test from ArtRenderer (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="ArtRenderer.NullArtBuildsEmpty" classname="ArtRenderer.NullArtBuildsEmpty" time="0.0367004" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = ArtRenderer.NullArtBuildsEmpty
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from ArtRenderer
+[ RUN      ] ArtRenderer.NullArtBuildsEmpty
+[       OK ] ArtRenderer.NullArtBuildsEmpty (0 ms)
+[----------] 1 test from ArtRenderer (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="FontAssets.VendoredFontsPresentAndParse" classname="FontAssets.VendoredFontsPresentAndParse" time="0.0382945" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = FontAssets.VendoredFontsPresentAndParse
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from FontAssets
+[ RUN      ] FontAssets.VendoredFontsPresentAndParse
+[       OK ] FontAssets.VendoredFontsPresentAndParse (4 ms)
+[----------] 1 test from FontAssets (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (4 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_projection.portrait_rotation_maps_corners" classname="unit_projection.portrait_rotation_maps_corners" time="0.0331511" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_projection.portrait_rotation_maps_corners
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_projection
+[ RUN      ] unit_projection.portrait_rotation_maps_corners
+[       OK ] unit_projection.portrait_rotation_maps_corners (0 ms)
+[----------] 1 test from unit_projection (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_projection.aspect_fit_letterboxes" classname="unit_projection.aspect_fit_letterboxes" time="0.0363117" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_projection.aspect_fit_letterboxes
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_projection
+[ RUN      ] unit_projection.aspect_fit_letterboxes
+[       OK ] unit_projection.aspect_fit_letterboxes (0 ms)
+[----------] 1 test from unit_projection (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="render_smoke.device_clear_present" classname="render_smoke.device_clear_present" time="0.0548207" status="notrun">
+		<skipped message="SKIP_REGULAR_EXPRESSION_MATCHED"/>
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = render_smoke.device_clear_present
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from render_smoke
+[ RUN      ] render_smoke.device_clear_present
+[WARN  ] [main] no shader blobs; cannot create GPU device
+D:\a\Tiltburst\Tiltburst\tests\render\render_smoke_test.cpp(24): Skipped
+no usable GPU backend on this runner
+
+[  SKIPPED ] render_smoke.device_clear_present (18 ms)
+[----------] 1 test from render_smoke (18 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (18 ms total)
+[  PASSED  ] 0 tests.
+[  SKIPPED ] 1 test, listed below:
+[  SKIPPED ] render_smoke.device_clear_present
+</system-out>
+	</testcase>
+	<testcase name="unit_shader_build.manifest_matches_installed_blobs" classname="unit_shader_build.manifest_matches_installed_blobs" time="0.0342626" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_shader_build.manifest_matches_installed_blobs
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_shader_build
+[ RUN      ] unit_shader_build.manifest_matches_installed_blobs
+[       OK ] unit_shader_build.manifest_matches_installed_blobs (0 ms)
+[----------] 1 test from unit_shader_build (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_broadphase.matches_brute_force" classname="unit_broadphase.matches_brute_force" time="0.0717109" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_broadphase.matches_brute_force
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_broadphase
+[ RUN      ] unit_broadphase.matches_brute_force
+[       OK ] unit_broadphase.matches_brute_force (38 ms)
+[----------] 1 test from unit_broadphase (38 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (38 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_sweep.segment_interior_flat" classname="unit_sweep.segment_interior_flat" time="0.0334287" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_sweep.segment_interior_flat
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_sweep
+[ RUN      ] unit_sweep.segment_interior_flat
+[       OK ] unit_sweep.segment_interior_flat (0 ms)
+[----------] 1 test from unit_sweep (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_sweep.segment_interior_45deg" classname="unit_sweep.segment_interior_45deg" time="0.0341548" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_sweep.segment_interior_45deg
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_sweep
+[ RUN      ] unit_sweep.segment_interior_45deg
+[       OK ] unit_sweep.segment_interior_45deg (0 ms)
+[----------] 1 test from unit_sweep (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_sweep.segment_endpoint_cap" classname="unit_sweep.segment_endpoint_cap" time="0.0330353" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_sweep.segment_endpoint_cap
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_sweep
+[ RUN      ] unit_sweep.segment_endpoint_cap
+[       OK ] unit_sweep.segment_endpoint_cap (0 ms)
+[----------] 1 test from unit_sweep (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_sweep.arc_inside_hit" classname="unit_sweep.arc_inside_hit" time="0.0329274" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_sweep.arc_inside_hit
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_sweep
+[ RUN      ] unit_sweep.arc_inside_hit
+[       OK ] unit_sweep.arc_inside_hit (0 ms)
+[----------] 1 test from unit_sweep (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_integrate.slope_gravity_1s" classname="unit_integrate.slope_gravity_1s" time="0.032927" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_integrate.slope_gravity_1s
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_integrate
+[ RUN      ] unit_integrate.slope_gravity_1s
+[       OK ] unit_integrate.slope_gravity_1s (0 ms)
+[----------] 1 test from unit_integrate (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_ccd_segment.no_tunnel_at_12mps" classname="unit_ccd_segment.no_tunnel_at_12mps" time="0.0336561" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_ccd_segment.no_tunnel_at_12mps
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_ccd_segment
+[ RUN      ] unit_ccd_segment.no_tunnel_at_12mps
+[       OK ] unit_ccd_segment.no_tunnel_at_12mps (0 ms)
+[----------] 1 test from unit_ccd_segment (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_hot_path.no_allocations_in_step" classname="unit_hot_path.no_allocations_in_step" time="0.0426974" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_hot_path.no_allocations_in_step
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_hot_path
+[ RUN      ] unit_hot_path.no_allocations_in_step
+[       OK ] unit_hot_path.no_allocations_in_step (9 ms)
+[----------] 1 test from unit_hot_path (9 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (9 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_hot_path.no_allocations_with_flippers" classname="unit_hot_path.no_allocations_with_flippers" time="0.0546429" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_hot_path.no_allocations_with_flippers
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_hot_path
+[ RUN      ] unit_hot_path.no_allocations_with_flippers
+[       OK ] unit_hot_path.no_allocations_with_flippers (20 ms)
+[----------] 1 test from unit_hot_path (20 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (20 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_layout.sim_includes_nothing_forbidden" classname="unit_layout.sim_includes_nothing_forbidden" time="0.0371755" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_layout.sim_includes_nothing_forbidden
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_layout
+[ RUN      ] unit_layout.sim_includes_nothing_forbidden
+[       OK ] unit_layout.sim_includes_nothing_forbidden (3 ms)
+[----------] 1 test from unit_layout (3 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (3 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_snapshot.latest_wins" classname="unit_snapshot.latest_wins" time="0.043239" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_snapshot.latest_wins
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_snapshot
+[ RUN      ] unit_snapshot.latest_wins
+[       OK ] unit_snapshot.latest_wins (8 ms)
+[----------] 1 test from unit_snapshot (8 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (9 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_snapshot.no_torn_read" classname="unit_snapshot.no_torn_read" time="0.0519602" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_snapshot.no_torn_read
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_snapshot
+[ RUN      ] unit_snapshot.no_torn_read
+[       OK ] unit_snapshot.no_torn_read (17 ms)
+[----------] 1 test from unit_snapshot (17 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (17 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_energy.passive_bounce_never_gains" classname="unit_energy.passive_bounce_never_gains" time="0.166852" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_energy.passive_bounce_never_gains
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_energy
+[ RUN      ] unit_energy.passive_bounce_never_gains
+[       OK ] unit_energy.passive_bounce_never_gains (132 ms)
+[----------] 1 test from unit_energy (132 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (132 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_ccd_ball_ball.head_on_momentum" classname="unit_ccd_ball_ball.head_on_momentum" time="0.0345915" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_ccd_ball_ball.head_on_momentum
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_ccd_ball_ball
+[ RUN      ] unit_ccd_ball_ball.head_on_momentum
+[       OK ] unit_ccd_ball_ball.head_on_momentum (0 ms)
+[----------] 1 test from unit_ccd_ball_ball (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_tick_loop.produces_1000_ticks_per_sim_second" classname="unit_tick_loop.produces_1000_ticks_per_sim_second" time="0.0336954" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_tick_loop.produces_1000_ticks_per_sim_second
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_tick_loop
+[ RUN      ] unit_tick_loop.produces_1000_ticks_per_sim_second
+[       OK ] unit_tick_loop.produces_1000_ticks_per_sim_second (0 ms)
+[----------] 1 test from unit_tick_loop (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+	<testcase name="unit_tick_loop.overrun_clamps_at_50" classname="unit_tick_loop.overrun_clamps_at_50" time="0.0334893" status="run">
+		<properties/>
+		<system-out>Running main() from D:\a\_temp\vcpkg\buildtrees\gtest\src\v1.18.0-e6987f02b9.clean\googletest\src\gtest_main.cc
+Note: Google Test filter = unit_tick_loop.overrun_clamps_at_50
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from unit_tick_loop
+[ RUN      ] unit_tick_loop.overrun_clamps_at_50
+[WARN  ] [sim] sim overrun: dropped 150 ticks
+[       OK ] unit_tick_loop.overrun_clamps_at_50 (0 ms)
+[----------] 1 test from unit_tick_loop (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 1 test.
+</system-out>
+	</testcase>
+</testsuite>

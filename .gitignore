@@ -8,3 +8,4 @@
 *.user
 CMakeUserPresets.json
 perf_report.json
+.gen/

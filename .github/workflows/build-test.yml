@@ -124,6 +124,12 @@ jobs:
           Get-ChildItem (Split-Path $bin) -Filter *.dll | ForEach-Object { Write-Host "  $($_.Name)" }
           $p = Start-Process -FilePath $bin -ArgumentList '--version' -PassThru -Wait -NoNewWindow
           Write-Host "--version exit code: $($p.ExitCode)"
+          $smokeDir = "build/smoke"
+          New-Item -ItemType Directory -Force -Path $smokeDir | Out-Null
+          $p2 = Start-Process -FilePath $bin -ArgumentList "--render-smoke --frames 120 --screenshot-dir $smokeDir" -PassThru -Wait -NoNewWindow -RedirectStandardError "$smokeDir/stderr.txt" -RedirectStandardOutput "$smokeDir/stdout.txt"
+          Write-Host "smoke exit code (NTSTATUS if negative): $($p2.ExitCode)"
+          Write-Host "stderr:"
+          if (Test-Path "$smokeDir/stderr.txt") { Get-Content "$smokeDir/stderr.txt" | Select-Object -First 20 }
 
       - name: Renderer smoke (exit 2 = logged skip, see 16-testing-ci.md §5)
         shell: bash

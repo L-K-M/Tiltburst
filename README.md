@@ -5,6 +5,9 @@ ordinary desktops: neon retro style, particle effects, five original tables,
 local 1–4 player multiplayer, and a fully text-based table format that both
 LLMs and humans can author.
 
+> [!IMPORTANT]
+> LLM disclosure: This codebase was written with substantial help from large language models: AI coding agents working from the [`AGENTS.md`](AGENTS.md) brief in this repo.
+
 ## Status
 
 Implementation in progress, milestone by milestone (see

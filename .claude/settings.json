@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "mcp__claude-code-remote__*"
-    ],
-    "defaultMode": "bypassPermissions"
-  }
-}

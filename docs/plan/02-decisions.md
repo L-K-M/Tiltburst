@@ -687,6 +687,66 @@ None for the sandbox contract: no `io`/`os`/`require`/`load`, watchdog
 hooks, capped allocator, or coroutine wrapping depend on 5.5-only
 behavior. sol2 3.5.0 (with its 5.5 compatibility patch) binds both.
 
+## ADR-026 — picosha2.h is MIT-licensed, not public domain
+
+**Status:** Accepted (license review after M14). Amends 04-milestones.md
+M0 (task 12 and the Files list) and 16-testing-ci.md §2, and adds a step to
+16-testing-ci.md §3.2's `format` job.
+
+### Context
+
+The spec called the vendored `tests/third_party/picosha2.h`
+"public-domain" in four places. The upstream header carries the MIT
+License (Copyright (C) 2017 okdshin). M0 recorded the real license in
+`tests/third_party/SOURCES.md` and in its JOURNAL deviations but did not
+amend the spec docs (03-process.md §3.3). A public-domain label invites
+dropping the MIT notice if the header is ever reused in shipped code.
+
+### Decision
+
+The spec docs and README.md call picosha2 MIT-licensed. The `format` CI
+job fails when a scanned doc — `docs/plan/` except this file, plus
+`PLAN.md`, `ARCHITECTURE.md` and `README.md` — says "public domain"
+within a line of a picosha2 mention.
+
+### Consequences
+
+None for the code: the header is unchanged, keeps its notice, and is used
+only by `tb_tests`, which never ships.
+
+## ADR-027 — Release archives carry license texts and third-party notices
+
+**Status:** Accepted (license review after M14). Amends 04-milestones.md
+M19, M20 and "Done when", 16-testing-ci.md §3.3, PLAN.md §8, and the
+README.md License section.
+
+### Context
+
+The shipped binaries link SDL3, Lua, sol2, fmt, nlohmann-json, miniaudio
+and stb from vcpkg: statically on the Linux and macOS triplets, as DLLs on
+`x64-windows`. Lua, sol2, fmt and nlohmann-json are MIT, and the SDL3 port
+carries MIT, BSD-3-Clause and Apache-2.0 code beside its Zlib core. Those
+terms require the copyright and license notices to accompany binary
+copies (Zlib alone would not), and OFL 1.1 requires the font license to
+travel with the fonts. The M19 archive contents, its smoke test and the
+M20 audit named none of this.
+
+### Decision
+
+Every release archive carries `LICENSE`, a `Third-Party-Notices.txt`
+generated at package time from the vcpkg install tree (every installed
+port minus a reasoned exclusion list; fails on a port without a
+`copyright` file), and `assets/fonts/` with the three `*-OFL.txt`. The
+packaged smoke test fails without them, and PLAN.md §8 gains a matching
+checkbox.
+
+### Consequences
+
+M19 gains a notices step in `tools/package/` and a few smoke-test lines.
+Toolchain runtimes need no entry: libstdc++ falls under the GCC Runtime
+Library Exception, macOS uses the system libc++, and the MSVC runtime is
+covered by the vc-redist note.
+
 ## Amendments to ARCHITECTURE.md (authoritative table)
 
 Where ARCHITECTURE.md disagrees with a row below, the amendment wins (canon

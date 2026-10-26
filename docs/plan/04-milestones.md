@@ -165,7 +165,7 @@ corrections are new entries. Format: 03-process.md §3.1.
     upstream path per file) and **`assets/fonts/SHA256SUMS`** (the verbatim
     `sha256sum` output over the three vendored `.ttf` files, in
     `sha256sum -c` format, one line per file). There is no `FONTS.md`.
-    The **test** recomputes those digests in-process with the public-domain
+    The **test** recomputes those digests in-process with the MIT-licensed
     single-header `picosha2.h`, vendored in this same PR at
     `/tests/third_party/picosha2.h` with its provenance recorded like any
     other vendored asset (`/tests/third_party/SOURCES.md`: upstream repo,
@@ -201,10 +201,10 @@ corrections are new entries. Format: 03-process.md §3.1.
 /tests/lsan.supp        (comment-only; the asan preset points LSAN_OPTIONS at it)
 /tests/quarantine.txt   (empty; read at configure time, guarded by if(EXISTS))
 /tests/render/font_assets_test.cpp   (13-art-direction.md §5.1)
-/tests/third_party/picosha2.h        (public-domain SHA-256, single header)
+/tests/third_party/picosha2.h        (MIT-licensed SHA-256, single header)
 /tests/third_party/SOURCES.md        (upstream repo + pinned commit + fetch date + license)
-/assets/fonts/{Orbitron-Bold.ttf,Monoton-Regular.ttf,Righteous-Regular.ttf}
-/assets/fonts/{Orbitron-OFL.txt,Monoton-OFL.txt,Righteous-OFL.txt}
+/assets/fonts/{ChakraPetch-Bold.ttf,Monoton-Regular.ttf,Righteous-Regular.ttf}   (orbitron role, ADR-015)
+/assets/fonts/{ChakraPetch-OFL.txt,Monoton-OFL.txt,Righteous-OFL.txt}
 /assets/fonts/SOURCES.md   (upstream repo + pinned commit + fetch date + upstream path per file)
 /assets/fonts/SHA256SUMS   (sha256sum -c format, one line per .ttf)
 ```
@@ -1629,15 +1629,31 @@ extended to full gameplay on all five tables); packaging per OS —
 Windows: `.zip` with `tiltburst.exe` + assets +
 tables + vc-redist note; macOS: `.app` bundle in a `.dmg` (unsigned;
 Gatekeeper right-click-open note in README); Linux: `.tar.gz` with launcher
-script; CI `release.yml` workflow (content in 16-testing-ci.md) builds and
+script; every archive also carries the license files below; CI
+`release.yml` workflow (content in 16-testing-ci.md) builds and
 uploads all three artifacts on tag push; packaged-build smoke test in CI
-(unpack, run `tiltburst --version`, run `tb_validate` on a bundled table);
-version stamping from the git tag.
+(unpack, run `tiltburst --version`, run `tb_validate` on a bundled table,
+assert the license files); version stamping from the git tag.
 **Scope out:** code signing/notarization (documented as post-1.0), installers
 with GUIs.
 
+**License files in every archive (ADR-027).** The binaries link SDL3, Lua,
+sol2, fmt, nlohmann-json, miniaudio and stb from vcpkg; the MIT,
+BSD-3-Clause and Apache-2.0 terms among them require their notices to
+accompany binary copies, and the OFL 1.1 fonts must travel with their
+license text. The package step writes `Third-Party-Notices.txt` from the
+build's vcpkg install tree (procedure in 16-testing-ci.md §3.3) and places
+it, with a copy of `LICENSE`, next to `tiltburst`/`tiltburst.exe` at the top
+of the `.tar.gz` and `.zip`, and in the `.app` bundle's
+`Contents/Resources/` in the `.dmg`. `assets/fonts/` ships whole, so
+`ChakraPetch-OFL.txt` (the orbitron role, ADR-015), `Monoton-OFL.txt`,
+`Righteous-OFL.txt` and `SOURCES.md` stay next to their fonts. The same
+notices file covers the DLLs that the dynamic `x64-windows` triplet puts
+beside `tiltburst.exe`.
+
 **Key interfaces.** None new; `tools/package/` scripts (`package_win.cmake`
-etc. or CPack config per 16-testing-ci.md).
+etc. or CPack config per 16-testing-ci.md), including the notices step of
+16-testing-ci.md §3.3.
 
 **Tests.** `perf_tick.gate_tables` (16-testing-ci.md §2.9) plus the three
 §2.10 release gates — `perf_startup.cold_boot_to_attract`,
@@ -1649,7 +1665,8 @@ only cold-start gate that exists, and the only budget for it);
 `TB_RELEASE_GATES` flips ON in this PR, exactly as `TB_TOOLS_READY` did at
 M15;
 `Package.SmokeBootsFromArchive` (CI job, all 3 OS);
-`Package.ContainsAllTablesAndAssets` (manifest check).
+`Package.ContainsAllTablesAndAssets` (manifest check, including `LICENSE`,
+`Third-Party-Notices.txt` and the three `*-OFL.txt`).
 
 **Acceptance criteria.**
 
@@ -1660,6 +1677,10 @@ M15;
       non-skipped local run pasted into the PR (R1, R2).
 - [ ] Packaged builds for all 3 OS produced by CI from a tag and smoke-boot
       on clean runners (R8).
+- [ ] Every archive carries `LICENSE`, `Third-Party-Notices.txt` (one entry
+      per installed vcpkg port not on the reasoned exclusion list) and the
+      three `*-OFL.txt`, and the packaged smoke test fails without them
+      (16-testing-ci.md §3.3, ADR-027).
 - [ ] Hot-path allocation audit clean across all five tables.
 - [ ] No perf gate was weakened to pass, and no threshold was changed without
       an ADR in 02-decisions.md (03-process.md fallback matrix,
@@ -1704,6 +1725,7 @@ gates from §2.10.
 | 2 | R2 latency budgets     | Latency.InputToTickUnder4ms (p99.9 < 4 ms over ≥ 10,000 scripted press edges); F3 overlay export docs/audit/r2.png | PASS |
 | 3 | R3 neon look + particles | 13-art-direction.md "Style checklist" ticked in M13 PR <url>; perf_particles.two_thousand_live_at_60fps; docs/audit/m13/*.png | PASS |
 | 4 | Startup / load budgets | perf_startup.cold_boot_to_attract; perf_load.table_under_2s, run <url> | PASS |
+| 5 | License files in release archives | release.yml "Smoke test the packaged build" license asserts, run <url>; Package.ContainsAllTablesAndAssets | PASS |
 | … | every PLAN.md §8 box and R1–R10 …                                            |
 ```
 
@@ -1863,4 +1885,5 @@ test: `Version.Is100` (version string matches the tag).
 - [ ] `docs/RELEASE-1.0-audit.md` shows PASS with evidence for every PLAN.md
       §8 item and every requirement R1–R10.
 - [ ] `v1.0.0` is tagged and CI-built artifacts for Windows, Linux, and macOS
-      exist and smoke-boot.
+      exist, smoke-boot, and carry `LICENSE`, `Third-Party-Notices.txt` and
+      the three vendored OFL texts (ADR-027).

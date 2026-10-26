@@ -331,3 +331,4 @@ Details and exact commands in [03-process.md](docs/plan/03-process.md).
 - [ ] `tb_validate` + `tb_autoplay` pass on all shipped tables
 - [ ] A new table can be authored end-to-end using only 14-authoring-guide.md
 - [ ] Packaged builds boot on all three OSes from a clean machine
+- [ ] Release archives carry `LICENSE`, `Third-Party-Notices.txt`, OFL texts

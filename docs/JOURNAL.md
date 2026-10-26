@@ -780,3 +780,20 @@ corrections are new entries. Format: 03-process.md §3.1.
   GPU draw path yet; lands with the screenshot tooling that needs
   it), per-table art-driven light-show personalization, the 30 s WAV
   demo artifact (needs tb_autoplay --wav, M15).
+
+## License review: notices and statements (2026-10-26)
+
+- Deviations:
+  - The spec docs still called tests/third_party/picosha2.h
+    "public-domain" (04-milestones.md M0, 16-testing-ci.md §2); it is
+    MIT, as the M00 entry recorded. Spec amended per 03-process.md §3.3
+    → ADR-026; the `format` job now fails if the label comes back.
+  - The M19 archives, their smoke test and the M20 audit never mentioned
+    license files, though the binaries link MIT/Zlib/BSD vcpkg ports and
+    the fonts are OFL 1.1. The M19 spec now has the package step write
+    Third-Party-Notices.txt from the vcpkg install tree and ship it with
+    LICENSE and the *-OFL.txt; the smoke test,
+    Package.ContainsAllTablesAndAssets and PLAN.md §8 check them; the
+    README License section now says what ships where → ADR-027. Plan
+    only: nothing is packaged before M19.
+- New ADRs: ADR-026, ADR-027.

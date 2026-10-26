@@ -81,7 +81,7 @@ Fixture layout:
     /screenshots/{windows,linux,macos}/<slug>.png
     /synth/hashes.json                      # per-OS PCM hashes
   /third_party
-    picosha2.h        # public-domain single-header SHA-256, vendored
+    picosha2.h        # MIT-licensed single-header SHA-256, vendored
   quarantine.txt
   lsan.supp
 ```
@@ -102,7 +102,7 @@ opened that way — starting with the first test written, M0's
 forbidden: they work from one build layout and break from the next. The CTest
 command tests (`validate_`, `smoke_`, `bounds_`) get absolute paths from
 `${CMAKE_SOURCE_DIR}` at registration time (snippet below) for the same
-reason. SHA-256 inside tests comes from the vendored public-domain
+reason. SHA-256 inside tests comes from the vendored MIT-licensed
 `tests/third_party/picosha2.h` (recorded like any vendored asset) — never a
 vcpkg crypto port and never a shell-out to `sha256sum`, which windows-latest
 does not have.
@@ -1189,6 +1189,30 @@ jobs:
           sudo apt-get install -y --no-install-recommends clang-format-18
           find src tests \( -name '*.cpp' -o -name '*.h' \) -print0 \
             | xargs -0 -r clang-format-18 --dry-run --Werror
+      # The vendored tests/third_party/picosha2.h is MIT (its header and
+      # tests/third_party/SOURCES.md). Fail if a scanned doc relabels it,
+      # which would invite dropping its notice. 02-decisions.md is
+      # skipped: its ADRs quote superseded spec text by design.
+      - name: picosha2 license statements (MIT label guard)
+        run: |
+          # The pattern is built from fragments so the verbatim copy of
+          # this step in docs/plan/16-testing-ci.md cannot match itself.
+          pat='publ''ic.doma''in'
+          for f in PLAN.md ARCHITECTURE.md README.md; do
+            [ -f "${f}" ] || { echo "::error::scanned doc missing: ${f}"; exit 1; }
+          done
+          [ -d docs/plan ] || { echo "::error::scanned dir missing: docs/plan"; exit 1; }
+          rc=0
+          hits=$(grep -rni -C1 --exclude=02-decisions.md picosha2 \
+              docs/plan PLAN.md ARCHITECTURE.md README.md) || rc=$?
+          if [ "${rc}" -gt 1 ]; then
+            echo "::error::picosha2 doc scan failed (grep exit ${rc})"
+            exit 1
+          fi
+          if printf '%s\n' "${hits}" | grep -i -e "${pat}"; then
+            echo "::error::picosha2.h is MIT-licensed; see tests/third_party/SOURCES.md"
+            exit 1
+          fi
 
   build-test:
     # Explicit template: without it a matrix job's three check runs are all
@@ -1452,10 +1476,11 @@ Implementor notes:
 Tag-push packaging per 04-milestones.md M19: build on all three OSes,
 package (Windows `.zip`, macOS `.app`-in-`.dmg`, Linux `.tar.gz`), smoke
 test the packaged build (unpack, `tiltburst --version`, `tb_validate` on a
-bundled table), stamp the version from the git tag, attach everything to a
-draft GitHub release. `tools/package/package.cmake` (M19 scope; 04 owns the
-archive contents) dispatches on platform and must write exactly
-`build/pkg/<artifact>`.
+bundled table, license files present), stamp the version from the git tag,
+attach everything to a draft GitHub release. `tools/package/package.cmake`
+(M19 scope; 04 owns the archive contents) dispatches on platform, writes
+`Third-Party-Notices.txt` into the staging tree (procedure after the
+workflow), and must write exactly `build/pkg/<artifact>`.
 
 ```yaml
 name: Release
@@ -1532,6 +1557,19 @@ jobs:
           test -n "${BIN}" && test -n "${VAL}" && test -n "${TABLE}"
           "${BIN}" --version | grep -F "${GITHUB_REF_NAME#v}"
           "${VAL}" "$(dirname "${TABLE}")"
+          # License files (04 M19, ADR-027): beside the binary, or in
+          # Contents/Resources of the .app; fonts keep theirs in assets/fonts.
+          DOCS=$(dirname "${BIN}")
+          case "${RUNNER_OS}" in macOS) DOCS="${DOCS}/../Resources" ;; esac
+          test -s "${DOCS}/LICENSE"
+          test -s "${DOCS}/Third-Party-Notices.txt"
+          grep -q 'Sam Lantinga' "${DOCS}/Third-Party-Notices.txt" # SDL3
+          grep -q 'Lua.org' "${DOCS}/Third-Party-Notices.txt"      # Lua
+          for font in ChakraPetch Monoton Righteous; do
+            OFL=$(find "${SMOKE}" -type f -path "*/assets/fonts/${font}-OFL.txt" | head -n1)
+            test -s "${OFL}"
+            grep -qi 'SIL Open Font License' "${OFL}"
+          done
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
@@ -1559,6 +1597,30 @@ the smoke step's `grep` proves the stamp took. The `grep -F` on the version
 and the `tb_validate` run implement 04 M19's packaged-build smoke test;
 macOS bundles stay unsigned (Gatekeeper note per 04 M19). `release.yml` is
 not a required check — it never runs on PRs.
+
+**Third-party notices (ADR-027).** Before archiving, `package.cmake` builds
+`Third-Party-Notices.txt` from the build's vcpkg install tree,
+`build/<preset>/vcpkg_installed/`:
+
+1. Port set: every package `vcpkg_installed/vcpkg/status` lists as
+   `install ok installed`, minus an exclusion list kept in `tools/package/`
+   with a reason per entry: `gtest` (tests only); the `vcpkg-*` helper
+   ports and build tools such as `gperf` (not linked); and on Linux the
+   D-Bus stack that SDL3's default `ibus` feature pulls in (`dbus`,
+   `expat`, `libsystemd` and the ports it depends on), which SDL3 loads
+   from the system's `libdbus-1.so.3` at run time instead of linking.
+   Exclude that stack only after `ldd` and `nm` on the packaged binaries
+   confirm nothing links it; otherwise keep it. A new dependency therefore
+   lands in the notices unless someone excludes it with a reason.
+2. Per port, sorted by name: a heading with the port name, version, SPDX
+   license and homepage (from `vcpkg.spdx.json`), then `copyright`
+   verbatim; both live in `vcpkg_installed/<triplet>/share/<port>/`.
+3. `message(FATAL_ERROR)` when a port in the set has no `copyright` file or
+   an empty one. A known gap gets an explicit, commented override with the
+   license text, never a silent omission.
+
+The smoke step's `test -s` lines catch a missing file; its `grep -q`
+sentinels catch an empty or stale notices file.
 
 ## 4. Local dev loop
 
@@ -1884,7 +1946,8 @@ No percentage gate, no coverage tooling in CI. Binding rules:
 - [ ] From M19, `.github/workflows/release.yml` matches §3.3: pushing a
       `v*` tag produces the three packaged artifacts, each smoke-tested
       (unpack, `tiltburst --version` matches the tag, `tb_validate` on a
-      bundled table) and attached to a draft GitHub release.
+      bundled table, license files present) and attached to a draft GitHub
+      release.
 - [ ] `CMakePresets.json` matches §4.1; `cmake --preset debug|release|asan`
       work on Linux/macOS, `cmake --preset windows` on Windows;
       `ctest --preset <x>` excludes fuzz/perf/bounds by default.

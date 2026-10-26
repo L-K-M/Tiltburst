@@ -39,6 +39,17 @@ jobs:
           find src tests \( -name '*.cpp' -o -name '*.h' \) \
             -not -path '*/third_party/*' -print0 \
             | xargs -0 -r clang-format-18 --dry-run --Werror
+      # The vendored tests/third_party/picosha2.h is MIT (its header and
+      # tests/third_party/SOURCES.md). Fail if a spec doc calls it public
+      # domain, which would invite dropping its notice. 02-decisions.md is
+      # skipped: its ADRs quote superseded spec text by design.
+      - name: picosha2 license statements (MIT, not public domain)
+        run: |
+          if grep -rn -C1 --exclude=02-decisions.md picosha2 \
+              docs/plan PLAN.md ARCHITECTURE.md | grep -i 'public.domain'; then
+            echo "::error::picosha2.h is MIT-licensed; see tests/third_party/SOURCES.md"
+            exit 1
+          fi
 
   build-test:
     # Explicit template: without it a matrix job's three check runs are all

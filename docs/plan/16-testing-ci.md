@@ -1198,6 +1198,9 @@ jobs:
           # The pattern is built from fragments so the verbatim copy of
           # this step in docs/plan/16-testing-ci.md cannot match itself.
           pat='publ''ic.doma''in'
+          for f in PLAN.md ARCHITECTURE.md README.md; do
+            [ -f "${f}" ] || { echo "::error::scanned doc missing: ${f}"; exit 1; }
+          done
           rc=0
           hits=$(grep -rni -C1 --exclude=02-decisions.md picosha2 \
               docs/plan PLAN.md ARCHITECTURE.md README.md) || rc=$?

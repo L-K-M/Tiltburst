@@ -715,7 +715,8 @@ only by `tb_tests`, which never ships.
 ## ADR-027 — Release archives carry license texts and third-party notices
 
 **Status:** Accepted (license review after M14). Amends 04-milestones.md
-M19, M20 and "Done when", 16-testing-ci.md §3.3, and PLAN.md §8.
+M19, M20 and "Done when", 16-testing-ci.md §3.3, PLAN.md §8, and the
+README.md License section.
 
 ### Context
 

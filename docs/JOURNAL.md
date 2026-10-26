@@ -793,6 +793,7 @@ corrections are new entries. Format: 03-process.md §3.1.
     the fonts are OFL 1.1. The M19 spec now has the package step write
     Third-Party-Notices.txt from the vcpkg install tree and ship it with
     LICENSE and the *-OFL.txt; the smoke test,
-    Package.ContainsAllTablesAndAssets and PLAN.md §8 check them
-    → ADR-027. Plan only: nothing is packaged before M19.
+    Package.ContainsAllTablesAndAssets and PLAN.md §8 check them; the
+    README License section now says what ships where → ADR-027. Plan
+    only: nothing is packaged before M19.
 - New ADRs: ADR-026, ADR-027.

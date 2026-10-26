@@ -81,7 +81,7 @@ Fixture layout:
     /screenshots/{windows,linux,macos}/<slug>.png
     /synth/hashes.json                      # per-OS PCM hashes
   /third_party
-    picosha2.h        # public-domain single-header SHA-256, vendored
+    picosha2.h        # MIT-licensed single-header SHA-256, vendored
   quarantine.txt
   lsan.supp
 ```
@@ -102,7 +102,7 @@ opened that way — starting with the first test written, M0's
 forbidden: they work from one build layout and break from the next. The CTest
 command tests (`validate_`, `smoke_`, `bounds_`) get absolute paths from
 `${CMAKE_SOURCE_DIR}` at registration time (snippet below) for the same
-reason. SHA-256 inside tests comes from the vendored public-domain
+reason. SHA-256 inside tests comes from the vendored MIT-licensed
 `tests/third_party/picosha2.h` (recorded like any vendored asset) — never a
 vcpkg crypto port and never a shell-out to `sha256sum`, which windows-latest
 does not have.

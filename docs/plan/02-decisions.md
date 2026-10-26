@@ -687,6 +687,31 @@ None for the sandbox contract: no `io`/`os`/`require`/`load`, watchdog
 hooks, capped allocator, or coroutine wrapping depend on 5.5-only
 behavior. sol2 3.5.0 (with its 5.5 compatibility patch) binds both.
 
+## ADR-026 — picosha2.h is MIT-licensed, not public domain
+
+**Status:** Accepted (license review after M14). Amends 04-milestones.md
+M0 (task 12 and the Files list) and 16-testing-ci.md §2, and adds a step to
+16-testing-ci.md §3.2's `format` job.
+
+### Context
+
+The spec called the vendored `tests/third_party/picosha2.h`
+"public-domain" in four places. The upstream header carries the MIT
+License (Copyright (C) 2017 okdshin). M0 recorded the real license in
+`tests/third_party/SOURCES.md` and in its JOURNAL deviations but did not
+amend the spec docs (03-process.md §3.3). A public-domain label invites
+dropping the MIT notice if the header is ever reused in shipped code.
+
+### Decision
+
+The spec docs call picosha2 MIT-licensed. The `format` CI job fails when a
+spec doc says "public domain" within a line of a picosha2 mention.
+
+### Consequences
+
+None for the code: the header is unchanged, keeps its notice, and is used
+only by `tb_tests`, which never ships.
+
 ## Amendments to ARCHITECTURE.md (authoritative table)
 
 Where ARCHITECTURE.md disagrees with a row below, the amendment wins (canon

@@ -780,3 +780,12 @@ corrections are new entries. Format: 03-process.md §3.1.
   GPU draw path yet; lands with the screenshot tooling that needs
   it), per-table art-driven light-show personalization, the 30 s WAV
   demo artifact (needs tb_autoplay --wav, M15).
+
+## License review: notices and statements (2026-10-26)
+
+- Deviations:
+  - The spec docs still called tests/third_party/picosha2.h
+    "public-domain" (04-milestones.md M0, 16-testing-ci.md §2); it is
+    MIT, as the M00 entry recorded. Spec amended per 03-process.md §3.3
+    → ADR-026; the `format` job now fails if the label comes back.
+- New ADRs: ADR-026.

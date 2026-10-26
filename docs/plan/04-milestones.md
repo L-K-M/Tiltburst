@@ -165,7 +165,7 @@ corrections are new entries. Format: 03-process.md §3.1.
     upstream path per file) and **`assets/fonts/SHA256SUMS`** (the verbatim
     `sha256sum` output over the three vendored `.ttf` files, in
     `sha256sum -c` format, one line per file). There is no `FONTS.md`.
-    The **test** recomputes those digests in-process with the public-domain
+    The **test** recomputes those digests in-process with the MIT-licensed
     single-header `picosha2.h`, vendored in this same PR at
     `/tests/third_party/picosha2.h` with its provenance recorded like any
     other vendored asset (`/tests/third_party/SOURCES.md`: upstream repo,
@@ -201,7 +201,7 @@ corrections are new entries. Format: 03-process.md §3.1.
 /tests/lsan.supp        (comment-only; the asan preset points LSAN_OPTIONS at it)
 /tests/quarantine.txt   (empty; read at configure time, guarded by if(EXISTS))
 /tests/render/font_assets_test.cpp   (13-art-direction.md §5.1)
-/tests/third_party/picosha2.h        (public-domain SHA-256, single header)
+/tests/third_party/picosha2.h        (MIT-licensed SHA-256, single header)
 /tests/third_party/SOURCES.md        (upstream repo + pinned commit + fetch date + license)
 /assets/fonts/{Orbitron-Bold.ttf,Monoton-Regular.ttf,Righteous-Regular.ttf}
 /assets/fonts/{Orbitron-OFL.txt,Monoton-OFL.txt,Righteous-OFL.txt}

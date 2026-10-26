@@ -704,8 +704,9 @@ dropping the MIT notice if the header is ever reused in shipped code.
 
 ### Decision
 
-The spec docs call picosha2 MIT-licensed. The `format` CI job fails when a
-spec doc says "public domain" within a line of a picosha2 mention.
+The spec docs and README.md call picosha2 MIT-licensed. The `format` CI
+job fails when any of them says "public domain" within a line of a
+picosha2 mention.
 
 ### Consequences
 

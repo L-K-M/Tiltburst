@@ -1190,7 +1190,7 @@ jobs:
           find src tests \( -name '*.cpp' -o -name '*.h' \) -print0 \
             | xargs -0 -r clang-format-18 --dry-run --Werror
       # The vendored tests/third_party/picosha2.h is MIT (its header and
-      # tests/third_party/SOURCES.md). Fail if a spec doc relabels it,
+      # tests/third_party/SOURCES.md). Fail if a scanned doc relabels it,
       # which would invite dropping its notice. 02-decisions.md is
       # skipped: its ADRs quote superseded spec text by design.
       - name: picosha2 license statements (MIT label guard)

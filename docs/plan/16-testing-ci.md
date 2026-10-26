@@ -1201,6 +1201,7 @@ jobs:
           for f in PLAN.md ARCHITECTURE.md README.md; do
             [ -f "${f}" ] || { echo "::error::scanned doc missing: ${f}"; exit 1; }
           done
+          [ -d docs/plan ] || { echo "::error::scanned dir missing: docs/plan"; exit 1; }
           rc=0
           hits=$(grep -rni -C1 --exclude=02-decisions.md picosha2 \
               docs/plan PLAN.md ARCHITECTURE.md README.md) || rc=$?

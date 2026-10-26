@@ -43,5 +43,19 @@ The presets are OS-conditioned; `CMakePresets.json` is authoritative.
 
 ## License
 
-Public domain ([Unlicense](LICENSE)); third-party assets carry their own
-licenses — see `assets/fonts/SOURCES.md` and `tests/third_party/SOURCES.md`.
+Tiltburst's own code and content are public domain
+([Unlicense](LICENSE)). The Unlicense covers Tiltburst's own files only.
+These files in the repository are third-party and keep their own
+licenses:
+
+- the fonts in `assets/fonts/` (SIL Open Font License 1.1), each with its
+  license text alongside and recorded in `assets/fonts/SOURCES.md`;
+- `tests/third_party/picosha2.h` (MIT), used only by the tests and
+  recorded in `tests/third_party/SOURCES.md`.
+
+Built binaries link SDL3, Lua, sol2, fmt, nlohmann-json, miniaudio and
+stb from vcpkg, which keep their own licenses. No binaries are
+distributed yet. The release archives planned for milestone M19 will
+carry their notices as `Third-Party-Notices.txt` with a copy of
+`LICENSE`, next to the binary or in the macOS app's `Contents/Resources`;
+the font license texts stay in `assets/fonts/`.

@@ -1544,7 +1544,7 @@ jobs:
           for font in ChakraPetch Monoton Righteous; do
             OFL=$(find "${SMOKE}" -type f -path "*/assets/fonts/${font}-OFL.txt" | head -n1)
             test -s "${OFL}"
-            grep -q 'SIL Open Font License' "${OFL}"
+            grep -qi 'SIL Open Font License' "${OFL}"
           done
 
       - name: Upload workflow artifact
@@ -1589,8 +1589,8 @@ not a required check — it never runs on PRs.
    confirm nothing links it; otherwise keep it. A new dependency therefore
    lands in the notices unless someone excludes it with a reason.
 2. Per port, sorted by name: a heading with the port name, version, SPDX
-   license and homepage (`share/<port>/vcpkg.spdx.json`), then
-   `vcpkg_installed/<triplet>/share/<port>/copyright` verbatim.
+   license and homepage (from `vcpkg.spdx.json`), then `copyright`
+   verbatim; both live in `vcpkg_installed/<triplet>/share/<port>/`.
 3. `message(FATAL_ERROR)` when a port in the set has no `copyright` file or
    an empty one. A known gap gets an explicit, commented override with the
    license text, never a silent omission.

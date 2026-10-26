@@ -1452,10 +1452,11 @@ Implementor notes:
 Tag-push packaging per 04-milestones.md M19: build on all three OSes,
 package (Windows `.zip`, macOS `.app`-in-`.dmg`, Linux `.tar.gz`), smoke
 test the packaged build (unpack, `tiltburst --version`, `tb_validate` on a
-bundled table), stamp the version from the git tag, attach everything to a
-draft GitHub release. `tools/package/package.cmake` (M19 scope; 04 owns the
-archive contents) dispatches on platform and must write exactly
-`build/pkg/<artifact>`.
+bundled table, license files present), stamp the version from the git tag,
+attach everything to a draft GitHub release. `tools/package/package.cmake`
+(M19 scope; 04 owns the archive contents) dispatches on platform, writes
+`Third-Party-Notices.txt` into the staging tree (procedure after the
+workflow), and must write exactly `build/pkg/<artifact>`.
 
 ```yaml
 name: Release
@@ -1532,6 +1533,19 @@ jobs:
           test -n "${BIN}" && test -n "${VAL}" && test -n "${TABLE}"
           "${BIN}" --version | grep -F "${GITHUB_REF_NAME#v}"
           "${VAL}" "$(dirname "${TABLE}")"
+          # License files (04 M19, ADR-027): beside the binary, or in
+          # Contents/Resources of the .app; fonts keep theirs in assets/fonts.
+          DOCS=$(dirname "${BIN}")
+          case "${RUNNER_OS}" in macOS) DOCS="${DOCS}/../Resources" ;; esac
+          test -s "${DOCS}/LICENSE"
+          test -s "${DOCS}/Third-Party-Notices.txt"
+          grep -q 'Sam Lantinga' "${DOCS}/Third-Party-Notices.txt" # SDL3
+          grep -q 'Lua.org' "${DOCS}/Third-Party-Notices.txt"      # Lua
+          for font in ChakraPetch Monoton Righteous; do
+            OFL=$(find "${SMOKE}" -type f -path "*/assets/fonts/${font}-OFL.txt" | head -n1)
+            test -s "${OFL}"
+            grep -q 'SIL Open Font License' "${OFL}"
+          done
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
@@ -1559,6 +1573,30 @@ the smoke step's `grep` proves the stamp took. The `grep -F` on the version
 and the `tb_validate` run implement 04 M19's packaged-build smoke test;
 macOS bundles stay unsigned (Gatekeeper note per 04 M19). `release.yml` is
 not a required check — it never runs on PRs.
+
+**Third-party notices (ADR-027).** Before archiving, `package.cmake` builds
+`Third-Party-Notices.txt` from the build's vcpkg install tree,
+`build/<preset>/vcpkg_installed/`:
+
+1. Port set: every package `vcpkg_installed/vcpkg/status` lists as
+   `install ok installed`, minus an exclusion list kept in `tools/package/`
+   with a reason per entry: `gtest` (tests only); the `vcpkg-*` helper
+   ports and build tools such as `gperf` (not linked); and on Linux the
+   D-Bus stack that SDL3's default `ibus` feature pulls in (`dbus`,
+   `expat`, `libsystemd` and the ports it depends on), which SDL3 loads
+   from the system's `libdbus-1.so.3` at run time instead of linking.
+   Exclude that stack only after `ldd` and `nm` on the packaged binaries
+   confirm nothing links it; otherwise keep it. A new dependency therefore
+   lands in the notices unless someone excludes it with a reason.
+2. Per port, sorted by name: a heading with the port name, version, SPDX
+   license and homepage (`share/<port>/vcpkg.spdx.json`), then
+   `vcpkg_installed/<triplet>/share/<port>/copyright` verbatim.
+3. `message(FATAL_ERROR)` when a port in the set has no `copyright` file or
+   an empty one. A known gap gets an explicit, commented override with the
+   license text, never a silent omission.
+
+The smoke step's `test -s` lines catch a missing file; its `grep -q`
+sentinels catch an empty or stale notices file.
 
 ## 4. Local dev loop
 
@@ -1884,7 +1922,8 @@ No percentage gate, no coverage tooling in CI. Binding rules:
 - [ ] From M19, `.github/workflows/release.yml` matches §3.3: pushing a
       `v*` tag produces the three packaged artifacts, each smoke-tested
       (unpack, `tiltburst --version` matches the tag, `tb_validate` on a
-      bundled table) and attached to a draft GitHub release.
+      bundled table, license files present) and attached to a draft GitHub
+      release.
 - [ ] `CMakePresets.json` matches §4.1; `cmake --preset debug|release|asan`
       work on Linux/macOS, `cmake --preset windows` on Windows;
       `ctest --preset <x>` excludes fuzz/perf/bounds by default.

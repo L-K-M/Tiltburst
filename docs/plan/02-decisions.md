@@ -712,6 +712,36 @@ spec doc says "public domain" within a line of a picosha2 mention.
 None for the code: the header is unchanged, keeps its notice, and is used
 only by `tb_tests`, which never ships.
 
+## ADR-027 — Release archives carry license texts and third-party notices
+
+**Status:** Accepted (license review after M14). Amends 04-milestones.md
+M19, M20 and "Done when", 16-testing-ci.md §3.3, and PLAN.md §8.
+
+### Context
+
+The shipped binaries link SDL3, Lua, sol2, fmt, nlohmann-json, miniaudio
+and stb from vcpkg: statically on the Linux and macOS triplets, as DLLs on
+`x64-windows`. Their MIT, Zlib, BSD-3-Clause and Apache-2.0 terms require
+the copyright and permission notices to accompany binary copies, and OFL
+1.1 requires the font license to travel with the fonts. The M19 archive
+contents, its smoke test and the M20 audit named none of this.
+
+### Decision
+
+Every release archive carries `LICENSE`, a `Third-Party-Notices.txt`
+generated at package time from the vcpkg install tree (every installed
+port minus a reasoned exclusion list; fails on a port without a
+`copyright` file), and `assets/fonts/` with the three `*-OFL.txt`. The
+packaged smoke test fails without them, and PLAN.md §8 gains a matching
+checkbox.
+
+### Consequences
+
+M19 gains a notices step in `tools/package/` and a few smoke-test lines.
+Toolchain runtimes need no entry: libstdc++ falls under the GCC Runtime
+Library Exception, macOS uses the system libc++, and the MSVC runtime is
+covered by the vc-redist note.
+
 ## Amendments to ARCHITECTURE.md (authoritative table)
 
 Where ARCHITECTURE.md disagrees with a row below, the amendment wins (canon

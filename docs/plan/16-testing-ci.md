@@ -1189,6 +1189,26 @@ jobs:
           sudo apt-get install -y --no-install-recommends clang-format-18
           find src tests \( -name '*.cpp' -o -name '*.h' \) -print0 \
             | xargs -0 -r clang-format-18 --dry-run --Werror
+      # The vendored tests/third_party/picosha2.h is MIT (its header and
+      # tests/third_party/SOURCES.md). Fail if a spec doc calls it public
+      # domain, which would invite dropping its notice. 02-decisions.md is
+      # skipped: its ADRs quote superseded spec text by design.
+      - name: picosha2 license statements (MIT label guard)
+        run: |
+          # The pattern is built from fragments so the verbatim copy of
+          # this step in docs/plan/16-testing-ci.md cannot match itself.
+          pat='publ''ic.doma''in'
+          rc=0
+          hits=$(grep -rni -C1 --exclude=02-decisions.md picosha2 \
+              docs/plan PLAN.md ARCHITECTURE.md) || rc=$?
+          if [ "${rc}" -gt 1 ]; then
+            echo "::error::picosha2 doc scan failed (grep exit ${rc})"
+            exit 1
+          fi
+          if printf '%s\n' "${hits}" | grep -i -e "${pat}"; then
+            echo "::error::picosha2.h is MIT-licensed; see tests/third_party/SOURCES.md"
+            exit 1
+          fi
 
   build-test:
     # Explicit template: without it a matrix job's three check runs are all

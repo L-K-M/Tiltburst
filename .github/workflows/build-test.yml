@@ -43,10 +43,19 @@ jobs:
       # tests/third_party/SOURCES.md). Fail if a spec doc calls it public
       # domain, which would invite dropping its notice. 02-decisions.md is
       # skipped: its ADRs quote superseded spec text by design.
-      - name: picosha2 license statements (MIT, not public domain)
+      - name: picosha2 license statements (MIT label guard)
         run: |
-          if grep -rni -C1 --exclude=02-decisions.md picosha2 \
-              docs/plan PLAN.md ARCHITECTURE.md | grep -i 'public.domain'; then
+          # The pattern is built from fragments so the verbatim copy of
+          # this step in docs/plan/16-testing-ci.md cannot match itself.
+          pat='publ''ic.doma''in'
+          rc=0
+          hits=$(grep -rni -C1 --exclude=02-decisions.md picosha2 \
+              docs/plan PLAN.md ARCHITECTURE.md) || rc=$?
+          if [ "${rc}" -gt 1 ]; then
+            echo "::error::picosha2 doc scan failed (grep exit ${rc})"
+            exit 1
+          fi
+          if printf '%s\n' "${hits}" | grep -i -e "${pat}"; then
             echo "::error::picosha2.h is MIT-licensed; see tests/third_party/SOURCES.md"
             exit 1
           fi

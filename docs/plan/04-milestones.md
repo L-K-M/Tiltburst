@@ -203,8 +203,8 @@ corrections are new entries. Format: 03-process.md §3.1.
 /tests/render/font_assets_test.cpp   (13-art-direction.md §5.1)
 /tests/third_party/picosha2.h        (MIT-licensed SHA-256, single header)
 /tests/third_party/SOURCES.md        (upstream repo + pinned commit + fetch date + license)
-/assets/fonts/{Orbitron-Bold.ttf,Monoton-Regular.ttf,Righteous-Regular.ttf}
-/assets/fonts/{Orbitron-OFL.txt,Monoton-OFL.txt,Righteous-OFL.txt}
+/assets/fonts/{ChakraPetch-Bold.ttf,Monoton-Regular.ttf,Righteous-Regular.ttf}   (orbitron role, ADR-015)
+/assets/fonts/{ChakraPetch-OFL.txt,Monoton-OFL.txt,Righteous-OFL.txt}
 /assets/fonts/SOURCES.md   (upstream repo + pinned commit + fetch date + upstream path per file)
 /assets/fonts/SHA256SUMS   (sha256sum -c format, one line per .ttf)
 ```

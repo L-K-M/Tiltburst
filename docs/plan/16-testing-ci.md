@@ -1190,8 +1190,8 @@ jobs:
           find src tests \( -name '*.cpp' -o -name '*.h' \) -print0 \
             | xargs -0 -r clang-format-18 --dry-run --Werror
       # The vendored tests/third_party/picosha2.h is MIT (its header and
-      # tests/third_party/SOURCES.md). Fail if a spec doc calls it public
-      # domain, which would invite dropping its notice. 02-decisions.md is
+      # tests/third_party/SOURCES.md). Fail if a spec doc relabels it,
+      # which would invite dropping its notice. 02-decisions.md is
       # skipped: its ADRs quote superseded spec text by design.
       - name: picosha2 license statements (MIT label guard)
         run: |
@@ -1200,7 +1200,7 @@ jobs:
           pat='publ''ic.doma''in'
           rc=0
           hits=$(grep -rni -C1 --exclude=02-decisions.md picosha2 \
-              docs/plan PLAN.md ARCHITECTURE.md) || rc=$?
+              docs/plan PLAN.md ARCHITECTURE.md README.md) || rc=$?
           if [ "${rc}" -gt 1 ]; then
             echo "::error::picosha2 doc scan failed (grep exit ${rc})"
             exit 1

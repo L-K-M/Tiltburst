@@ -721,10 +721,12 @@ M19, M20 and "Done when", 16-testing-ci.md §3.3, and PLAN.md §8.
 
 The shipped binaries link SDL3, Lua, sol2, fmt, nlohmann-json, miniaudio
 and stb from vcpkg: statically on the Linux and macOS triplets, as DLLs on
-`x64-windows`. Their MIT, Zlib, BSD-3-Clause and Apache-2.0 terms require
-the copyright and permission notices to accompany binary copies, and OFL
-1.1 requires the font license to travel with the fonts. The M19 archive
-contents, its smoke test and the M20 audit named none of this.
+`x64-windows`. Lua, sol2, fmt and nlohmann-json are MIT, and the SDL3 port
+carries MIT, BSD-3-Clause and Apache-2.0 code beside its Zlib core. Those
+terms require the copyright and license notices to accompany binary
+copies (Zlib alone would not), and OFL 1.1 requires the font license to
+travel with the fonts. The M19 archive contents, its smoke test and the
+M20 audit named none of this.
 
 ### Decision
 

@@ -45,7 +45,7 @@ jobs:
       # skipped: its ADRs quote superseded spec text by design.
       - name: picosha2 license statements (MIT, not public domain)
         run: |
-          if grep -rn -C1 --exclude=02-decisions.md picosha2 \
+          if grep -rni -C1 --exclude=02-decisions.md picosha2 \
               docs/plan PLAN.md ARCHITECTURE.md | grep -i 'public.domain'; then
             echo "::error::picosha2.h is MIT-licensed; see tests/third_party/SOURCES.md"
             exit 1
